@@ -1,0 +1,92 @@
+﻿using Microsoft.AspNetCore.Mvc;
+using Newtonsoft.Json.Linq;
+using XAUAT.EduApi.DataModels;
+using XAUAT.EduApi.Models;
+
+namespace XAUAT.EduApi.Controllers;
+
+[ApiController]
+[Route("[controller]")]
+public class ScoreController(IHttpClientFactory httpClientFactory, ILogger<CourseController> logger)
+    : ControllerBase
+{
+    [HttpPost("Semester")]
+    public async Task<ActionResult<SemesterResult>> ParseSemester()
+    {
+        try
+        {
+            logger.LogInformation("开始抓取学期数据");
+            var cookie = Request.Headers.Cookie.ToString();
+            if (string.IsNullOrEmpty(cookie))
+            {
+                cookie = Request.Headers["xauat"].ToString(); // 从请求中获取 cookie
+            }
+
+            var client = httpClientFactory.CreateClient();
+            client.DefaultRequestHeaders.Add("Cookie", cookie);
+            var html = await client.GetStringAsync("https://swjw.xauat.edu.cn/student/for-std/grade/sheet");
+            var result = new SemesterResult();
+            result.Parse(html);
+            return result;
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { error = ex.Message });
+        }
+    }
+
+    [HttpGet]
+    public async Task<ActionResult<List<ScoreResponse>>> GetScore(string studentId, string semester)
+    {
+        try
+        {
+            logger.LogInformation("开始抓取考试分数");
+            var cookie = Request.Headers.Cookie.ToString();
+            if (string.IsNullOrEmpty(cookie))
+            {
+                cookie = Request.Headers["xauat"].ToString(); // 从请求中获取 cookie
+            }
+
+            if (string.IsNullOrEmpty(studentId) || string.IsNullOrEmpty(cookie))
+            {
+                return BadRequest("学号或Cookie不能为空");
+            }
+
+            var client = httpClientFactory.CreateClient();
+            client.DefaultRequestHeaders.Add("Cookie", cookie);
+
+            var response = await client.GetAsync(
+                $"https://swjw.xauat.edu.cn/student/for-std/grade/sheet/info/{studentId}?semester={semester}");
+
+            if (!response.IsSuccessStatusCode)
+            {
+                return StatusCode((int)response.StatusCode, "获取分数数据失败");
+            }
+
+            var stream = await response.Content.ReadAsStringAsync();
+
+            var json = JObject.Parse(stream);
+            
+            var result = new List<ScoreResponse>();
+            foreach (var item in json["semesterId2studentGrades"]?[semester]!)
+            {
+                result.Add(new ScoreResponse()
+                {
+                    Name = item["course"]!["nameZh"]!.ToString(),
+                    Credit = item["course"]!["credits"]!.ToString(),
+                    LessonCode = item["lessonCode"]!.ToString(),
+                    LessonName = item["lessonNameZh"]!.ToString(),
+                    Grade = item["gaGrade"]!.ToString(),
+                    Gpa = item["gp"]!.ToString(),
+                    GradeDetail = item["gradeDetail"]!.ToString()
+                });
+            }
+            
+            return result;
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { error = ex.Message });
+        }
+    }
+}

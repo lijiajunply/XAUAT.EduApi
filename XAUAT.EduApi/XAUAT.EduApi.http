@@ -1,0 +1,6 @@
+@XAUAT.EduApi_HostAddress = http://localhost:5216
+
+GET {{XAUAT.EduApi_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
