@@ -105,7 +105,7 @@ public class ScoreController(IHttpClientFactory httpClientFactory, ILogger<Cours
                     LessonName = item["lessonNameZh"]!.ToString(),
                     Grade = item["gaGrade"]!.ToString(),
                     Gpa = item["gp"]!.ToString(),
-                    GradeDetail = string.Join(";",
+                    GradeDetail = string.Join("; ",
                         Regex.Matches(item["gradeDetail"]!.ToString(), @"<span[^>]*>([^<]+)<\/span>")
                             .Select(m => m.Groups[1].Value.Trim()))
                 })
