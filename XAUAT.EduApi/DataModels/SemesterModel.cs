@@ -2,12 +2,6 @@
 
 namespace XAUAT.EduApi.DataModels;
 
-public class SemesterModel
-{
-    public string SemesterId { get; set; } = "";
-    public string SemesterName { get; set; } = "";
-}
-
 [Serializable]
 public class SemesterItem
 {
@@ -18,7 +12,7 @@ public class SemesterItem
 [Serializable]
 public class SemesterResult
 {
-    public List<SemesterItem> Data { get; } = [];
+    public List<SemesterItem?> Data { get; } = [];
 
     public void Parse(string html)
     {
@@ -51,5 +45,26 @@ public class SemesterResult
                 Text = text
             });
         }
+    }
+
+    public SemesterItem ParseNow(string html)
+    {
+        // 检查是否登录
+        if (!Regex.IsMatch(html, "课表"))
+        {
+            return new SemesterItem();
+        }
+
+        // 使用正则表达式匹配所有semester选项
+        var regex = new Regex("<option selected=\"selected\" value=\"(.*)\">(.*)</option>");
+        var matches = regex.Matches(html);
+
+        if (matches.Count == 0) return new SemesterItem();
+
+        return new SemesterItem()
+        {
+            Value = matches.First().Groups[1].Value,
+            Text = matches.First().Groups[2].Value
+        };
     }
 }

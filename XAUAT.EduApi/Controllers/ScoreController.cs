@@ -34,6 +34,30 @@ public class ScoreController(IHttpClientFactory httpClientFactory, ILogger<Cours
             return StatusCode(500, new { error = ex.Message });
         }
     }
+    
+    [HttpPost("ThisSemester")]
+    public async Task<ActionResult<SemesterItem>> GetThisSemester()
+    {
+        try
+        {
+            logger.LogInformation("开始抓取学期数据");
+            var cookie = Request.Headers.Cookie.ToString();
+            if (string.IsNullOrEmpty(cookie))
+            {
+                cookie = Request.Headers["xauat"].ToString(); // 从请求中获取 cookie
+            }
+
+            var client = httpClientFactory.CreateClient();
+            client.DefaultRequestHeaders.Add("Cookie", cookie);
+            var html = await client.GetStringAsync("https://swjw.xauat.edu.cn/student/for-std/course-table");
+            var result = new SemesterResult();
+            return Ok(result.ParseNow(html));
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { error = ex.Message });
+        }
+    }
 
     [HttpGet]
     public async Task<ActionResult<List<ScoreResponse>>> GetScore(string studentId, string semester)
@@ -66,11 +90,8 @@ public class ScoreController(IHttpClientFactory httpClientFactory, ILogger<Cours
             var stream = await response.Content.ReadAsStringAsync();
 
             var json = JObject.Parse(stream);
-            
-            var result = new List<ScoreResponse>();
-            foreach (var item in json["semesterId2studentGrades"]?[semester]!)
-            {
-                result.Add(new ScoreResponse()
+
+            return (json["semesterId2studentGrades"]?[semester]!).Select(item => new ScoreResponse()
                 {
                     Name = item["course"]!["nameZh"]!.ToString(),
                     Credit = item["course"]!["credits"]!.ToString(),
@@ -79,10 +100,8 @@ public class ScoreController(IHttpClientFactory httpClientFactory, ILogger<Cours
                     Grade = item["gaGrade"]!.ToString(),
                     Gpa = item["gp"]!.ToString(),
                     GradeDetail = item["gradeDetail"]!.ToString()
-                });
-            }
-            
-            return result;
+                })
+                .ToList();
         }
         catch (Exception ex)
         {

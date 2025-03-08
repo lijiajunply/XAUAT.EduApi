@@ -20,8 +20,15 @@ public class InfoController(IHttpClientFactory httpClientFactory, ILogger<Course
 
         var client = httpClientFactory.CreateClient();
         client.DefaultRequestHeaders.Add("Cookie", cookie);
-        var response = await client.GetAsync("https://swjw.xauat.edu.cn/student/ws/student/home-page/programCompletionPreview");
+        var response =
+            await client.GetAsync("https://swjw.xauat.edu.cn/student/ws/student/home-page/programCompletionPreview");
         var content = await response.Content.ReadAsStringAsync();
         return Content(content);
+    }
+
+    [HttpGet("Time")]
+    public ActionResult GetTime()
+    {
+        return Ok(new { StartTime = "2025-02-23", EndTime = "2025-07-19" });
     }
 }
