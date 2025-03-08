@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using System.Text.RegularExpressions;
+using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json.Linq;
 using XAUAT.EduApi.DataModels;
 using XAUAT.EduApi.Models;
@@ -34,7 +35,7 @@ public class ScoreController(IHttpClientFactory httpClientFactory, ILogger<Cours
             return StatusCode(500, new { error = ex.Message });
         }
     }
-    
+
     [HttpGet("ThisSemester")]
     public async Task<ActionResult<SemesterItem>> GetThisSemester()
     {
@@ -91,6 +92,11 @@ public class ScoreController(IHttpClientFactory httpClientFactory, ILogger<Cours
 
             var json = JObject.Parse(stream);
 
+
+// 结果会是：
+
+// string[] { "期末成绩:70", "过程考核成绩:86.5(慕课成绩:75.96;作业:84.79;实验:99)" }
+
             return (json["semesterId2studentGrades"]?[semester]!).Select(item => new ScoreResponse()
                 {
                     Name = item["course"]!["nameZh"]!.ToString(),
@@ -99,7 +105,9 @@ public class ScoreController(IHttpClientFactory httpClientFactory, ILogger<Cours
                     LessonName = item["lessonNameZh"]!.ToString(),
                     Grade = item["gaGrade"]!.ToString(),
                     Gpa = item["gp"]!.ToString(),
-                    GradeDetail = item["gradeDetail"]!.ToString()
+                    GradeDetail = string.Join(";",
+                        Regex.Matches(item["gradeDetail"]!.ToString(), @"<span[^>]*>([^<]+)<\/span>")
+                            .Select(m => m.Groups[1].Value.Trim()))
                 })
                 .ToList();
         }
