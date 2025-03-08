@@ -10,7 +10,7 @@ namespace XAUAT.EduApi.Controllers;
 public class ScoreController(IHttpClientFactory httpClientFactory, ILogger<CourseController> logger)
     : ControllerBase
 {
-    [HttpPost("Semester")]
+    [HttpGet("Semester")]
     public async Task<ActionResult<SemesterResult>> ParseSemester()
     {
         try
@@ -35,7 +35,7 @@ public class ScoreController(IHttpClientFactory httpClientFactory, ILogger<Cours
         }
     }
     
-    [HttpPost("ThisSemester")]
+    [HttpGet("ThisSemester")]
     public async Task<ActionResult<SemesterItem>> GetThisSemester()
     {
         try
