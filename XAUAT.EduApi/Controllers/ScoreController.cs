@@ -3,12 +3,13 @@ using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json.Linq;
 using XAUAT.EduApi.DataModels;
 using XAUAT.EduApi.Models;
+using XAUAT.EduApi.Services;
 
 namespace XAUAT.EduApi.Controllers;
 
 [ApiController]
 [Route("[controller]")]
-public class ScoreController(IHttpClientFactory httpClientFactory, ILogger<CourseController> logger)
+public class ScoreController(IHttpClientFactory httpClientFactory, ILogger<CourseController> logger, IExamService exam)
     : ControllerBase
 {
     [HttpGet("Semester")]
@@ -49,18 +50,13 @@ public class ScoreController(IHttpClientFactory httpClientFactory, ILogger<Cours
     {
         try
         {
-            logger.LogInformation("开始抓取学期数据");
             var cookie = Request.Headers.Cookie.ToString();
             if (string.IsNullOrEmpty(cookie))
             {
                 cookie = Request.Headers["xauat"].ToString(); // 从请求中获取 cookie
             }
 
-            var client = httpClientFactory.CreateClient();
-            client.DefaultRequestHeaders.Add("Cookie", cookie);
-            var html = await client.GetStringAsync("https://swjw.xauat.edu.cn/student/for-std/course-table");
-            var result = new SemesterResult();
-            return Ok(result.ParseNow(html));
+            return await exam.GetThisSemester(cookie, httpClientFactory);
         }
         catch (Exception ex)
         {
@@ -93,17 +89,16 @@ public class ScoreController(IHttpClientFactory httpClientFactory, ILogger<Cours
                 var scoreResponse = await GetScoreResponse(s, semester, cookie);
                 result.AddRange(scoreResponse);
             }
-            
-            return result;
 
+            return result;
         }
         catch (Exception ex)
         {
             return StatusCode(500, new { error = ex.Message });
         }
     }
-    
-    private async Task<List<ScoreResponse>> GetScoreResponse(string studentId, string semester,string cookie)
+
+    private async Task<List<ScoreResponse>> GetScoreResponse(string studentId, string semester, string cookie)
     {
         var client = httpClientFactory.CreateClient();
         client.DefaultRequestHeaders.Add("Cookie", cookie);

@@ -1,5 +1,6 @@
 ﻿using System.Text.RegularExpressions;
 using Newtonsoft.Json;
+using XAUAT.EduApi.DataModels;
 using XAUAT.EduApi.Models;
 
 namespace XAUAT.EduApi.Services;
@@ -24,6 +25,17 @@ public class ExamService(HttpClient httpClient, ILogger<ExamService> logger) : I
         }
 
         return examResponse;
+    }
+
+    public async Task<SemesterItem> GetThisSemester(string cookie,IHttpClientFactory httpClientFactory)
+    {
+        logger.LogInformation("开始抓取学期数据");
+
+        var client = httpClientFactory.CreateClient();
+        client.DefaultRequestHeaders.Add("Cookie", cookie);
+        var html = await client.GetStringAsync("https://swjw.xauat.edu.cn/student/for-std/course-table");
+        var result = new SemesterResult();
+        return result.ParseNow(html);
     }
 
     private async Task<ExamResponse> GetExamArrangementAsync(string cookie, string? id = null)

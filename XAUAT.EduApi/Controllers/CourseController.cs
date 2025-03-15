@@ -1,12 +1,13 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json;
 using XAUAT.EduApi.Models;
+using XAUAT.EduApi.Services;
 
 namespace XAUAT.EduApi.Controllers;
 
 [ApiController]
 [Route("[controller]")]
-public class CourseController(IHttpClientFactory httpClientFactory, ILogger<CourseController> logger)
+public class CourseController(IHttpClientFactory httpClientFactory, ILogger<CourseController> logger, IExamService exam)
     : ControllerBase
 {
     [HttpGet]
@@ -25,7 +26,7 @@ public class CourseController(IHttpClientFactory httpClientFactory, ILogger<Cour
             {
                 return BadRequest("学号或Cookie不能为空");
             }
-            
+
             if (studentId.Contains(','))
             {
                 studentId = studentId.Split(',')[0];
@@ -34,8 +35,10 @@ public class CourseController(IHttpClientFactory httpClientFactory, ILogger<Cour
             var client = httpClientFactory.CreateClient();
             client.DefaultRequestHeaders.Add("Cookie", cookie);
 
+            var semester = await exam.GetThisSemester(cookie, httpClientFactory);
+
             var response = await client.GetAsync(
-                $"https://swjw.xauat.edu.cn/student/for-std/course-table/semester/281/print-data/{studentId}");
+                $"https://swjw.xauat.edu.cn/student/for-std/course-table/semester/{semester.Value}/print-data/{studentId}");
 
             if (!response.IsSuccessStatusCode)
             {
