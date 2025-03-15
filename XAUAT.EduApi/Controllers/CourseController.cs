@@ -25,6 +25,11 @@ public class CourseController(IHttpClientFactory httpClientFactory, ILogger<Cour
             {
                 return BadRequest("学号或Cookie不能为空");
             }
+            
+            if (studentId.Contains(','))
+            {
+                studentId = studentId.Split(',')[0];
+            }
 
             var client = httpClientFactory.CreateClient();
             client.DefaultRequestHeaders.Add("Cookie", cookie);
