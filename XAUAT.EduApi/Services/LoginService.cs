@@ -55,9 +55,16 @@ public class LoginService(HttpClient httpClient, ICodeService codeService) : ILo
             return "";
 
         var content = await response.Content.ReadAsStringAsync();
-        var match = Regex.Match(content, @"/student/for-std/program/info-en/(.*?)'");
+        var match = Regex.Match(content, "/student/for-std/program/info-en/(.*?)'");
 
-        return match.Success ? match.Groups[1].Value : "";
+        if (!match.Success)
+        {
+            var matches = Regex.Matches(content,
+                """value="(.*?)">""");
+            return matches.Count >= 1 ? string.Join(';', matches.Select(m => m.Groups[1].Value)) : "";
+        }
+
+        return match.Groups[1].Value;
     }
 
     private string ParseCookie(IEnumerable<string> cookies)

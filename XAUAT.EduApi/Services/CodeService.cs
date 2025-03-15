@@ -1,11 +1,9 @@
 ﻿using System.Text.Json.Nodes;
-
-namespace XAUAT.EduApi.Services;
-
-using System;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+
+namespace XAUAT.EduApi.Services;
 
 public class CodeService : ICodeService
 {
