@@ -15,7 +15,7 @@ public class ExamService(HttpClient httpClient, ILogger<ExamService> logger) : I
         {
             return await GetExamArrangementAsync(cookie);
         }
-
+        
         var split = id.Split(',');
         var examResponse = new ExamResponse();
         foreach (var s in split)
@@ -27,7 +27,7 @@ public class ExamService(HttpClient httpClient, ILogger<ExamService> logger) : I
         return examResponse;
     }
 
-    public async Task<SemesterItem> GetThisSemester(string cookie,IHttpClientFactory httpClientFactory)
+    public async Task<SemesterItem> GetThisSemester(string cookie, IHttpClientFactory httpClientFactory)
     {
         logger.LogInformation("开始抓取学期数据");
 
@@ -42,7 +42,12 @@ public class ExamService(HttpClient httpClient, ILogger<ExamService> logger) : I
     {
         try
         {
-            var request = new HttpRequestMessage(HttpMethod.Get, $"{_baseUrl}/student/for-std/exam-arrange/{id}");
+            var url = $"{_baseUrl}/student/for-std/exam-arrange/";
+            if (!string.IsNullOrEmpty(id))
+            {
+                url += $"info/{id}?";
+            }
+            var request = new HttpRequestMessage(HttpMethod.Get, url);
             request.Headers.Add("Cookie", cookie);
 
             var response = await httpClient.SendAsync(request);
