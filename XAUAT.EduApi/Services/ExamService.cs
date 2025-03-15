@@ -1,5 +1,4 @@
-﻿
-using System.Text.RegularExpressions;
+﻿using System.Text.RegularExpressions;
 using Newtonsoft.Json;
 using XAUAT.EduApi.Models;
 
@@ -9,11 +8,29 @@ public class ExamService(HttpClient httpClient, ILogger<ExamService> logger) : I
 {
     private const string _baseUrl = "https://swjw.xauat.edu.cn";
 
-    public async Task<ExamResponse> GetExamArrangementsAsync(string cookie)
+    public async Task<ExamResponse> GetExamArrangementsAsync(string cookie, string? id)
+    {
+        if (string.IsNullOrEmpty(id) || !id.Contains(','))
+        {
+            return await GetExamArrangementAsync(cookie);
+        }
+
+        var split = id.Split(',');
+        var examResponse = new ExamResponse();
+        foreach (var s in split)
+        {
+            var e1 = await GetExamArrangementAsync(cookie, s);
+            examResponse.Exams.AddRange(e1.Exams);
+        }
+
+        return examResponse;
+    }
+
+    private async Task<ExamResponse> GetExamArrangementAsync(string cookie, string? id = null)
     {
         try
         {
-            var request = new HttpRequestMessage(HttpMethod.Get, $"{_baseUrl}/student/for-std/exam-arrange");
+            var request = new HttpRequestMessage(HttpMethod.Get, $"{_baseUrl}/student/for-std/exam-arrange/{id}");
             request.Headers.Add("Cookie", cookie);
 
             var response = await httpClient.SendAsync(request);
@@ -73,7 +90,11 @@ public class ExamService(HttpClient httpClient, ILogger<ExamService> logger) : I
         catch (Exception ex)
         {
             logger.LogError(ex, "Error getting exam arrangements");
-            throw;
+            return new ExamResponse
+            {
+                Exams = [],
+                CanClick = false
+            };
         }
     }
 }

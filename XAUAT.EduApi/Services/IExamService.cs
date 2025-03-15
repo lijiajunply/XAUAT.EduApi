@@ -4,5 +4,5 @@ namespace XAUAT.EduApi.Services;
 
 public interface IExamService
 {
-    Task<ExamResponse> GetExamArrangementsAsync(string cookie);
+    Task<ExamResponse> GetExamArrangementsAsync(string cookie,string? id);
 }

@@ -18,7 +18,7 @@ public class ExamController(
     /// </info>
     /// <returns></returns>
     [HttpGet]
-    public async Task<ActionResult<ExamResponse>> GetExamArrangements()
+    public async Task<ActionResult<ExamResponse>> GetExamArrangements(string? studentId)
     {
         try
         {
@@ -27,7 +27,8 @@ public class ExamController(
             {
                 cookie = Request.Headers["xauat"].ToString(); // 从请求中获取 cookie
             }
-            var result = await examService.GetExamArrangementsAsync(cookie);
+
+            var result = await examService.GetExamArrangementsAsync(cookie, studentId);
             return Ok(result);
         }
         catch (Exception ex)
