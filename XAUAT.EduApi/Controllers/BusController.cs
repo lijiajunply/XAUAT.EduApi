@@ -9,7 +9,7 @@ namespace XAUAT.EduApi.Controllers;
 public class BusController(IHttpClientFactory httpClientFactory)
     : ControllerBase
 {
-    [HttpGet("{time}")]
+    [HttpGet("{time?}")]
     public async Task<IActionResult> GetBus(string? time)
     {
         var client = httpClientFactory.CreateClient();
