@@ -24,6 +24,7 @@ public class BusController(IHttpClientFactory httpClientFactory)
         busModel.Total = json["data"]!["total"]!.ToObject<int>();
         foreach (var j in json["data"]!["records"]!)
         {
+            if (j["wayStation"] != null && !string.IsNullOrEmpty(j["wayStation"]!.ToString())) continue;
             busModel.Records.Add(new BusItem()
             {
                 LineName = j["lineName"]!.ToString(),
@@ -34,7 +35,7 @@ public class BusController(IHttpClientFactory httpClientFactory)
                 ArrivalStationTime = j["arrivalStationTime"]!.ToString()
             });
         }
-        
+
         return Ok(busModel);
     }
 }
