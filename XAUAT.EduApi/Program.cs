@@ -1,4 +1,5 @@
 using Scalar.AspNetCore;
+using StackExchange.Redis;
 using XAUAT.EduApi.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -21,6 +22,13 @@ builder.Services.AddCors(options =>
 builder.Services.AddScoped<ICodeService, CodeService>();
 builder.Services.AddScoped<ILoginService, LoginService>();
 builder.Services.AddScoped<IExamService, ExamService>();
+
+var redis = Environment.GetEnvironmentVariable("REDIS", EnvironmentVariableTarget.Process);
+if (!string.IsNullOrEmpty(redis))
+{
+    builder.Services.AddSingleton<IConnectionMultiplexer>(ConnectionMultiplexer.Connect(redis));
+}
+
 builder.Services.AddHttpClient();
 builder.Services.AddHttpContextAccessor();
 

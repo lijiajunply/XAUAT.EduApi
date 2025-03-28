@@ -98,6 +98,13 @@ public class ScoreController(IHttpClientFactory httpClientFactory, ILogger<Cours
         }
     }
 
+    /// <summary>
+    /// 获取单学期成绩
+    /// </summary>
+    /// <param name="studentId"></param>
+    /// <param name="semester"></param>
+    /// <param name="cookie"></param>
+    /// <returns></returns>
     private async Task<List<ScoreResponse>> GetScoreResponse(string studentId, string semester, string cookie)
     {
         var client = httpClientFactory.CreateClient();

@@ -1,13 +1,16 @@
 ﻿using System.Text.RegularExpressions;
 using Newtonsoft.Json;
+using StackExchange.Redis;
 using XAUAT.EduApi.DataModels;
 using XAUAT.EduApi.Models;
 
 namespace XAUAT.EduApi.Services;
 
-public class ExamService(HttpClient httpClient, ILogger<ExamService> logger) : IExamService
+public class ExamService(HttpClient httpClient, ILogger<ExamService> logger, IConnectionMultiplexer muxer)
+    : IExamService
 {
     private const string _baseUrl = "https://swjw.xauat.edu.cn";
+    private readonly IDatabase _redis = muxer.GetDatabase();
 
     public async Task<ExamResponse> GetExamArrangementsAsync(string cookie, string? id)
     {
@@ -15,7 +18,7 @@ public class ExamService(HttpClient httpClient, ILogger<ExamService> logger) : I
         {
             return await GetExamArrangementAsync(cookie);
         }
-        
+
         var split = id.Split(',');
         var examResponse = new ExamResponse();
         foreach (var s in split)
@@ -27,17 +30,41 @@ public class ExamService(HttpClient httpClient, ILogger<ExamService> logger) : I
         return examResponse;
     }
 
+    /// <summary>
+    /// 获取本学期
+    /// </summary>
+    /// <param name="cookie"></param>
+    /// <param name="httpClientFactory"></param>
+    /// <returns></returns>
     public async Task<SemesterItem> GetThisSemester(string cookie, IHttpClientFactory httpClientFactory)
     {
         logger.LogInformation("开始抓取学期数据");
+
+        var thisSemester = await _redis.StringGetAsync("thisSemester");
+        
+        if (thisSemester.HasValue)
+        {
+            return JsonConvert.DeserializeObject<SemesterItem>(thisSemester.ToString()) ?? new SemesterItem();
+        }
 
         var client = httpClientFactory.CreateClient();
         client.DefaultRequestHeaders.Add("Cookie", cookie);
         var html = await client.GetStringAsync("https://swjw.xauat.edu.cn/student/for-std/course-table");
         var result = new SemesterResult();
-        return result.ParseNow(html);
+        var data = result.ParseNow(html);
+
+        await _redis.StringSetAsync("thisSemester", JsonConvert.SerializeObject(data),
+            expiry: new TimeSpan(10, 0, 0, 0));
+
+        return data;
     }
 
+    /// <summary>
+    /// 获取考试安排
+    /// </summary>
+    /// <param name="cookie"></param>
+    /// <param name="id"></param>
+    /// <returns></returns>
     private async Task<ExamResponse> GetExamArrangementAsync(string cookie, string? id = null)
     {
         try
@@ -47,6 +74,7 @@ public class ExamService(HttpClient httpClient, ILogger<ExamService> logger) : I
             {
                 url += $"info/{id}?";
             }
+
             var request = new HttpRequestMessage(HttpMethod.Get, url);
             request.Headers.Add("Cookie", cookie);
 
