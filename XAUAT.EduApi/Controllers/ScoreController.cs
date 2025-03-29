@@ -1,6 +1,8 @@
 ﻿using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Mvc;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using StackExchange.Redis;
 using XAUAT.EduApi.DataModels;
 using XAUAT.EduApi.Models;
 using XAUAT.EduApi.Services;
@@ -9,9 +11,15 @@ namespace XAUAT.EduApi.Controllers;
 
 [ApiController]
 [Route("[controller]")]
-public class ScoreController(IHttpClientFactory httpClientFactory, ILogger<CourseController> logger, IExamService exam)
+public class ScoreController(
+    IHttpClientFactory httpClientFactory,
+    ILogger<CourseController> logger,
+    IExamService exam,
+    IConnectionMultiplexer muxer)
     : ControllerBase
 {
+    private readonly IDatabase _redis = muxer.GetDatabase();
+
     [HttpGet("Semester")]
     public async Task<ActionResult<SemesterResult>> ParseSemester(string? studentId)
     {
@@ -105,8 +113,15 @@ public class ScoreController(IHttpClientFactory httpClientFactory, ILogger<Cours
     /// <param name="semester"></param>
     /// <param name="cookie"></param>
     /// <returns></returns>
-    private async Task<List<ScoreResponse>> GetScoreResponse(string studentId, string semester, string cookie)
+    private async Task<IEnumerable<ScoreResponse>> GetScoreResponse(string studentId, string semester, string cookie)
     {
+        var cacheKey = $"score_{studentId}_{semester}";
+        if (_redis.KeyExists(cacheKey))
+        {
+            var result = _redis.StringGet(cacheKey);
+            return result.HasValue ? JsonConvert.DeserializeObject<List<ScoreResponse>>(result.ToString()) ?? [] : [];
+        }
+
         var client = httpClientFactory.CreateClient();
         client.DefaultRequestHeaders.Add("Cookie", cookie);
 
@@ -127,18 +142,39 @@ public class ScoreController(IHttpClientFactory httpClientFactory, ILogger<Cours
 
         // string[] { "期末成绩:70", "过程考核成绩:86.5(慕课成绩:75.96;作业:84.79;实验:99)" }
 
-        return (json["semesterId2studentGrades"]?[semester]!).Select(item => new ScoreResponse()
-            {
-                Name = item["course"]!["nameZh"]!.ToString(),
-                Credit = item["course"]!["credits"]!.ToString(),
-                LessonCode = item["lessonCode"]!.ToString(),
-                LessonName = item["lessonNameZh"]!.ToString(),
-                Grade = item["gaGrade"]!.ToString(),
-                Gpa = item["gp"]!.ToString(),
-                GradeDetail = string.Join("; ",
-                    Regex.Matches(item["gradeDetail"]!.ToString(), @"<span[^>]*>([^<]+)<\/span>")
-                        .Select(m => m.Groups[1].Value.Trim()))
-            })
-            .ToList();
+        var list = (json["semesterId2studentGrades"]?[semester]!).Select(item => new ScoreResponse()
+        {
+            Name = item["course"]!["nameZh"]!.ToString(),
+            Credit = item["course"]!["credits"]!.ToString(),
+            LessonCode = item["lessonCode"]!.ToString(),
+            LessonName = item["lessonNameZh"]!.ToString(),
+            Grade = item["gaGrade"]!.ToString(),
+            Gpa = item["gp"]!.ToString(),
+            GradeDetail = string.Join("; ",
+                Regex.Matches(item["gradeDetail"]!.ToString(), @"<span[^>]*>([^<]+)<\/span>")
+                    .Select(m => m.Groups[1].Value.Trim()))
+        });
+
+        var scoreResponses = list as ScoreResponse[] ?? list.ToArray();
+        if (scoreResponses.Length == 0) return scoreResponses;
+        SemesterItem a;
+        if (!_redis.KeyExists("thisSemester"))
+        {
+            a = await exam.GetThisSemester(cookie, httpClientFactory);
+        }
+        else
+        {
+            var thisSemester = _redis.StringGet("thisSemester");
+            if (!thisSemester.HasValue || thisSemester.IsNullOrEmpty) return scoreResponses;
+            a = JsonConvert.DeserializeObject<SemesterItem>(thisSemester!) ?? new SemesterItem();
+        }
+
+        if (a.Value != semester)
+        {
+            await _redis.StringSetAsync(cacheKey, JsonConvert.SerializeObject(list),
+                expiry: new TimeSpan(5, 0, 0, 0));
+        }
+
+        return scoreResponses;
     }
 }

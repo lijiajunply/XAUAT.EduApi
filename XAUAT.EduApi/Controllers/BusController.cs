@@ -50,7 +50,7 @@ public class BusController(IHttpClientFactory httpClientFactory, IConnectionMult
 
         if (busModel.Total != 0)
             await _redis.StringSetAsync("bus:" + time, JsonConvert.SerializeObject(busModel),
-                expiry: new TimeSpan(0, 6, 0, 0));
+                expiry: new TimeSpan(0, 12, 0, 0));
 
         return Ok(busModel);
     }

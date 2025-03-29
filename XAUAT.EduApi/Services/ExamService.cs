@@ -48,6 +48,7 @@ public class ExamService(HttpClient httpClient, ILogger<ExamService> logger, ICo
         }
 
         var client = httpClientFactory.CreateClient();
+        client.Timeout = TimeSpan.FromSeconds(15); // 添加超时控制
         client.DefaultRequestHeaders.Add("Cookie", cookie);
         var html = await client.GetStringAsync("https://swjw.xauat.edu.cn/student/for-std/course-table");
         var result = new SemesterResult();
@@ -78,6 +79,7 @@ public class ExamService(HttpClient httpClient, ILogger<ExamService> logger, ICo
             var request = new HttpRequestMessage(HttpMethod.Get, url);
             request.Headers.Add("Cookie", cookie);
 
+            httpClient.Timeout = TimeSpan.FromSeconds(15); // 添加超时控制
             var response = await httpClient.SendAsync(request);
             var content = await response.Content.ReadAsStringAsync();
 
