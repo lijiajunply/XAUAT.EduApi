@@ -14,8 +14,7 @@ public class LoginController(ILoginService loginService, ILogger<LoginController
     {
         try
         {
-            var result = await loginService.LoginAsync(request.Username, request.Password);
-            return Ok(result);
+            return Ok(await loginService.LoginAsync(request.Username, request.Password));
         }
         catch (Exception ex)
         {
