@@ -9,8 +9,7 @@ public class CodeService : ICodeService
 {
     public object Encode(object loginParams)
     {
-        if (loginParams == null)
-            throw new ArgumentNullException(nameof(loginParams));
+        ArgumentNullException.ThrowIfNull(loginParams);
 
         // 将传入的对象转换为具体的类型
         var jsonString = JsonSerializer.Serialize(loginParams);
@@ -34,11 +33,10 @@ public class CodeService : ICodeService
         return result;
     }
 
-    private string CalculateSHA1(string input)
+    private static string CalculateSHA1(string input)
     {
-        using var sha1 = SHA1.Create();
         var inputBytes = Encoding.UTF8.GetBytes(input);
-        var hashBytes = sha1.ComputeHash(inputBytes);
+        var hashBytes = SHA1.HashData(inputBytes);
 
         // 将字节数组转换为十六进制字符串
         var sb = new StringBuilder();

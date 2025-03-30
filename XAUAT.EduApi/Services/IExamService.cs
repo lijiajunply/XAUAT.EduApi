@@ -7,5 +7,5 @@ public interface IExamService
 {
     Task<ExamResponse> GetExamArrangementsAsync(string cookie,string? id);
 
-    Task<SemesterItem> GetThisSemester(string cookie,IHttpClientFactory httpClientFactory);
+    Task<SemesterItem> GetThisSemester(string cookie);
 }

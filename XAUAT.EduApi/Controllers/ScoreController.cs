@@ -64,7 +64,7 @@ public class ScoreController(
                 cookie = Request.Headers["xauat"].ToString(); // 从请求中获取 cookie
             }
 
-            return await exam.GetThisSemester(cookie, httpClientFactory);
+            return await exam.GetThisSemester(cookie);
         }
         catch (Exception ex)
         {
@@ -160,7 +160,7 @@ public class ScoreController(
         SemesterItem a;
         if (!_redis.KeyExists("thisSemester"))
         {
-            a = await exam.GetThisSemester(cookie, httpClientFactory);
+            a = await exam.GetThisSemester(cookie);
         }
         else
         {

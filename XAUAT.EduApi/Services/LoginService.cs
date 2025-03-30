@@ -4,10 +4,11 @@ using System.Text.RegularExpressions;
 
 namespace XAUAT.EduApi.Services;
 
-public partial class LoginService(HttpClient httpClient, ICodeService codeService) : ILoginService
+public partial class LoginService(IHttpClientFactory httpClientFactory, ICodeService codeService) : ILoginService
 {
     public async Task<object> LoginAsync(string username, string password)
     {
+        var httpClient = httpClientFactory.CreateClient();
         // 获取 salt
         var saltResponse = await httpClient.GetAsync("https://swjw.xauat.edu.cn/student/login-salt");
         if (!saltResponse.IsSuccessStatusCode)
@@ -47,6 +48,7 @@ public partial class LoginService(HttpClient httpClient, ICodeService codeServic
         var request = new HttpRequestMessage(HttpMethod.Get, "https://swjw.xauat.edu.cn/student/for-std/precaution");
         request.Headers.Add("Cookie", cookies);
 
+        var httpClient = httpClientFactory.CreateClient();
         var response = await httpClient.SendAsync(request);
 
         if (!response.IsSuccessStatusCode)

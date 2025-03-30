@@ -6,7 +6,10 @@ using XAUAT.EduApi.Models;
 
 namespace XAUAT.EduApi.Services;
 
-public class ExamService(HttpClient httpClient, ILogger<ExamService> logger, IConnectionMultiplexer muxer)
+public class ExamService(
+    IHttpClientFactory httpClientFactory,
+    ILogger<ExamService> logger,
+    IConnectionMultiplexer muxer)
     : IExamService
 {
     private const string _baseUrl = "https://swjw.xauat.edu.cn";
@@ -34,14 +37,13 @@ public class ExamService(HttpClient httpClient, ILogger<ExamService> logger, ICo
     /// 获取本学期
     /// </summary>
     /// <param name="cookie"></param>
-    /// <param name="httpClientFactory"></param>
     /// <returns></returns>
-    public async Task<SemesterItem> GetThisSemester(string cookie, IHttpClientFactory httpClientFactory)
+    public async Task<SemesterItem> GetThisSemester(string cookie)
     {
         logger.LogInformation("开始抓取学期数据");
 
         var thisSemester = await _redis.StringGetAsync("thisSemester");
-        
+
         if (thisSemester.HasValue)
         {
             return JsonConvert.DeserializeObject<SemesterItem>(thisSemester.ToString()) ?? new SemesterItem();
@@ -78,6 +80,8 @@ public class ExamService(HttpClient httpClient, ILogger<ExamService> logger, ICo
 
             var request = new HttpRequestMessage(HttpMethod.Get, url);
             request.Headers.Add("Cookie", cookie);
+
+            var httpClient = httpClientFactory.CreateClient();
 
             httpClient.Timeout = TimeSpan.FromSeconds(15); // 添加超时控制
             var response = await httpClient.SendAsync(request);

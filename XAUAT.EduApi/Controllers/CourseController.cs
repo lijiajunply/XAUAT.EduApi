@@ -35,7 +35,7 @@ public class CourseController(IHttpClientFactory httpClientFactory, ILogger<Cour
             var client = httpClientFactory.CreateClient();
             client.DefaultRequestHeaders.Add("Cookie", cookie);
 
-            var semester = await exam.GetThisSemester(cookie, httpClientFactory);
+            var semester = await exam.GetThisSemester(cookie);
 
             var response = await client.GetAsync(
                 $"https://swjw.xauat.edu.cn/student/for-std/course-table/semester/{semester.Value}/print-data/{studentId}");
