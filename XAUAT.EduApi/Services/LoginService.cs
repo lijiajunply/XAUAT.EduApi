@@ -4,7 +4,7 @@ using System.Text.RegularExpressions;
 
 namespace XAUAT.EduApi.Services;
 
-public class LoginService(HttpClient httpClient, ICodeService codeService) : ILoginService
+public partial class LoginService(HttpClient httpClient, ICodeService codeService) : ILoginService
 {
     public async Task<object> LoginAsync(string username, string password)
     {
@@ -44,7 +44,7 @@ public class LoginService(HttpClient httpClient, ICodeService codeService) : ILo
 
     private async Task<string> GetCode(string cookies)
     {
-        var request = new HttpRequestMessage(HttpMethod.Get, "https://swjw.xauat.edu.cn/student/for-std/student-info/");
+        var request = new HttpRequestMessage(HttpMethod.Get, "https://swjw.xauat.edu.cn/student/for-std/precaution");
         request.Headers.Add("Cookie", cookies);
 
         var response = await httpClient.SendAsync(request);
@@ -54,18 +54,13 @@ public class LoginService(HttpClient httpClient, ICodeService codeService) : ILo
             return "";
         }
 
-        var a = request.RequestUri!.LocalPath.Replace("/student/for-std/student-info/info/", "");
+        var a = request.RequestUri!.LocalPath.Replace("/student/precaution/index/", "");
 
-        if (!int.TryParse(a, out _))
-        {
-            var Content = await response.Content.ReadAsStringAsync();
+        if (a != "/student/for-std/precaution") return a;
+        var Content = await response.Content.ReadAsStringAsync();
 
-            var matches = Regex.Matches(Content,
-                """value="(.*?)">""");
-            return matches.Count >= 1 ? string.Join(';', matches.Select(m => m.Groups[1].Value)) : "";
-        }
-
-        return a;
+        var matches = MyRegex().Matches(Content);
+        return matches.Count >= 1 ? string.Join(';', matches.Select(m => m.Groups[1].Value)) : "";
     }
 
     private static string ParseCookie(IEnumerable<string> cookies)
@@ -87,4 +82,7 @@ public class LoginService(HttpClient httpClient, ICodeService codeService) : ILo
 
         return result.ToString();
     }
+
+    [GeneratedRegex("""value="(.*?)">""")]
+    private static partial Regex MyRegex();
 }
