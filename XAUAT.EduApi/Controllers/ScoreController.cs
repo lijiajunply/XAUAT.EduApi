@@ -92,10 +92,20 @@ public class ScoreController(
             var split = studentId.Split(',');
             var result = new List<ScoreResponse>();
 
-            foreach (var s in split)
+            for (var i = 0; i < split.Length; i++)
             {
+                var s = split[i];
                 var scoreResponse = await GetScoreResponse(s, semester, cookie);
-                result.AddRange(scoreResponse);
+                var scoreResponses = scoreResponse as ScoreResponse[] ?? scoreResponse.ToArray();
+                if (i != 0)
+                {
+                    foreach (var t in scoreResponses)
+                    {
+                        t.IsMinor = true;
+                    }
+                }
+
+                result.AddRange(scoreResponses);
             }
 
             return result;

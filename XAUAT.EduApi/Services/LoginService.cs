@@ -62,7 +62,7 @@ public partial class LoginService(IHttpClientFactory httpClientFactory, ICodeSer
         var Content = await response.Content.ReadAsStringAsync();
 
         var matches = MyRegex().Matches(Content);
-        return matches.Count >= 1 ? string.Join(';', matches.Select(m => m.Groups[1].Value)) : "";
+        return matches.Count >= 1 ? string.Join(',', matches.Select(m => m.Groups[1].Value)) : "";
     }
 
     private static string ParseCookie(IEnumerable<string> cookies)

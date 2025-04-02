@@ -9,4 +9,5 @@ public class ScoreResponse
     public string Gpa { get; set; } = "";
     public string GradeDetail { get; set; } = "";
     public string Credit { get; set; } = "";
+    public bool IsMinor { get; set; }
 }

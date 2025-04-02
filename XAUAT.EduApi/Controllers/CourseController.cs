@@ -27,55 +27,51 @@ public class CourseController(IHttpClientFactory httpClientFactory, ILogger<Cour
                 return BadRequest("学号或Cookie不能为空");
             }
 
-            if (studentId.Contains(','))
-            {
-                studentId = studentId.Split(',')[0];
-            }
+            var split = studentId.Split(',');
+
+            var courses = new List<CourseActivity>();
 
             var client = httpClientFactory.CreateClient();
             client.DefaultRequestHeaders.Add("Cookie", cookie);
 
             var semester = await exam.GetThisSemester(cookie);
 
-            var response = await client.GetAsync(
-                $"https://swjw.xauat.edu.cn/student/for-std/course-table/semester/{semester.Value}/print-data/{studentId}");
-
-            if (!response.IsSuccessStatusCode)
+            foreach (var a in split)
             {
-                return StatusCode((int)response.StatusCode, "获取课程数据失败");
-            }
+                var response = await client.GetAsync(
+                    $"https://swjw.xauat.edu.cn/student/for-std/course-table/semester/{semester.Value}/print-data/{a}");
 
-            var jsonString = await response.Content.ReadAsStringAsync();
-
-            var jsonResponse = JsonConvert.DeserializeObject<CourseResponse>(jsonString);
-
-            if (jsonResponse?.StudentTableVm == null)
-            {
-                return NotFound("未找到课程数据");
-            }
-
-            var courses = jsonResponse.StudentTableVm.Activities;
-
-            if (courses != null! && courses.Count != 0)
-            {
-                foreach (var item in courses)
+                if (!response.IsSuccessStatusCode)
                 {
-                    item.WeekIndexes = item.WeekIndexes.OrderBy(x => x).ToList();
-                    item.Room = string.IsNullOrEmpty(item.Room) ? "未知" : item.Room.Replace("*", "");
+                    return StatusCode((int)response.StatusCode, "获取课程数据失败");
                 }
 
-                logger.LogInformation("课程抓取成功");
+                var jsonString = await response.Content.ReadAsStringAsync();
 
-                // 返回处理后的课程数据
-                return Ok(new
+                var jsonResponse = JsonConvert.DeserializeObject<CourseResponse>(jsonString);
+
+                if (jsonResponse?.StudentTableVm == null)
                 {
-                    Success = true,
-                    Data = courses,
-                    ExpirationTime = DateTime.Now.AddDays(7)
-                });
+                    return NotFound("未找到课程数据");
+                }
+
+                courses.AddRange(jsonResponse.StudentTableVm.Activities);
             }
 
-            return NotFound(new { Success = false, Message = "未找到课程数据" });
+            if (courses == null! || courses.Count == 0) return NotFound(new { Success = false, Message = "未找到课程数据" });
+            foreach (var item in courses)
+            {
+                item.WeekIndexes = item.WeekIndexes.OrderBy(x => x).ToList();
+                item.Room = string.IsNullOrEmpty(item.Room) ? "未知" : item.Room.Replace("*", "");
+            }
+
+            // 返回处理后的课程数据
+            return Ok(new
+            {
+                Success = true,
+                Data = courses,
+                ExpirationTime = DateTime.Now.AddDays(7)
+            });
         }
         catch (Exception ex)
         {
