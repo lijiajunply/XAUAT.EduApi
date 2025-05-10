@@ -72,6 +72,15 @@ public class ExamService(
     {
         try
         {
+            var cacheKey = $"exam_{id}";
+            if (_redis.KeyExists(cacheKey))
+            {
+                var redisResult = _redis.StringGet(cacheKey);
+                return redisResult.HasValue
+                    ? JsonConvert.DeserializeObject<ExamResponse>(redisResult.ToString()) ?? new ExamResponse()
+                    : new ExamResponse();
+            }
+
             var url = $"{_baseUrl}/student/for-std/exam-arrange/";
             if (!string.IsNullOrEmpty(id))
             {
@@ -92,7 +101,7 @@ public class ExamService(
             {
                 return new ExamResponse
                 {
-                    Exams = new List<ExamInfo>(),
+                    Exams = [],
                     CanClick = false
                 };
             }
@@ -120,9 +129,12 @@ public class ExamService(
                 return new ExamResponse
                 {
                     Exams = [],
-                    CanClick = true
+                    CanClick = false
                 };
             }
+
+            await _redis.StringSetAsync(cacheKey, jsonData,
+                expiry: new TimeSpan(0, 1, 0, 0));
 
             var result = new ExamResponse
             {

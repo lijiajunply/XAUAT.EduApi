@@ -7,7 +7,8 @@
       "launchBrowser": false,
       "applicationUrl": "http://localhost:5216",
       "environmentVariables": {
-        "ASPNETCORE_ENVIRONMENT": "Development"
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "REDIS": "120.46.175.170:30281,password=53JHc8Nj0liKw7yoU1Sm9eL6qMR2aX4Z"
       }
     },
     "https": {
