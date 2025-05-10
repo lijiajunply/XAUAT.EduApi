@@ -72,7 +72,7 @@ public class ExamService(
     {
         try
         {
-            var cacheKey = $"exam_{id}";
+            var cacheKey = $"exam_arrangement_{id}";
             if (_redis.KeyExists(cacheKey))
             {
                 var redisResult = _redis.StringGet(cacheKey);
