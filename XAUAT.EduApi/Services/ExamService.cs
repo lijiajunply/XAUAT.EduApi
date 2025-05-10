@@ -79,7 +79,7 @@ public class ExamService(
                 if (redisResult.HasValue)
                 {
                     var a = JsonConvert.DeserializeObject<ExamResponse>(redisResult.ToString());
-                    if (a != null) return a;
+                    if (a is { CanClick: true }) return a;
                 }
             }
 
