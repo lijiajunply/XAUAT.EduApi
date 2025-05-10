@@ -76,13 +76,11 @@ public class ExamService(
             if (_redis.KeyExists(cacheKey))
             {
                 var redisResult = _redis.StringGet(cacheKey);
-                return redisResult.HasValue
-                    ? new ExamResponse()
-                    {
-                        Exams = JsonConvert.DeserializeObject<List<ExamInfo>>(redisResult.ToString()) ?? [],
-                        CanClick = true
-                    }
-                    : new ExamResponse();
+                if (redisResult.HasValue)
+                {
+                    var a = JsonConvert.DeserializeObject<ExamResponse>(redisResult.ToString());
+                    if (a != null) return a;
+                }
             }
 
             var url = $"{_baseUrl}/student/for-std/exam-arrange/";
@@ -146,7 +144,7 @@ public class ExamService(
                     Location = d.Room,
                     Seat = d.SeatNo
                 }).ToList(),
-                CanClick = examData.Count == 0
+                CanClick = examData.Count != 0
             };
 
             await _redis.StringSetAsync(cacheKey, JsonConvert.SerializeObject(result),
