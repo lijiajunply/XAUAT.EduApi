@@ -147,7 +147,11 @@ public class ExamService(
                 CanClick = examData.Count != 0
             };
 
-            await _redis.StringSetAsync(cacheKey, JsonConvert.SerializeObject(result),
+            jsonData = JsonConvert.SerializeObject(result);
+
+            Console.WriteLine(jsonData);
+
+            await _redis.StringSetAsync(cacheKey, jsonData,
                 expiry: new TimeSpan(0, 1, 0, 0));
 
             return result;
