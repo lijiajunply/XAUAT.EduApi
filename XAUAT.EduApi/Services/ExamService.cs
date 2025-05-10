@@ -77,7 +77,11 @@ public class ExamService(
             {
                 var redisResult = _redis.StringGet(cacheKey);
                 return redisResult.HasValue
-                    ? JsonConvert.DeserializeObject<ExamResponse>(redisResult.ToString()) ?? new ExamResponse()
+                    ? new ExamResponse()
+                    {
+                        Exams = JsonConvert.DeserializeObject<List<ExamInfo>>(redisResult.ToString()) ?? [],
+                        CanClick = true
+                    }
                     : new ExamResponse();
             }
 
@@ -133,9 +137,6 @@ public class ExamService(
                 };
             }
 
-            await _redis.StringSetAsync(cacheKey, jsonData,
-                expiry: new TimeSpan(0, 1, 0, 0));
-
             var result = new ExamResponse
             {
                 Exams = examData.Select(d => new ExamInfo
@@ -147,6 +148,9 @@ public class ExamService(
                 }).ToList(),
                 CanClick = examData.Count == 0
             };
+
+            await _redis.StringSetAsync(cacheKey, JsonConvert.SerializeObject(result),
+                expiry: new TimeSpan(0, 1, 0, 0));
 
             return result;
         }
