@@ -102,10 +102,14 @@ public class ExamService(
             var retryPolicy = Policy
                 .Handle<HttpRequestException>()
                 .Or<TaskCanceledException>()
-                .WaitAndRetryAsync(3, retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)));
+                .WaitAndRetryAsync(3, retryAttempt =>
+                    TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)));
 
-            var response = await retryPolicy.ExecuteAsync(async () =>
-                await httpClient.SendAsync(request, cts.Token));
+            var response = await retryPolicy.ExecuteAsync(async ct =>
+            {
+                var requestPolicy = CreateRequest(); // 每次重试都新建请求
+                return await httpClient.SendAsync(requestPolicy, ct);
+            }, cts.Token);
 
             var content = await response.Content.ReadAsStringAsync(cts.Token);
 
@@ -165,6 +169,11 @@ public class ExamService(
                 expiry: new TimeSpan(0, 1, 0, 0));
 
             return result;
+
+            HttpRequestMessage CreateRequest() => new(HttpMethod.Get, url)
+            {
+                Headers = { { "Cookie", cookie } }
+            };
         }
         catch (Exception ex)
         {
