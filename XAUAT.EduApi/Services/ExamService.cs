@@ -73,16 +73,16 @@ public class ExamService(
     {
         try
         {
-            var cacheKey = $"exam_arrangement_{id}";
-            if (_redis.KeyExists(cacheKey))
-            {
-                var redisResult = _redis.StringGet(cacheKey);
-                if (redisResult.HasValue)
-                {
-                    var a = JsonConvert.DeserializeObject<ExamResponse>(redisResult.ToString());
-                    if (a is { CanClick: true }) return a;
-                }
-            }
+            // var cacheKey = $"exam_arrangement_{id}";
+            // if (_redis.KeyExists(cacheKey))
+            // {
+            //     var redisResult = _redis.StringGet(cacheKey);
+            //     if (redisResult.HasValue)
+            //     {
+            //         var a = JsonConvert.DeserializeObject<ExamResponse>(redisResult.ToString());
+            //         if (a is { CanClick: true }) return a;
+            //     }
+            // }
 
             var url = $"{_baseUrl}/student/for-std/exam-arrange/";
             if (!string.IsNullOrEmpty(id))
@@ -158,12 +158,10 @@ public class ExamService(
                 CanClick = examData.Count != 0
             };
 
-            jsonData = JsonConvert.SerializeObject(result);
+            // jsonData = JsonConvert.SerializeObject(result);
 
-            Console.WriteLine(jsonData);
-
-            await _redis.StringSetAsync(cacheKey, jsonData,
-                expiry: new TimeSpan(0, 1, 0, 0));
+            // await _redis.StringSetAsync(cacheKey, jsonData,
+            //     expiry: new TimeSpan(0, 1, 0, 0));
 
             return result;
         }
