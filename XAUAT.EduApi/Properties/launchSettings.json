@@ -8,7 +8,7 @@
       "applicationUrl": "http://localhost:5216",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development",
-        "REDIS": "120.46.175.170:30281,password=53JHc8Nj0liKw7yoU1Sm9eL6qMR2aX4Z"
+        "REDIS": "hkg1.clusters.zeabur.com:31509,password=Fi6rVDd1n9JA8j2O5QMWfox0cR37UH4Y"
       }
     },
     "https": {

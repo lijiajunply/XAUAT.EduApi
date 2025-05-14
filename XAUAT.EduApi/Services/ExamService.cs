@@ -1,5 +1,6 @@
 ﻿using System.Text.RegularExpressions;
 using Newtonsoft.Json;
+using Polly;
 using StackExchange.Redis;
 using XAUAT.EduApi.DataModels;
 using XAUAT.EduApi.Models;
@@ -92,11 +93,21 @@ public class ExamService(
             var request = new HttpRequestMessage(HttpMethod.Get, url);
             request.Headers.Add("Cookie", cookie);
 
-            var httpClient = httpClientFactory.CreateClient();
+            var httpClient = httpClientFactory.CreateClient("ExamClient"); // 使用命名客户端
 
-            httpClient.Timeout = TimeSpan.FromSeconds(15); // 添加超时控制
-            var response = await httpClient.SendAsync(request);
-            var content = await response.Content.ReadAsStringAsync();
+            // 设置 CancellationToken
+            var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+
+            // 添加重试逻辑（示例）
+            var retryPolicy = Policy
+                .Handle<HttpRequestException>()
+                .Or<TaskCanceledException>()
+                .WaitAndRetryAsync(3, retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)));
+
+            var response = await retryPolicy.ExecuteAsync(async () =>
+                await httpClient.SendAsync(request, cts.Token));
+
+            var content = await response.Content.ReadAsStringAsync(cts.Token);
 
             // 检查是否重定向到登录页面
             if (content.Contains("登入页面"))
