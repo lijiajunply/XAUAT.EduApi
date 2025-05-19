@@ -16,7 +16,7 @@ public class BusController(IHttpClientFactory httpClientFactory, IConnectionMult
     [HttpGet("{time?}")]
     public async Task<IActionResult> GetBus(string? time)
     {
-        var client = httpClientFactory.CreateClient();
+        using var client = httpClientFactory.CreateClient();
         time ??= DateTime.Today.ToString("yyyy-MM-dd");
 
         var bus = await _redis.StringGetAsync("bus:" + time);

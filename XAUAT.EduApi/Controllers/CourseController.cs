@@ -31,7 +31,7 @@ public class CourseController(IHttpClientFactory httpClientFactory, ILogger<Cour
 
             var courses = new List<CourseActivity>();
 
-            var client = httpClientFactory.CreateClient();
+            using var client = httpClientFactory.CreateClient();
             client.DefaultRequestHeaders.Add("Cookie", cookie);
 
             var semester = await exam.GetThisSemester(cookie);

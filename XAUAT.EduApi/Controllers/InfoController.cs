@@ -18,7 +18,7 @@ public class InfoController(IHttpClientFactory httpClientFactory, ILogger<Course
             cookie = Request.Headers["xauat"].ToString(); // 从请求中获取 cookie
         }
 
-        var client = httpClientFactory.CreateClient();
+        using var client = httpClientFactory.CreateClient();
         client.DefaultRequestHeaders.Add("Cookie", cookie);
         var response =
             await client.GetAsync("https://swjw.xauat.edu.cn/student/ws/student/home-page/programCompletionPreview");

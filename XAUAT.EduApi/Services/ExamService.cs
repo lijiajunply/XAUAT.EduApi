@@ -50,7 +50,7 @@ public class ExamService(
             return JsonConvert.DeserializeObject<SemesterItem>(thisSemester.ToString()) ?? new SemesterItem();
         }
 
-        var client = httpClientFactory.CreateClient();
+        using var client = httpClientFactory.CreateClient();
         client.Timeout = TimeSpan.FromSeconds(15); // 添加超时控制
         client.DefaultRequestHeaders.Add("Cookie", cookie);
         var html = await client.GetStringAsync("https://swjw.xauat.edu.cn/student/for-std/course-table");
@@ -93,7 +93,7 @@ public class ExamService(
             var request = new HttpRequestMessage(HttpMethod.Get, url);
             request.Headers.Add("Cookie", cookie);
 
-            var httpClient = httpClientFactory.CreateClient("ExamClient"); // 使用命名客户端
+            using var httpClient = httpClientFactory.CreateClient(); // 使用命名客户端
 
             // 设置 CancellationToken
             var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));

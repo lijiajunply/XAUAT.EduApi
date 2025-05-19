@@ -32,7 +32,7 @@ public class ScoreController(
                 cookie = Request.Headers["xauat"].ToString(); // 从请求中获取 cookie
             }
 
-            var client = httpClientFactory.CreateClient();
+            using var client = httpClientFactory.CreateClient();
             client.DefaultRequestHeaders.Add("Cookie", cookie);
             var url = "https://swjw.xauat.edu.cn/student/for-std/grade/sheet";
             if (!string.IsNullOrEmpty(studentId))
@@ -132,7 +132,7 @@ public class ScoreController(
             return result.HasValue ? JsonConvert.DeserializeObject<List<ScoreResponse>>(result.ToString()) ?? [] : [];
         }
 
-        var client = httpClientFactory.CreateClient();
+        using var client = httpClientFactory.CreateClient();
         client.DefaultRequestHeaders.Add("Cookie", cookie);
 
         var response = await client.GetAsync(
