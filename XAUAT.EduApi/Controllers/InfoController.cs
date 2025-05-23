@@ -29,6 +29,8 @@ public class InfoController(IHttpClientFactory httpClientFactory, ILogger<Course
     [HttpGet("Time")]
     public ActionResult GetTime()
     {
-        return Ok(new { StartTime = "2025-02-23", EndTime = "2025-07-19" });
+        var start = Environment.GetEnvironmentVariable("START", EnvironmentVariableTarget.Process);
+        var end = Environment.GetEnvironmentVariable("END", EnvironmentVariableTarget.Process);
+        return Ok(new { StartTime = start ?? "2025-02-23", EndTime = end ?? "2025-07-19" });
     }
 }
