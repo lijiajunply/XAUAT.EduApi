@@ -1,5 +1,4 @@
-﻿using XAUAT.EduApi.DataModels;
-using XAUAT.EduApi.Models;
+﻿using XAUAT.EduApi.Models;
 
 namespace XAUAT.EduApi.Services;
 

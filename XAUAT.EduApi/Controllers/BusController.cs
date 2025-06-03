@@ -28,7 +28,7 @@ public class BusController(IHttpClientFactory httpClientFactory, IConnectionMult
 
         var response =
             await client.GetAsync(
-                $"https://school-bus.xauat.edu.cn/api/school/bus/user/runPlanPage?current=1&size=20&keyWord=&lineId=&date={time}");
+                $"https://school-bus.xauat.edu.cn/api/school/bus/user/runPlanPage?current=1&size=30&keyWord=&lineId=&date={time}");
         response.EnsureSuccessStatusCode();
         var content = await response.Content.ReadAsStringAsync();
         var busModel = new BusModel();

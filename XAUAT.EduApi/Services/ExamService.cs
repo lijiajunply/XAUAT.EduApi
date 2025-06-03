@@ -2,7 +2,6 @@
 using Newtonsoft.Json;
 using Polly;
 using StackExchange.Redis;
-using XAUAT.EduApi.DataModels;
 using XAUAT.EduApi.Models;
 
 namespace XAUAT.EduApi.Services;
