@@ -23,6 +23,7 @@ public class BusController(IHttpClientFactory httpClientFactory, IConnectionMult
     public async Task<IActionResult> GetBusFromNewData(string? time, string loc = "ALL")
     {
         using var client = httpClientFactory.CreateClient();
+        client.Timeout = new TimeSpan(0, 0, 0, 5, 0);
         time ??= DateTime.Today.ToString("yyyy-MM-dd");
 
         var key = "bus_new_data:" + time;
@@ -34,54 +35,63 @@ public class BusController(IHttpClientFactory httpClientFactory, IConnectionMult
             return Ok(JsonConvert.DeserializeObject<BusModel>(bus.ToString()));
         }
 
-        var response =
-            await client.PostAsJsonAsync(
-                "https://bcdd.xauat.edu.cn/api/openapi/getDayBusPlans", new { type = loc, nowDay = time });
-        response.EnsureSuccessStatusCode();
-
-        var content = await response.Content.ReadAsStringAsync();
-        var busModel = new BusModel();
-        var json = JObject.Parse(content);
-
-        var i = json["data"]!["dfBusPlans"] as JArray;
-
-        if (i?.Count == 0)
+        try
         {
+            var response =
+                await client.PostAsJsonAsync(
+                    "https://bcdd.xauat.edu.cn/api/openapi/getDayBusPlans", new { type = loc, nowDay = time });
+            response.EnsureSuccessStatusCode();
+
+            var content = await response.Content.ReadAsStringAsync();
+            var busModel = new BusModel();
+            var json = JObject.Parse(content);
+
+            var i = json["data"]!["dfBusPlans"] as JArray;
+
+            if (i?.Count == 0)
+            {
+                return Ok(await GetBusFromOldData(time));
+            }
+
+            foreach (var j in json["data"]!["dfBusPlans"]!)
+            {
+                if (j["frcamp"] != null && !string.IsNullOrEmpty(j["frcamp"]!.ToString())) continue;
+                var departure = j["fscamp"] + "校区";
+                var arrival = j["fecamp"] + "校区";
+                var timestamp = long.Parse(j["fstime"]!.ToString()) * 10000;
+
+                var tricks1970 = new DateTime(1970, 1, 1, 8, 0, 0).Ticks; //1970年1月1日刻度
+                var time_tricks = tricks1970 + timestamp; //日志日期刻度
+
+                var runTime = new DateTime(time_tricks);
+                busModel.Records.Add(new BusItem()
+                {
+                    LineName = $"{departure}→{arrival}",
+                    Description = j["fbusNo"]!.ToString(),
+                    DepartureStation = departure,
+                    ArrivalStation = arrival,
+                    RunTime = runTime.ToString("T"),
+                    ArrivalStationTime = "01:30",
+                });
+            }
+
+            busModel.Total = busModel.Records.Count;
+
+            if (busModel.Total != 0)
+                await _redis.StringSetAsync(key, JsonConvert.SerializeObject(busModel),
+                    expiry: new TimeSpan(0, 12, 0, 0));
+
+            return Ok(busModel);
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine(e);
             return Ok(await GetBusFromOldData(time));
         }
-
-        foreach (var j in json["data"]!["dfBusPlans"]!)
-        {
-            if (j["frcamp"] != null && !string.IsNullOrEmpty(j["frcamp"]!.ToString())) continue;
-            var departure = j["fscamp"] + "校区";
-            var arrival = j["fecamp"] + "校区";
-            var timestamp = long.Parse(j["fstime"]!.ToString()) * 10000;
-
-            var tricks1970 = new DateTime(1970, 1, 1, 8, 0, 0).Ticks; //1970年1月1日刻度
-            var time_tricks = tricks1970 + timestamp; //日志日期刻度
-
-            var runTime = new DateTime(time_tricks);
-            busModel.Records.Add(new BusItem()
-            {
-                LineName = $"{departure}→{arrival}",
-                Description = j["fbusNo"]!.ToString(),
-                DepartureStation = departure,
-                ArrivalStation = arrival,
-                RunTime = runTime.ToString("T"),
-                ArrivalStationTime = "01:30",
-            });
-        }
-
-        busModel.Total = busModel.Records.Count;
-
-        if (busModel.Total != 0)
-            await _redis.StringSetAsync(key, JsonConvert.SerializeObject(busModel),
-                expiry: new TimeSpan(0, 12, 0, 0));
-
-        return Ok(busModel);
     }
 
-    private async Task<BusModel> GetBusFromOldData(string? time)
+    [HttpGet("OldData/{time?}")]
+    public async Task<BusModel> GetBusFromOldData(string? time)
     {
         using var client = httpClientFactory.CreateClient();
         time ??= DateTime.Today.ToString("yyyy-MM-dd");
