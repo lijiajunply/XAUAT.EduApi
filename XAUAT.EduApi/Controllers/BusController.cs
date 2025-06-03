@@ -54,7 +54,7 @@ public class BusController(IHttpClientFactory httpClientFactory, IConnectionMult
 
         if (i?.Count == 0)
         {
-            return Ok(await GetBusFromOldData(time));
+            return Ok(await GetBusFromOldData(time, isShow: true));
         }
 
         foreach (var j in json["data"]!["dfBusPlans"]!)
@@ -89,7 +89,7 @@ public class BusController(IHttpClientFactory httpClientFactory, IConnectionMult
     }
 
     [HttpGet("OldData/{time?}")]
-    public async Task<BusModel> GetBusFromOldData(string? time)
+    public async Task<BusModel> GetBusFromOldData(string? time, bool isShow = false)
     {
         using var client = httpClientFactory.CreateClient();
         time ??= DateTime.Today.ToString("yyyy-MM-dd");
@@ -115,7 +115,7 @@ public class BusController(IHttpClientFactory httpClientFactory, IConnectionMult
             busModel.Records.Add(new BusItem()
             {
                 LineName = j["lineName"]!.ToString(),
-                Description = j["descr"]! + " (调用的为旧平台数据)",
+                Description = j["descr"]! + (isShow ? " (调用的为旧平台数据)" : ""),
                 DepartureStation = j["departureStation"]!.ToString(),
                 ArrivalStation = j["arrivalStation"]!.ToString(),
                 RunTime = j["runTime"]!.ToString(),
