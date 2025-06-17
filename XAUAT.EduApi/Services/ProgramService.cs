@@ -1,15 +1,26 @@
 ﻿using System.Text;
 using System.Text.Json.Serialization;
+using Newtonsoft.Json;
+using StackExchange.Redis;
 using JsonSerializer = System.Text.Json.JsonSerializer;
 
 namespace XAUAT.EduApi.Services;
 
-public class ProgramService(IHttpClientFactory httpClientFactory) : IProgramService
+public class ProgramService(IHttpClientFactory httpClientFactory, IConnectionMultiplexer muxer) : IProgramService
 {
     private const string _baseUrl = "https://swjw.xauat.edu.cn";
+    private readonly IDatabase _redis = muxer.GetDatabase();
 
     public async Task<List<PlanCourse>> GetAllTrainProgram(string cookie, string id)
     {
+        var key = $"train-program-{id}";
+        var trainProgramValue = await _redis.StringGetAsync(key);
+
+        if (trainProgramValue.HasValue)
+        {
+            return JsonConvert.DeserializeObject<List<PlanCourse>>(trainProgramValue.ToString()) ?? [];
+        }
+
         var request =
             new HttpRequestMessage(HttpMethod.Get, $"{_baseUrl}/student/for-std/program/root-module-json/{id}");
         request.Headers.Add("Cookie", cookie);
@@ -22,7 +33,14 @@ public class ProgramService(IHttpClientFactory httpClientFactory) : IProgramServ
 
         var result = JsonSerializer.Deserialize<ProgramModel>(content) ?? new ProgramModel();
 
-        return GetPlanCourses(result);
+        var list = GetPlanCourses(result);
+
+        if (list.Count != 0)
+        {
+            _redis.StringSet(key, JsonSerializer.Serialize(list), new TimeSpan(1, 0, 0, 0));
+        }
+
+        return list;
     }
 
     private static List<PlanCourse> GetPlanCourses(ProgramModel result)
@@ -101,23 +119,25 @@ public class CourseItem
     public double credits { get; set; }
 }
 
+[Serializable]
 public class DefaultExamMode
 {
     public string name { get; set; } = "";
 }
 
+[Serializable]
 public class CourseType
 {
     public string name { get; set; } = "";
 }
 
+[Serializable]
 public class PlanCourse
 {
-    public string Name { get; set; } = "";
+    public string Name { get; init; } = "";
     public string LessonType { get; set; } = "";
     public string ExamMode { get; set; } = "";
     public string CourseTypeName { get; set; } = "";
     public double Credits { get; set; }
-
-    public string TermStr { get; set; } = "";
+    public string TermStr { get; init; } = "";
 }
