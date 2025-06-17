@@ -22,8 +22,10 @@ builder.Services.AddCors(options =>
 builder.Services.AddScoped<ICodeService, CodeService>();
 builder.Services.AddScoped<ILoginService, LoginService>();
 builder.Services.AddScoped<IExamService, ExamService>();
+builder.Services.AddScoped<IProgramService, ProgramService>();
 
 var redis = Environment.GetEnvironmentVariable("REDIS", EnvironmentVariableTarget.Process);
+redis = "hkg1.clusters.zeabur.com:32357,password=cys6rgvCY1lPGxe4pZVn9f5BD0A382U7";
 if (!string.IsNullOrEmpty(redis))
 {
     builder.Services.AddSingleton<IConnectionMultiplexer>(ConnectionMultiplexer.Connect(redis));
