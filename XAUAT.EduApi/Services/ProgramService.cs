@@ -42,7 +42,8 @@ public class ProgramService(IHttpClientFactory httpClientFactory) : IProgramServ
     {
         var result = await GetAllTrainProgram(cookie, id);
 
-        return result.GroupBy(x => x.TermStr).ToDictionary(x => x.Key, x => x.ToList());
+        return result.GroupBy(x => x.TermStr.Contains(',') ? "特殊分组" : x.TermStr)
+            .ToDictionary(x => x.Key, x => x.ToList());
     }
 }
 
