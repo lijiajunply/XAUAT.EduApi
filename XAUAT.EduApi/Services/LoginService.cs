@@ -4,7 +4,7 @@ using System.Text.RegularExpressions;
 
 namespace XAUAT.EduApi.Services;
 
-public partial class LoginService(IHttpClientFactory httpClientFactory, ICodeService codeService) : ILoginService
+public class LoginService(IHttpClientFactory httpClientFactory, ICodeService codeService,CookieCodeService cookieCode) : ILoginService
 {
     public async Task<object> LoginAsync(string username, string password)
     {
@@ -15,7 +15,7 @@ public partial class LoginService(IHttpClientFactory httpClientFactory, ICodeSer
             throw new Exception("Failed to get salt");
 
         var salt = await saltResponse.Content.ReadAsStringAsync();
-        var cookies = ParseCookie(saltResponse.Headers.GetValues("Set-Cookie"));
+        var cookies = cookieCode.ParseCookie(saltResponse.Headers.GetValues("Set-Cookie"));
 
         // 准备登录参数
         var loginParams = new
@@ -39,11 +39,14 @@ public partial class LoginService(IHttpClientFactory httpClientFactory, ICodeSer
         var loginResponse = await httpClient.SendAsync(request);
 
         if (!loginResponse.IsSuccessStatusCode) throw new Exception("Login failed");
-        var studentId = await GetCode(cookies);
+        var studentId = await cookieCode.GetCode(cookies);
         return new { Success = true, StudentId = studentId, Cookie = cookies };
     }
+}
 
-    private async Task<string> GetCode(string cookies)
+public partial class CookieCodeService(IHttpClientFactory httpClientFactory)
+{
+    public async Task<string> GetCode(string cookies)
     {
         var request = new HttpRequestMessage(HttpMethod.Get, "https://swjw.xauat.edu.cn/student/for-std/precaution");
         request.Headers.Add("Cookie", cookies);
@@ -65,7 +68,7 @@ public partial class LoginService(IHttpClientFactory httpClientFactory, ICodeSer
         return matches.Count >= 1 ? string.Join(',', matches.Select(m => m.Groups[1].Value)) : "";
     }
 
-    private static string ParseCookie(IEnumerable<string> cookies)
+    public string ParseCookie(IEnumerable<string> cookies)
     {
         var result = new StringBuilder();
 

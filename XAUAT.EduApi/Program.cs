@@ -19,10 +19,14 @@ builder.Services.AddCors(options =>
             .AllowAnyOrigin();
     });
 });
+
+// Add services to the container.
 builder.Services.AddScoped<ICodeService, CodeService>();
-builder.Services.AddScoped<ILoginService, LoginService>();
+builder.Services.AddScoped<ILoginService, SSOLoginService>();
 builder.Services.AddScoped<IExamService, ExamService>();
 builder.Services.AddScoped<IProgramService, ProgramService>();
+builder.Services.AddScoped<IInfoService, InfoService>();
+builder.Services.AddScoped<CookieCodeService>();
 
 var redis = Environment.GetEnvironmentVariable("REDIS", EnvironmentVariableTarget.Process);
 if (string.IsNullOrEmpty(redis) && builder.Environment.IsDevelopment())

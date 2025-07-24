@@ -1,4 +1,5 @@
 ﻿using System.Text.RegularExpressions;
+using XAUAT.EduApi.Services;
 
 namespace XAUAT.EduApi.Models;
 
@@ -52,7 +53,7 @@ public class SemesterResult
         }
     }
 
-    public SemesterItem ParseNow(string html)
+    public SemesterItem ParseNow(string html, IInfoService service)
     {
         // 检查是否登录
         if (!Regex.IsMatch(html, "课表"))
@@ -61,7 +62,14 @@ public class SemesterResult
         }
 
         // 使用正则表达式匹配所有semester选项
-        var regex = new Regex("<option selected=\"selected\" value=\"(.*)\">(.*)</option>");
+        var regexString = "<option value=\"(.*)\">(.*)</option>";
+
+        if (service.IsInSchool())
+        {
+            regexString = "<option selected=\"selected\" value=\"(.*)\">(.*)</option>";
+        }
+
+        var regex = new Regex(regexString);
         var matches = regex.Matches(html);
 
         if (matches.Count == 0) return new SemesterItem();

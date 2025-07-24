@@ -9,6 +9,7 @@ namespace XAUAT.EduApi.Services;
 public class ExamService(
     IHttpClientFactory httpClientFactory,
     ILogger<ExamService> logger,
+    IInfoService info,
     IConnectionMultiplexer muxer)
     : IExamService
 {
@@ -44,9 +45,10 @@ public class ExamService(
 
         var thisSemester = await _redis.StringGetAsync("thisSemester");
 
-        if (thisSemester.HasValue)
+        if (thisSemester is { HasValue: true, IsNullOrEmpty: false })
         {
-            return JsonConvert.DeserializeObject<SemesterItem>(thisSemester.ToString()) ?? new SemesterItem();
+            var item = JsonConvert.DeserializeObject<SemesterItem>(thisSemester.ToString()) ?? new SemesterItem();
+            return item;
         }
 
         using var client = httpClientFactory.CreateClient();
@@ -54,10 +56,10 @@ public class ExamService(
         client.DefaultRequestHeaders.Add("Cookie", cookie);
         var html = await client.GetStringAsync("https://swjw.xauat.edu.cn/student/for-std/course-table");
         var result = new SemesterResult();
-        var data = result.ParseNow(html);
+        var data = result.ParseNow(html, info);
 
         await _redis.StringSetAsync("thisSemester", JsonConvert.SerializeObject(data),
-            expiry: new TimeSpan(10, 0, 0, 0));
+            expiry: new TimeSpan(2, 0, 0, 0));
 
         return data;
     }

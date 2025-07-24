@@ -1,10 +1,11 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using XAUAT.EduApi.Services;
 
 namespace XAUAT.EduApi.Controllers;
 
 [ApiController]
 [Route("[controller]")]
-public class InfoController(IHttpClientFactory httpClientFactory, ILogger<CourseController> logger)
+public class InfoController(IHttpClientFactory httpClientFactory, ILogger<CourseController> logger, IInfoService info)
     : ControllerBase
 {
     //https://swjw.xauat.edu.cn/student/ws/student/home-page/programCompletionPreview
@@ -29,8 +30,6 @@ public class InfoController(IHttpClientFactory httpClientFactory, ILogger<Course
     [HttpGet("Time")]
     public ActionResult GetTime()
     {
-        var start = Environment.GetEnvironmentVariable("START", EnvironmentVariableTarget.Process);
-        var end = Environment.GetEnvironmentVariable("END", EnvironmentVariableTarget.Process);
-        return Ok(new { StartTime = start ?? "2025-02-23", EndTime = end ?? "2025-07-19" });
+        return Ok(info.GetTime());
     }
 }
