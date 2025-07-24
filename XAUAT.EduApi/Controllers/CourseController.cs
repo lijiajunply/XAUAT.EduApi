@@ -36,6 +36,11 @@ public class CourseController(IHttpClientFactory httpClientFactory, ILogger<Cour
 
             var semester = await exam.GetThisSemester(cookie);
 
+            if (string.IsNullOrEmpty(semester.Value))
+            {
+                return NotFound();
+            }
+            
             foreach (var a in split)
             {
                 var response = await client.GetAsync(

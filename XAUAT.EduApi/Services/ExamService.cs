@@ -48,7 +48,11 @@ public class ExamService(
         if (thisSemester is { HasValue: true, IsNullOrEmpty: false })
         {
             var item = JsonConvert.DeserializeObject<SemesterItem>(thisSemester.ToString()) ?? new SemesterItem();
-            return item;
+            if (!string.IsNullOrEmpty(item.Value))
+            {
+                logger.LogInformation("已提取到缓存信息");
+                return item;
+            }
         }
 
         using var client = httpClientFactory.CreateClient();
