@@ -6,7 +6,7 @@ public class InfoService : IInfoService
     {
         var start = Environment.GetEnvironmentVariable("START", EnvironmentVariableTarget.Process);
         var end = Environment.GetEnvironmentVariable("END", EnvironmentVariableTarget.Process);
-        return new TimeModel() { StartTime = start ?? "2025-02-23", EndTime = end ?? "2025-07-19" };
+        return new TimeModel() { StartTime = start ?? "2025-08-31", EndTime = end ?? "2026-01-24" };
     }
 
     public bool IsInSchool()
