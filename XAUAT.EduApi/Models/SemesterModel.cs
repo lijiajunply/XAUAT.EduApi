@@ -74,10 +74,18 @@ public class SemesterResult
 
         if (matches.Count == 0) return new SemesterItem();
 
+        var text = matches.First().Groups[2].Value;
+        if (text[^1] != '3')
+            return new SemesterItem()
+            {
+                Value = matches.First().Groups[1].Value,
+                Text = text
+            };
+
         return new SemesterItem()
         {
-            Value = matches.First().Groups[1].Value,
-            Text = matches.First().Groups[2].Value
+            Value = "301",
+            Text = "2025-2026-1"
         };
     }
 }
