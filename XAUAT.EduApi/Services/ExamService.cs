@@ -45,15 +45,15 @@ public class ExamService(
 
         var thisSemester = await _redis.StringGetAsync("thisSemester");
 
-        // if (thisSemester is { HasValue: true, IsNullOrEmpty: false })
-        // {
-        //     var item = JsonConvert.DeserializeObject<SemesterItem>(thisSemester.ToString()) ?? new SemesterItem();
-        //     if (!string.IsNullOrEmpty(item.Value))
-        //     {
-        //         logger.LogInformation("已提取到缓存信息");
-        //         return item;
-        //     }
-        // }
+        if (thisSemester is { HasValue: true, IsNullOrEmpty: false })
+        {
+            var item = JsonConvert.DeserializeObject<SemesterItem>(thisSemester.ToString()) ?? new SemesterItem();
+            if (!string.IsNullOrEmpty(item.Value))
+            {
+                logger.LogInformation("已提取到缓存信息");
+                return item;
+            }
+        }
 
         using var client = httpClientFactory.CreateClient();
         client.Timeout = TimeSpan.FromSeconds(15); // 添加超时控制
