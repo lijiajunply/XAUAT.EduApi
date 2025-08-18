@@ -1,7 +1,9 @@
 ﻿using System.Text.Json;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using StackExchange.Redis;
 using XAUAT.EduApi.Models;
+using JsonSerializer = System.Text.Json.JsonSerializer;
 
 namespace XAUAT.EduApi.Services;
 
@@ -49,6 +51,7 @@ public class PaymentService(IConnectionMultiplexer muxer, IHttpClientFactory htt
         };
 
         using var client = httpClientFactory.CreateClient();
+        client.Timeout = TimeSpan.FromSeconds(15); // 添加超时控制
         // Step 1: Get the keyboard data
         var keyboardResponse =
             await client.GetAsync(
@@ -99,8 +102,8 @@ public class PaymentService(IConnectionMultiplexer muxer, IHttpClientFactory htt
     public async Task<PaymentData> GetTurnoverAsync(string cardNum)
     {
         var token = await Login(cardNum);
-        var payments = await GetPayments(token);
-        var t = await GetBalanceAsync(token);
+        var payments = await GetPayments(token, cardNum);
+        var t = await GetBalanceAsync(token, cardNum);
         return new PaymentData()
         {
             Records = payments,
@@ -108,8 +111,20 @@ public class PaymentService(IConnectionMultiplexer muxer, IHttpClientFactory htt
         };
     }
 
-    private async Task<List<PaymentModel>> GetPayments(string token)
+    private async Task<List<PaymentModel>> GetPayments(string token, string cardNum)
     {
+        var key = $"paymentList-{cardNum}";
+        var paymentValue = await _redis.StringGetAsync(key);
+
+        if (paymentValue is { HasValue: true, IsNullOrEmpty: false })
+        {
+            var item = paymentValue.ToString();
+            if (!string.IsNullOrEmpty(item))
+            {
+                return JsonConvert.DeserializeObject<List<PaymentModel>>(item) ?? [];
+            }
+        }
+
         const string _url = "http://ydfwpt.xauat.edu.cn/berserker-search/search/personal/turnover";
         var paramsDict = new Dictionary<string, string>
         {
@@ -129,6 +144,7 @@ public class PaymentService(IConnectionMultiplexer muxer, IHttpClientFactory htt
         uriBuilder.Query = query;
 
         using var client = httpClientFactory.CreateClient();
+        client.Timeout = TimeSpan.FromSeconds(6); // 添加超时控制
         foreach (var header in headers)
         {
             client.DefaultRequestHeaders.Add(header.Key, header.Value);
@@ -144,7 +160,10 @@ public class PaymentService(IConnectionMultiplexer muxer, IHttpClientFactory htt
             if (data == null || !data.TryGetValue("data", out var dataPart) ||
                 !dataPart.TryGetProperty("records", out var recordsElement)) return [];
             var records = recordsElement.Deserialize<List<Dictionary<string, JsonElement>>>();
-            return records?.Select(PaymentModel.FromJson).ToList() ?? [];
+            var a = records?.Select(PaymentModel.FromJson).ToList() ?? [];
+
+            await _redis.StringSetAsync(key, JsonConvert.SerializeObject(a), TimeSpan.FromMinutes(20));
+            return a;
         }
 
         Console.WriteLine($"Error: {response.StatusCode}");
@@ -152,8 +171,20 @@ public class PaymentService(IConnectionMultiplexer muxer, IHttpClientFactory htt
         return [];
     }
 
-    private async Task<double> GetBalanceAsync(string token)
+    private async Task<double> GetBalanceAsync(string token, string cardNum)
     {
+        var key = $"ele-acc-{cardNum}";
+        var paymentValue = await _redis.StringGetAsync(key);
+
+        if (paymentValue is { HasValue: true, IsNullOrEmpty: false })
+        {
+            var item = paymentValue.ToString();
+            if (!string.IsNullOrEmpty(item))
+            {
+                return double.Parse(item) / 100;
+            }
+        }
+
         const string _url = "https://ydfwpt.xauat.edu.cn/berserker-app/ykt/tsm/queryCard?synAccessSource=h5";
 
         var headers = new Dictionary<string, string>
@@ -163,6 +194,7 @@ public class PaymentService(IConnectionMultiplexer muxer, IHttpClientFactory htt
         };
 
         using var client = httpClientFactory.CreateClient();
+        client.Timeout = TimeSpan.FromSeconds(6); // 添加超时控制
         foreach (var header in headers)
         {
             client.DefaultRequestHeaders.Add(header.Key, header.Value);
@@ -174,12 +206,9 @@ public class PaymentService(IConnectionMultiplexer muxer, IHttpClientFactory htt
         var responseBody = await response.Content.ReadAsStringAsync();
         var data = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(responseBody);
         if (data == null || !data.TryGetValue("data", out var dataPart)) return 0;
-        if (dataPart.TryGetProperty("card", out var balanceElement) &&
-            balanceElement[0].TryGetProperty("elec_accamt", out var element))
-        {
-            return element.GetDouble() / 100;
-        }
-
-        return 0;
+        if (!dataPart.TryGetProperty("card", out var balanceElement) ||
+            !balanceElement[0].TryGetProperty("elec_accamt", out var element)) return 0;
+        await _redis.StringSetAsync(key, element.GetString() ?? "0", TimeSpan.FromMinutes(20));
+        return element.GetDouble() / 100;
     }
 }
