@@ -1,7 +1,4 @@
-﻿using System.Security.Cryptography;
-using System.Text;
-using HtmlAgilityPack;
-using Newtonsoft.Json.Linq;
+﻿using Newtonsoft.Json.Linq;
 
 namespace XAUAT.EduApi.Services;
 
