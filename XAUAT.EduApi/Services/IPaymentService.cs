@@ -208,7 +208,7 @@ public class PaymentService(IConnectionMultiplexer muxer, IHttpClientFactory htt
         if (data == null || !data.TryGetValue("data", out var dataPart)) return 0;
         if (!dataPart.TryGetProperty("card", out var balanceElement) ||
             !balanceElement[0].TryGetProperty("elec_accamt", out var element)) return 0;
-        await _redis.StringSetAsync(key, element.GetString() ?? "0", TimeSpan.FromMinutes(20));
+        await _redis.StringSetAsync(key, element.GetInt32().ToString(), TimeSpan.FromMinutes(20));
         return element.GetDouble() / 100;
     }
 }
