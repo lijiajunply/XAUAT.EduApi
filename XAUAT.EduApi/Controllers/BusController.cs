@@ -13,7 +13,7 @@ public class BusController(IHttpClientFactory httpClientFactory, IConnectionMult
 {
     private readonly IDatabase _redis = muxer.GetDatabase();
 
-    [HttpGet("{time}")]
+    [HttpGet("{time?}")]
     public async Task<IActionResult> GetBus(string? time)
     {
         return Ok(await GetBusFromOldData(time));

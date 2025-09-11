@@ -95,7 +95,7 @@ public class PaymentService(IConnectionMultiplexer muxer, IHttpClientFactory htt
         var responseData = JObject.Parse(responseJson);
         var accessToken = responseData["access_token"]!.ToObject<string>() ?? "";
 
-        await _redis.StringSetAsync(key, accessToken, TimeSpan.FromDays(1));
+        await _redis.StringSetAsync(key, accessToken, TimeSpan.FromHours(1));
         return accessToken;
     }
 
