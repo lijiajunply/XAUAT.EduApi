@@ -44,7 +44,6 @@ public class ScoreController(
             }
 
             var html = await client.GetStringAsync(url);
-            Console.WriteLine(html);
             var result = new SemesterResult();
             result.Parse(html);
             return result;
