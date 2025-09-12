@@ -32,6 +32,7 @@ public class ScoreController(
             }
 
             using var client = httpClientFactory.CreateClient();
+            client.SetRealisticHeaders();
             client.DefaultRequestHeaders.Add("Cookie", cookie);
             var url = "https://swjw.xauat.edu.cn/student/for-std/grade/sheet";
             if (!string.IsNullOrEmpty(studentId))
@@ -133,6 +134,7 @@ public class ScoreController(
         }
 
         using var client = httpClientFactory.CreateClient();
+        client.SetRealisticHeaders();
         client.DefaultRequestHeaders.Add("Cookie", cookie);
 
         var response = await client.GetAsync(
@@ -146,11 +148,6 @@ public class ScoreController(
         var stream = await response.Content.ReadAsStringAsync();
 
         var json = JObject.Parse(stream);
-
-
-        // 结果会是：
-
-        // string[] { "期末成绩:70", "过程考核成绩:86.5(慕课成绩:75.96;作业:84.79;实验:99)" }
 
         var list = (json["semesterId2studentGrades"]?[semester]!).Select(item => new ScoreResponse()
         {

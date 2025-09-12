@@ -63,6 +63,7 @@ public class ExamService(
         }
 
         using var client = httpClientFactory.CreateClient();
+        client.SetRealisticHeaders();
         client.Timeout = TimeSpan.FromSeconds(15); // 添加超时控制
         client.DefaultRequestHeaders.Add("Cookie", cookie);
         var html = await client.GetStringAsync("https://swjw.xauat.edu.cn/student/for-std/course-table");
@@ -106,6 +107,7 @@ public class ExamService(
             request.Headers.Add("Cookie", cookie);
 
             using var httpClient = httpClientFactory.CreateClient(); // 使用命名客户端
+            httpClient.SetRealisticHeaders();
 
             // 设置 CancellationToken
             var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));

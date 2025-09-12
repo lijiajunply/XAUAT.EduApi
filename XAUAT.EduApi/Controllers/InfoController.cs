@@ -20,6 +20,7 @@ public class InfoController(IHttpClientFactory httpClientFactory, ILogger<Course
         }
 
         using var client = httpClientFactory.CreateClient();
+        client.SetRealisticHeaders();
         client.Timeout = TimeSpan.FromSeconds(6); // 添加超时控制
         client.DefaultRequestHeaders.Add("Cookie", cookie);
         var response =

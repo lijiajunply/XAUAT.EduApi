@@ -3,6 +3,7 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using StackExchange.Redis;
 using XAUAT.EduApi.Models;
+using XAUAT.EduApi.Services;
 
 namespace XAUAT.EduApi.Controllers;
 
@@ -29,6 +30,7 @@ public class BusController(IHttpClientFactory httpClientFactory, IConnectionMult
     public async Task<IActionResult> GetBusFromNewData(string? time, string loc = "ALL")
     {
         using var client = httpClientFactory.CreateClient();
+        client.SetRealisticHeaders();
         client.Timeout = new TimeSpan(0, 0, 0, 1, 0);
         time ??= DateTime.Today.ToString("yyyy-MM-dd");
 
@@ -92,6 +94,7 @@ public class BusController(IHttpClientFactory httpClientFactory, IConnectionMult
     public async Task<BusModel> GetBusFromOldData(string? time, bool isShow = false)
     {
         using var client = httpClientFactory.CreateClient();
+        client.SetRealisticHeaders();
         time ??= DateTime.Today.ToString("yyyy-MM-dd");
 
         var bus = await _redis.StringGetAsync("bus:" + time);
