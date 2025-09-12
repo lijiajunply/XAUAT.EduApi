@@ -34,6 +34,7 @@ public class ScoreController(
             using var client = httpClientFactory.CreateClient();
             client.SetRealisticHeaders();
             client.DefaultRequestHeaders.Add("Cookie", cookie);
+            client.Timeout = TimeSpan.FromSeconds(3);
             var url = "https://swjw.xauat.edu.cn/student/for-std/grade/sheet";
             if (!string.IsNullOrEmpty(studentId))
             {
