@@ -22,7 +22,7 @@ public class EduContext(DbContextOptions<EduContext> options) : DbContext
         modelBuilder.Entity<UserModel>()
             .HasMany(u => u.ScoreResponses)
             .WithOne()
-            .HasForeignKey("UserId");
+            .HasForeignKey(s => s.UserId);
     }
 }
 

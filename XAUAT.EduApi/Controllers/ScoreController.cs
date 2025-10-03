@@ -189,10 +189,19 @@ public class ScoreController(
         {
             // 为每个成绩项生成唯一键值
             score.Key = $"{studentId}_{semester}_{score.LessonCode}_{score.Name}".ToHash();
-            await context.Set<ScoreResponse>().AddAsync(score);
+            context.Set<ScoreResponse>().Add(score);
         }
         
-        await context.SaveChangesAsync();
+        try 
+        {
+            await context.SaveChangesAsync();
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "保存成绩数据到数据库时出错");
+            // 即使保存失败也返回爬取的数据
+        }
+        
         return crawledScores;
     }
 

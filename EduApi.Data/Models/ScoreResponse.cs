@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Text.Json.Serialization;
 
@@ -7,7 +7,7 @@ namespace EduApi.Data.Models;
 [Table("scores")]
 public class ScoreResponse : DataModel
 {
-    [JsonIgnore] [Key] [MaxLength(64)] public string Key { get; set; } = "";
+    [JsonIgnore] [Key] [MaxLength(64)] public string Key { get; set; } = Guid.NewGuid().ToString();
     [MaxLength(64)] public string Name { get; set; } = "";
     [MaxLength(64)] public string LessonCode { get; set; } = "";
     [MaxLength(64)] public string LessonName { get; set; } = "";
@@ -16,4 +16,6 @@ public class ScoreResponse : DataModel
     [MaxLength(64)] public string GradeDetail { get; set; } = "";
     [MaxLength(64)] public string Credit { get; set; } = "";
     public bool IsMinor { get; set; }
+    
+    [JsonIgnore] [MaxLength(64)] public string UserId { get; set; } = "";
 }
