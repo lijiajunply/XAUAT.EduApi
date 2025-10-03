@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace EduApi.Data.Models;
@@ -13,4 +13,10 @@ public class UserModel : DataModel
     public List<string> Semesters { get; set; } = [];
     [MaxLength(64)] public string SemesterUpdateTime { get; set; } = "";
     [MaxLength(64)] public string ScoreResponsesUpdateTime { get; set; } = "";
+    
+    public UserModel()
+    {
+        ScoreResponses = new List<ScoreResponse>();
+        Semesters = new List<string>();
+    }
 }

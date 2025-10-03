@@ -2,6 +2,7 @@ using EduApi.Data;
 using Microsoft.EntityFrameworkCore;
 using Scalar.AspNetCore;
 using StackExchange.Redis;
+using XAUAT.EduApi.Repos;
 using XAUAT.EduApi.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -26,6 +27,9 @@ builder.Services.AddDbContextFactory<EduContext>(opt =>
         o => o.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery)));
 
 // Add services to the container.
+builder.Services.AddScoped<IScoreRepository, ScoreRepository>();
+builder.Services.AddScoped<IUserRepository, UserRepository>();
+
 builder.Services.AddScoped<ICodeService, CodeService>();
 builder.Services.AddScoped<ILoginService, SSOLoginService>();
 builder.Services.AddScoped<IExamService, ExamService>();

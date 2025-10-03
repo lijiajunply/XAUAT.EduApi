@@ -1,4 +1,4 @@
-﻿using System.Text.RegularExpressions;
+using System.Text.RegularExpressions;
 using EduApi.Data;
 using EduApi.Data.Models;
 using Microsoft.AspNetCore.Mvc;
@@ -14,7 +14,7 @@ namespace XAUAT.EduApi.Controllers;
 [Route("[controller]")]
 public class ScoreController(
     IHttpClientFactory httpClientFactory,
-    ILogger<CourseController> logger,
+    ILogger<ScoreController> logger,
     IExamService exam,
     IConnectionMultiplexer muxer,
     IDbContextFactory<EduContext> factory)
@@ -93,6 +93,9 @@ public class ScoreController(
                 return BadRequest("学号或Cookie不能为空");
             }
 
+            // 确保用户存在于数据库中
+            await EnsureUserExists(studentId, cookie);
+
             var split = studentId.Split(',');
             var result = new List<ScoreResponse>();
 
@@ -121,6 +124,35 @@ public class ScoreController(
     }
 
     /// <summary>
+    /// 确保用户存在于数据库中
+    /// </summary>
+    /// <param name="studentId"></param>
+    /// <param name="cookie"></param>
+    /// <returns></returns>
+    private async Task EnsureUserExists(string studentId, string cookie)
+    {
+        await using var context = await factory.CreateDbContextAsync();
+        var userExists = await context.Users.AnyAsync(u => u.Id == studentId);
+        
+        if (!userExists)
+        {
+            // 如果用户不存在，创建一个新用户
+            var newUser = new UserModel
+            {
+                Id = studentId,
+                Username = studentId, // 使用学号作为默认用户名
+                Password = "", // 密码留空，因为我们通过cookie验证
+                SemesterUpdateTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
+                ScoreResponsesUpdateTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
+            };
+            
+            context.Users.Add(newUser);
+            await context.SaveChangesAsync();
+            logger.LogInformation("为学号 {StudentId} 创建了新用户记录", studentId);
+        }
+    }
+
+    /// <summary>
     /// 获取单学期成绩
     /// </summary>
     /// <param name="studentId"></param>
@@ -129,11 +161,56 @@ public class ScoreController(
     /// <returns></returns>
     private async Task<IEnumerable<ScoreResponse>> GetScoreResponse(string studentId, string semester, string cookie)
     {
+        // 先判断是否为当前学期
+        var thisSemester = await exam.GetThisSemester(cookie);
+        var isCurrentSemester = thisSemester.Value == semester;
+
+        // 如果是当前学期，直接爬虫
+        if (isCurrentSemester)
+        {
+            return await CrawlScores(studentId, semester, cookie);
+        }
+
+        // 如果不是当前学期，先从数据库查询
+        await using var context = await factory.CreateDbContextAsync();
+        var dbScores = await context.Set<ScoreResponse>()
+            .Where(s => s.Key.StartsWith($"{studentId}_{semester}_"))
+            .ToListAsync();
+
+        // 如果数据库中有数据，直接返回
+        if (dbScores.Any())
+        {
+            return dbScores;
+        }
+
+        // 如果数据库中没有数据，则爬虫获取并保存到数据库
+        var crawledScores = await CrawlScores(studentId, semester, cookie);
+        foreach (var score in crawledScores)
+        {
+            // 为每个成绩项生成唯一键值
+            score.Key = $"{studentId}_{semester}_{score.LessonCode}_{score.Name}".ToHash();
+            await context.Set<ScoreResponse>().AddAsync(score);
+        }
+        
+        await context.SaveChangesAsync();
+        return crawledScores;
+    }
+
+    /// <summary>
+    /// 爬取成绩数据
+    /// </summary>
+    /// <param name="studentId"></param>
+    /// <param name="semester"></param>
+    /// <param name="cookie"></param>
+    /// <returns></returns>
+    private async Task<List<ScoreResponse>> CrawlScores(string studentId, string semester, string cookie)
+    {
         var cacheKey = $"score_{studentId}_{semester}";
         if (_redis.KeyExists(cacheKey))
         {
             var result = _redis.StringGet(cacheKey);
-            return result.HasValue ? JsonConvert.DeserializeObject<List<ScoreResponse>>(result.ToString()) ?? [] : [];
+            var cached = result.HasValue ? JsonConvert.DeserializeObject<List<ScoreResponse>>(result.ToString()) ?? [] : [];
+            return cached.ToList();
         }
 
         using var client = httpClientFactory.CreateClient();
@@ -145,12 +222,29 @@ public class ScoreController(
 
         if (!response.IsSuccessStatusCode)
         {
+            logger.LogWarning("获取成绩数据失败，HTTP状态码: {StatusCode}", response.StatusCode);
             return [];
         }
 
-        var stream = await response.Content.ReadAsStringAsync();
+        var content = await response.Content.ReadAsStringAsync();
+        
+        // 检查返回的内容是否为HTML（表示可能需要重新登录）
+        if (content.StartsWith("<"))
+        {
+            logger.LogWarning("获取成绩数据失败，返回了HTML内容而非JSON，可能Cookie已过期");
+            return [];
+        }
 
-        var json = JObject.Parse(stream);
+        JObject json;
+        try
+        {
+            json = JObject.Parse(content);
+        }
+        catch (JsonReaderException ex)
+        {
+            logger.LogError(ex, "解析成绩JSON数据失败，原始内容: {Content}", content);
+            return [];
+        }
 
         var list = (json["semesterId2studentGrades"]?[semester]!).Select(item => new ScoreResponse()
         {
@@ -163,28 +257,28 @@ public class ScoreController(
             GradeDetail = string.Join("; ",
                 Regex.Matches(item["gradeDetail"]!.ToString(), @"<span[^>]*>([^<]+)<\/span>")
                     .Select(m => m.Groups[1].Value.Trim()))
-        });
+        }).ToList();
 
-        var scoreResponses = list as ScoreResponse[] ?? list.ToArray();
-        if (scoreResponses.Length == 0) return scoreResponses;
-        SemesterItem a;
+        if (list.Count == 0) return list;
+        
+        SemesterItem thisSemester;
         if (!_redis.KeyExists("thisSemester"))
         {
-            a = await exam.GetThisSemester(cookie);
+            thisSemester = await exam.GetThisSemester(cookie);
         }
         else
         {
-            var thisSemester = _redis.StringGet("thisSemester");
-            if (!thisSemester.HasValue || thisSemester.IsNullOrEmpty) return scoreResponses;
-            a = JsonConvert.DeserializeObject<SemesterItem>(thisSemester!) ?? new SemesterItem();
+            var thisSemesterCache = _redis.StringGet("thisSemester");
+            if (!thisSemesterCache.HasValue || thisSemesterCache.IsNullOrEmpty) return list;
+            thisSemester = JsonConvert.DeserializeObject<SemesterItem>(thisSemesterCache!) ?? new SemesterItem();
         }
 
-        if (a.Value != semester)
+        if (thisSemester.Value != semester)
         {
             await _redis.StringSetAsync(cacheKey, JsonConvert.SerializeObject(list),
                 expiry: new TimeSpan(5, 0, 0, 0));
         }
 
-        return scoreResponses;
+        return list;
     }
 }

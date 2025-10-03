@@ -21,4 +21,8 @@
       <ProjectReference Include="..\EduApi.Data\EduApi.Data.csproj" />
     </ItemGroup>
 
+    <ItemGroup>
+      <Folder Include="Repos\" />
+    </ItemGroup>
+
 </Project>

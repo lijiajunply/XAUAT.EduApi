@@ -1,4 +1,4 @@
-﻿using System.Reflection;
+using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
 using EduApi.Data.Models;
@@ -10,10 +10,19 @@ namespace EduApi.Data;
 public class EduContext(DbContextOptions<EduContext> options) : DbContext
 {
     public DbSet<UserModel> Users { get; set; }
+    public DbSet<ScoreResponse> Scores { get; set; }
     
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
         optionsBuilder.UseSqlite("Data Source=Data.db");
+    }
+    
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<UserModel>()
+            .HasMany(u => u.ScoreResponses)
+            .WithOne()
+            .HasForeignKey("UserId");
     }
 }
 
