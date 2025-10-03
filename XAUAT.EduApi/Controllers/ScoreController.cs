@@ -189,6 +189,8 @@ public class ScoreController(
         {
             // 为每个成绩项生成唯一键值
             score.Key = $"{studentId}_{semester}_{score.LessonCode}_{score.Name}".ToHash();
+            // 设置外键关联
+            score.UserId = studentId;
             context.Set<ScoreResponse>().Add(score);
         }
 
