@@ -5,3 +5,7 @@ riderModule.iml
 /_ReSharper.Caches/
 
 appsettings.Development.json
+
+*.db
+*.db-shm
+*.db-wal

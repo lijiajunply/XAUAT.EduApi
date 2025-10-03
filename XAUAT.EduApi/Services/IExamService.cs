@@ -1,14 +1,14 @@
 ﻿using System.Text.RegularExpressions;
+using EduApi.Data.Models;
 using Newtonsoft.Json;
 using Polly;
 using StackExchange.Redis;
-using XAUAT.EduApi.Models;
 
 namespace XAUAT.EduApi.Services;
 
 public interface IExamService
 {
-    Task<ExamResponse> GetExamArrangementsAsync(string cookie,string? id);
+    Task<ExamResponse> GetExamArrangementsAsync(string cookie, string? id);
 
     Task<SemesterItem> GetThisSemester(string cookie);
 }
@@ -67,8 +67,8 @@ public class ExamService(
         client.Timeout = TimeSpan.FromSeconds(15); // 添加超时控制
         client.DefaultRequestHeaders.Add("Cookie", cookie);
         var html = await client.GetStringAsync("https://swjw.xauat.edu.cn/student/for-std/course-table");
-        var result = new SemesterResult();
-        var data = result.ParseNow(html, info);
+
+        var data = html.ParseNow(info);
 
         await _redis.StringSetAsync("thisSemester", JsonConvert.SerializeObject(data),
             expiry: new TimeSpan(2, 0, 0, 0));
@@ -198,5 +198,47 @@ public class ExamService(
                 CanClick = false
             };
         }
+    }
+}
+
+public static class SemesterModelStatic
+{
+    public static SemesterItem ParseNow(this string html, IInfoService service)
+    {
+        // 检查是否登录
+        if (!Regex.IsMatch(html, "课表"))
+        {
+            return new SemesterItem();
+        }
+
+        // 使用正则表达式匹配所有semester选项
+        var regexString = "<option value=\"(.*)\">(.*)</option>";
+
+        if (service.IsInSchool())
+        {
+            regexString = "<option selected=\"selected\" value=\"(.*)\">(.*)</option>";
+        }
+
+        var regex = new Regex(regexString);
+        var matches = regex.Matches(html);
+
+        if (matches.Count == 0) return new SemesterItem();
+
+        var text = matches.First().Groups[2].Value;
+
+        if (text == "" || text[^1] == '3')
+        {
+            return new SemesterItem()
+            {
+                Value = "301",
+                Text = "2025-2026-1"
+            };
+        }
+
+        return new SemesterItem()
+        {
+            Value = matches.First().Groups[1].Value,
+            Text = text
+        };
     }
 }

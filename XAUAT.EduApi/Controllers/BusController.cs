@@ -1,8 +1,8 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using EduApi.Data.Models;
+using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using StackExchange.Redis;
-using XAUAT.EduApi.Models;
 using XAUAT.EduApi.Services;
 
 namespace XAUAT.EduApi.Controllers;

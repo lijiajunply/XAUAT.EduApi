@@ -1,6 +1,6 @@
 ﻿using System.Text.Json;
 
-namespace XAUAT.EduApi.Models;
+namespace EduApi.Data.Models;
 
 [Serializable]
 public class PaymentData

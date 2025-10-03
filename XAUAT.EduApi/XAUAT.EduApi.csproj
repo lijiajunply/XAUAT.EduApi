@@ -17,4 +17,8 @@
         <PackageReference Include="StackExchange.Redis" Version="2.9.17" />
     </ItemGroup>
 
+    <ItemGroup>
+      <ProjectReference Include="..\EduApi.Data\EduApi.Data.csproj" />
+    </ItemGroup>
+
 </Project>

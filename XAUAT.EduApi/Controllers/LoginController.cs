@@ -1,5 +1,5 @@
+using EduApi.Data.Models;
 using Microsoft.AspNetCore.Mvc;
-using XAUAT.EduApi.Models;
 using XAUAT.EduApi.Services;
 
 namespace XAUAT.EduApi.Controllers;

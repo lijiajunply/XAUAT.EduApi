@@ -1,8 +1,14 @@
-﻿using Newtonsoft.Json.Linq;
+﻿using EduApi.Data;
+using EduApi.Data.Models;
+using Microsoft.EntityFrameworkCore;
+using Newtonsoft.Json.Linq;
 
 namespace XAUAT.EduApi.Services;
 
-public class SSOLoginService(IHttpClientFactory httpClientFactory, CookieCodeService cookieCode) : ILoginService
+public class SSOLoginService(
+    IHttpClientFactory httpClientFactory,
+    CookieCodeService cookieCode,
+    EduContext context) : ILoginService
 {
     public async Task<object> LoginAsync(string username, string password)
     {
@@ -14,6 +20,18 @@ public class SSOLoginService(IHttpClientFactory httpClientFactory, CookieCodeSer
         if (!json["success"]!.ToObject<bool>()) throw new Exception("Login failed");
         var cookies = json["cookies"]!.ToObject<string>() ?? "";
         var studentId = await cookieCode.GetCode(cookies);
+
+        if (await context.Users.AnyAsync(u => u.Id == studentId))
+            return new { Success = true, StudentId = studentId, Cookie = cookies };
+        context.Users.Add(new UserModel
+        {
+            Id = studentId,
+            Username = username,
+            Password = DataTool.StringToHash(password)
+        });
+
+        await context.SaveChangesAsync();
+
         return new { Success = true, StudentId = studentId, Cookie = cookies };
     }
 }

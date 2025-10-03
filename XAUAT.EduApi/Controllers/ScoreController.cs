@@ -1,9 +1,11 @@
 ﻿using System.Text.RegularExpressions;
+using EduApi.Data;
+using EduApi.Data.Models;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using StackExchange.Redis;
-using XAUAT.EduApi.Models;
 using XAUAT.EduApi.Services;
 
 namespace XAUAT.EduApi.Controllers;
@@ -14,7 +16,8 @@ public class ScoreController(
     IHttpClientFactory httpClientFactory,
     ILogger<CourseController> logger,
     IExamService exam,
-    IConnectionMultiplexer muxer)
+    IConnectionMultiplexer muxer,
+    IDbContextFactory<EduContext> factory)
     : ControllerBase
 {
     private readonly IDatabase _redis = muxer.GetDatabase();

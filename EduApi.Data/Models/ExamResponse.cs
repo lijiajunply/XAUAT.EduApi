@@ -1,4 +1,4 @@
-﻿namespace XAUAT.EduApi.Models;
+﻿namespace EduApi.Data.Models;
 
 [Serializable]
 public class ExamInfo

@@ -1,8 +1,8 @@
 ﻿using System.Text.Json;
+using EduApi.Data.Models;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using StackExchange.Redis;
-using XAUAT.EduApi.Models;
 using JsonSerializer = System.Text.Json.JsonSerializer;
 
 namespace XAUAT.EduApi.Services;

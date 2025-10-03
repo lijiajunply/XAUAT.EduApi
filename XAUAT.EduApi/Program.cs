@@ -1,3 +1,5 @@
+using EduApi.Data;
+using Microsoft.EntityFrameworkCore;
 using Scalar.AspNetCore;
 using StackExchange.Redis;
 using XAUAT.EduApi.Services;
@@ -19,6 +21,10 @@ builder.Services.AddCors(options =>
     });
 });
 
+builder.Services.AddDbContextFactory<EduContext>(opt =>
+    opt.UseSqlite("Data Source=Data.db",
+        o => o.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery)));
+
 // Add services to the container.
 builder.Services.AddScoped<ICodeService, CodeService>();
 builder.Services.AddScoped<ILoginService, SSOLoginService>();
@@ -33,6 +39,7 @@ if (string.IsNullOrEmpty(redis) && builder.Environment.IsDevelopment())
 {
     redis = builder.Configuration["Redis"];
 }
+
 if (!string.IsNullOrEmpty(redis))
 {
     builder.Services.AddSingleton<IConnectionMultiplexer>(ConnectionMultiplexer.Connect(redis));
@@ -44,6 +51,37 @@ builder.Services.AddHttpContextAccessor();
 var app = builder.Build();
 
 app.MapOpenApi();
+
+using (var scope = app.Services.CreateScope())
+{
+    var services = scope.ServiceProvider;
+    var context = services.GetRequiredService<EduContext>();
+
+    var pending = context.Database.GetPendingMigrations();
+    var enumerable = pending as string[] ?? pending.ToArray();
+
+    if (enumerable.Length != 0)
+    {
+        Console.WriteLine("Pending migrations: " + string.Join("; ", enumerable));
+        try
+        {
+            await context.Database.MigrateAsync();
+            Console.WriteLine("Migrations applied successfully.");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("Migration error: " + ex);
+            throw; // 让异常冒泡，方便定位问题
+        }
+    }
+    else
+    {
+        Console.WriteLine("No pending migrations.");
+    }
+
+    await context.SaveChangesAsync();
+    await context.DisposeAsync();
+}
 
 app.UseAuthorization();
 app.UseCors();

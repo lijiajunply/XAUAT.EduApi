@@ -1,5 +1,8 @@
 ﻿using System.Text;
 using System.Text.Json;
+using EduApi.Data;
+using EduApi.Data.Models;
+using Microsoft.EntityFrameworkCore;
 
 namespace XAUAT.EduApi.Services;
 
@@ -8,7 +11,11 @@ public interface ILoginService
     Task<object> LoginAsync(string username, string password);
 }
 
-public class LoginService(IHttpClientFactory httpClientFactory, ICodeService codeService, CookieCodeService cookieCode)
+public class LoginService(
+    IHttpClientFactory httpClientFactory,
+    ICodeService codeService,
+    CookieCodeService cookieCode,
+    EduContext context)
     : ILoginService
 {
     public async Task<object> LoginAsync(string username, string password)
@@ -45,6 +52,18 @@ public class LoginService(IHttpClientFactory httpClientFactory, ICodeService cod
 
         if (!loginResponse.IsSuccessStatusCode) throw new Exception("Login failed");
         var studentId = await cookieCode.GetCode(cookies);
+
+        if (await context.Users.AnyAsync(u => u.Id == studentId))
+            return new { Success = true, StudentId = studentId, Cookie = cookies };
+        context.Users.Add(new UserModel
+        {
+            Id = studentId,
+            Username = username,
+            Password = DataTool.StringToHash(password)
+        });
+
+        await context.SaveChangesAsync();
+
         return new { Success = true, StudentId = studentId, Cookie = cookies };
     }
 }

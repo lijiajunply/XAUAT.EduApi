@@ -1,6 +1,6 @@
 ﻿using System.Text.Json.Serialization;
 
-namespace XAUAT.EduApi.Models;
+namespace EduApi.Data.Models;
 
 [Serializable]
 public class ExamDataRaw

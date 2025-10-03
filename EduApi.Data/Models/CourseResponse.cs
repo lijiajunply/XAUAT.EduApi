@@ -1,4 +1,4 @@
-﻿namespace XAUAT.EduApi.Models;
+﻿namespace EduApi.Data.Models;
 
 public class CourseResponse
 {
