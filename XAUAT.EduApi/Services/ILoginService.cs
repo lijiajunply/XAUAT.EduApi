@@ -1,8 +1,9 @@
-﻿using System.Text;
+using System.Text;
 using System.Text.Json;
 using EduApi.Data;
 using EduApi.Data.Models;
 using Microsoft.EntityFrameworkCore;
+using Polly;
 
 namespace XAUAT.EduApi.Services;
 
@@ -20,50 +21,60 @@ public class LoginService(
 {
     public async Task<object> LoginAsync(string username, string password)
     {
-        using var httpClient = httpClientFactory.CreateClient();
-        // 获取 salt
-        var saltResponse = await httpClient.GetAsync("https://swjw.xauat.edu.cn/student/login-salt");
-        if (!saltResponse.IsSuccessStatusCode)
-            throw new Exception("Failed to get salt");
+        var retryPolicy = Policy
+            .Handle<HttpRequestException>()
+            .Or<TaskCanceledException>()
+            .WaitAndRetryAsync(3, retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)));
 
-        var salt = await saltResponse.Content.ReadAsStringAsync();
-        var cookies = cookieCode.ParseCookie(saltResponse.Headers.GetValues("Set-Cookie"));
-
-        // 准备登录参数
-        var loginParams = new
+        return await retryPolicy.ExecuteAsync(async () =>
         {
-            salt,
-            username,
-            password
-        };
+            using var httpClient = httpClientFactory.CreateClient();
+            httpClient.Timeout = TimeSpan.FromSeconds(5); // 5秒超时
+            
+            // 获取 salt
+            var saltResponse = await httpClient.GetAsync("https://swjw.xauat.edu.cn/student/login-salt");
+            if (!saltResponse.IsSuccessStatusCode)
+                throw new Exception("Failed to get salt");
 
-        var encodedParams = codeService.Encode(loginParams); // 需要实现对应的加密方法
+            var salt = await saltResponse.Content.ReadAsStringAsync();
+            var cookies = cookieCode.ParseCookie(saltResponse.Headers.GetValues("Set-Cookie"));
 
-        // 发送登录请求
-        var request = new HttpRequestMessage(HttpMethod.Post, "https://swjw.xauat.edu.cn/student/login");
-        request.Headers.Add("Cookie", cookies);
+            // 准备登录参数
+            var loginParams = new
+            {
+                salt,
+                username,
+                password
+            };
 
-        request.Content = new StringContent(
-            JsonSerializer.Serialize(encodedParams),
-            Encoding.UTF8,
-            "application/json");
+            var encodedParams = codeService.Encode(loginParams); // 需要实现对应的加密方法
 
-        var loginResponse = await httpClient.SendAsync(request);
+            // 发送登录请求
+            var request = new HttpRequestMessage(HttpMethod.Post, "https://swjw.xauat.edu.cn/student/login");
+            request.Headers.Add("Cookie", cookies);
 
-        if (!loginResponse.IsSuccessStatusCode) throw new Exception("Login failed");
-        var studentId = await cookieCode.GetCode(cookies);
+            request.Content = new StringContent(
+                JsonSerializer.Serialize(encodedParams),
+                Encoding.UTF8,
+                "application/json");
 
-        if (await context.Users.AnyAsync(u => u.Id == studentId))
+            var loginResponse = await httpClient.SendAsync(request);
+
+            if (!loginResponse.IsSuccessStatusCode) throw new Exception("Login failed");
+            var studentId = await cookieCode.GetCode(cookies);
+
+            if (await context.Users.AnyAsync(u => u.Id == studentId))
+                return new { Success = true, StudentId = studentId, Cookie = cookies };
+            context.Users.Add(new UserModel
+            {
+                Id = studentId,
+                Username = username,
+                Password = DataTool.StringToHash(password)
+            });
+
+            await context.SaveChangesAsync();
+
             return new { Success = true, StudentId = studentId, Cookie = cookies };
-        context.Users.Add(new UserModel
-        {
-            Id = studentId,
-            Username = username,
-            Password = DataTool.StringToHash(password)
         });
-
-        await context.SaveChangesAsync();
-
-        return new { Success = true, StudentId = studentId, Cookie = cookies };
     }
 }

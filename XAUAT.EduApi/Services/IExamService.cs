@@ -1,4 +1,4 @@
-﻿using System.Text.RegularExpressions;
+using System.Text.RegularExpressions;
 using EduApi.Data.Models;
 using Newtonsoft.Json;
 using Polly;
@@ -62,18 +62,26 @@ public class ExamService(
             }
         }
 
-        using var client = httpClientFactory.CreateClient();
-        client.SetRealisticHeaders();
-        client.Timeout = TimeSpan.FromSeconds(15); // 添加超时控制
-        client.DefaultRequestHeaders.Add("Cookie", cookie);
-        var html = await client.GetStringAsync("https://swjw.xauat.edu.cn/student/for-std/course-table");
+        var retryPolicy = Policy
+            .Handle<HttpRequestException>()
+            .Or<TaskCanceledException>()
+            .WaitAndRetryAsync(3, retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)));
 
-        var data = html.ParseNow(info);
+        return await retryPolicy.ExecuteAsync(async () =>
+        {
+            using var client = httpClientFactory.CreateClient();
+            client.SetRealisticHeaders();
+            client.Timeout = TimeSpan.FromSeconds(5); // 修改为5秒超时
+            client.DefaultRequestHeaders.Add("Cookie", cookie);
+            var html = await client.GetStringAsync("https://swjw.xauat.edu.cn/student/for-std/course-table");
 
-        await _redis.StringSetAsync("thisSemester", JsonConvert.SerializeObject(data),
-            expiry: new TimeSpan(2, 0, 0, 0));
+            var data = html.ParseNow(info);
 
-        return data;
+            await _redis.StringSetAsync("thisSemester", JsonConvert.SerializeObject(data),
+                expiry: new TimeSpan(2, 0, 0, 0));
+
+            return data;
+        });
     }
 
     /// <summary>
@@ -108,9 +116,10 @@ public class ExamService(
 
             using var httpClient = httpClientFactory.CreateClient(); // 使用命名客户端
             httpClient.SetRealisticHeaders();
+            httpClient.Timeout = TimeSpan.FromSeconds(5); // 修改为5秒超时
 
             // 设置 CancellationToken
-            var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+            var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
 
             // 添加重试逻辑（示例）
             var retryPolicy = Policy

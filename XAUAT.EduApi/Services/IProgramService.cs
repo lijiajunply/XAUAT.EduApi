@@ -1,8 +1,9 @@
-﻿using System.Text;
+using System.Text;
 using Newtonsoft.Json;
 using System.Text.Json.Serialization;
 using StackExchange.Redis;
 using JsonSerializer = System.Text.Json.JsonSerializer;
+using Polly;
 
 namespace XAUAT.EduApi.Services;
 
@@ -28,26 +29,35 @@ public class ProgramService(IHttpClientFactory httpClientFactory, IConnectionMul
             return JsonConvert.DeserializeObject<List<PlanCourse>>(trainProgramValue.ToString()) ?? [];
         }
 
-        var request =
-            new HttpRequestMessage(HttpMethod.Get, $"{_baseUrl}/student/for-std/program/root-module-json/{id}");
-        request.Headers.Add("Cookie", cookie);
+        var retryPolicy = Policy
+            .Handle<HttpRequestException>()
+            .Or<TaskCanceledException>()
+            .WaitAndRetryAsync(3, retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)));
 
-        using var httpClient = httpClientFactory.CreateClient(); // 使用命名客户端
-
-        var response = await httpClient.SendAsync(request);
-        if (!response.IsSuccessStatusCode) return [];
-        var content = await response.Content.ReadAsStringAsync();
-
-        var result = JsonSerializer.Deserialize<ProgramModel>(content) ?? new ProgramModel();
-
-        var list = GetPlanCourses(result);
-
-        if (list.Count != 0)
+        return await retryPolicy.ExecuteAsync(async () =>
         {
-            _redis.StringSet(key, JsonSerializer.Serialize(list), new TimeSpan(1, 0, 0, 0));
-        }
+            var request =
+                new HttpRequestMessage(HttpMethod.Get, $"{_baseUrl}/student/for-std/program/root-module-json/{id}");
+            request.Headers.Add("Cookie", cookie);
 
-        return list;
+            using var httpClient = httpClientFactory.CreateClient(); // 使用命名客户端
+            httpClient.Timeout = TimeSpan.FromSeconds(5); // 5秒超时
+
+            var response = await httpClient.SendAsync(request);
+            if (!response.IsSuccessStatusCode) return [];
+            var content = await response.Content.ReadAsStringAsync();
+
+            var result = JsonSerializer.Deserialize<ProgramModel>(content) ?? new ProgramModel();
+
+            var list = GetPlanCourses(result);
+
+            if (list.Count != 0)
+            {
+                _redis.StringSet(key, JsonSerializer.Serialize(list), new TimeSpan(1, 0, 0, 0));
+            }
+
+            return list;
+        });
     }
 
     private static List<PlanCourse> GetPlanCourses(ProgramModel result)
