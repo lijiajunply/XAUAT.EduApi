@@ -133,7 +133,7 @@ public class ScoreController(
     {
         await using var context = await factory.CreateDbContextAsync();
         var userExists = await context.Users.AnyAsync(u => u.Id == studentId);
-        
+
         if (!userExists)
         {
             // 如果用户不存在，创建一个新用户
@@ -145,7 +145,7 @@ public class ScoreController(
                 SemesterUpdateTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
                 ScoreResponsesUpdateTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
             };
-            
+
             context.Users.Add(newUser);
             await context.SaveChangesAsync();
             logger.LogInformation("为学号 {StudentId} 创建了新用户记录", studentId);
@@ -173,12 +173,12 @@ public class ScoreController(
 
         // 如果不是当前学期，先从数据库查询
         await using var context = await factory.CreateDbContextAsync();
-        var dbScores = await context.Set<ScoreResponse>()
+        var dbScores = await context.Scores
             .Where(s => s.Key.StartsWith($"{studentId}_{semester}_"))
             .ToListAsync();
 
         // 如果数据库中有数据，直接返回
-        if (dbScores.Any())
+        if (dbScores.Count != 0)
         {
             return dbScores;
         }
@@ -191,8 +191,8 @@ public class ScoreController(
             score.Key = $"{studentId}_{semester}_{score.LessonCode}_{score.Name}".ToHash();
             context.Set<ScoreResponse>().Add(score);
         }
-        
-        try 
+
+        try
         {
             await context.SaveChangesAsync();
         }
@@ -201,7 +201,7 @@ public class ScoreController(
             logger.LogError(ex, "保存成绩数据到数据库时出错");
             // 即使保存失败也返回爬取的数据
         }
-        
+
         return crawledScores;
     }
 
@@ -218,7 +218,9 @@ public class ScoreController(
         if (_redis.KeyExists(cacheKey))
         {
             var result = _redis.StringGet(cacheKey);
-            var cached = result.HasValue ? JsonConvert.DeserializeObject<List<ScoreResponse>>(result.ToString()) ?? [] : [];
+            var cached = result.HasValue
+                ? JsonConvert.DeserializeObject<List<ScoreResponse>>(result.ToString()) ?? []
+                : [];
             return cached.ToList();
         }
 
@@ -236,7 +238,7 @@ public class ScoreController(
         }
 
         var content = await response.Content.ReadAsStringAsync();
-        
+
         // 检查返回的内容是否为HTML（表示可能需要重新登录）
         if (content.StartsWith("<"))
         {
@@ -269,7 +271,7 @@ public class ScoreController(
         }).ToList();
 
         if (list.Count == 0) return list;
-        
+
         SemesterItem thisSemester;
         if (!_redis.KeyExists("thisSemester"))
         {

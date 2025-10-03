@@ -30,7 +30,7 @@ public class LoginService(
         {
             using var httpClient = httpClientFactory.CreateClient();
             httpClient.Timeout = TimeSpan.FromSeconds(5); // 5秒超时
-            
+
             // 获取 salt
             var saltResponse = await httpClient.GetAsync("https://swjw.xauat.edu.cn/student/login-salt");
             if (!saltResponse.IsSuccessStatusCode)
@@ -63,8 +63,15 @@ public class LoginService(
             if (!loginResponse.IsSuccessStatusCode) throw new Exception("Login failed");
             var studentId = await cookieCode.GetCode(cookies);
 
-            if (await context.Users.AnyAsync(u => u.Id == studentId))
+            var user = await context.Users.FirstOrDefaultAsync(u => u.Id == studentId);
+
+            if (user != null)
+            {
+                user.Username = username;
+                user.Password = DataTool.StringToHash(password);
                 return new { Success = true, StudentId = studentId, Cookie = cookies };
+            }
+
             context.Users.Add(new UserModel
             {
                 Id = studentId,
