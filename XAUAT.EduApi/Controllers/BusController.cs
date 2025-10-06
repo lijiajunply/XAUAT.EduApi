@@ -1,4 +1,4 @@
-﻿using EduApi.Data.Models;
+using EduApi.Data.Models;
 using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -29,7 +29,8 @@ public class BusController(IHttpClientFactory httpClientFactory, IConnectionMult
     [HttpGet("NewData/{time?}")]
     public async Task<IActionResult> GetBusFromNewData(string? time, string loc = "ALL")
     {
-        using var client = httpClientFactory.CreateClient();
+        // 使用专门配置的HttpClient（跳过SSL验证）
+        using var client = httpClientFactory.CreateClient("BusClient");
         client.SetRealisticHeaders();
         client.Timeout = new TimeSpan(0, 0, 0, 1, 0);
         time ??= DateTime.Today.ToString("yyyy-MM-dd");
@@ -93,7 +94,8 @@ public class BusController(IHttpClientFactory httpClientFactory, IConnectionMult
     [HttpGet("OldData/{time?}")]
     public async Task<BusModel> GetBusFromOldData(string? time, bool isShow = false)
     {
-        using var client = httpClientFactory.CreateClient();
+        // 使用专门配置的HttpClient（跳过SSL验证）
+        using var client = httpClientFactory.CreateClient("BusClient");
         client.SetRealisticHeaders();
         time ??= DateTime.Today.ToString("yyyy-MM-dd");
 

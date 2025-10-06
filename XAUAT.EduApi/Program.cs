@@ -4,6 +4,7 @@ using Scalar.AspNetCore;
 using StackExchange.Redis;
 using XAUAT.EduApi.Repos;
 using XAUAT.EduApi.Services;
+using System.Net.Http;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -49,7 +50,15 @@ if (!string.IsNullOrEmpty(redis))
     builder.Services.AddSingleton<IConnectionMultiplexer>(ConnectionMultiplexer.Connect(redis));
 }
 
+// 配置默认的HttpClient（不跳过SSL验证）
 builder.Services.AddHttpClient();
+// 配置专门用于BusController的HttpClient（跳过SSL验证）
+builder.Services.AddHttpClient("BusClient")
+    .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler()
+    {
+        ServerCertificateCustomValidationCallback = (message, cert, chain, errors) => true
+    });
+    
 builder.Services.AddHttpContextAccessor();
 
 var app = builder.Build();
