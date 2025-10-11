@@ -10,8 +10,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace EduApi.Data.Migrations
 {
     [DbContext(typeof(EduContext))]
-    [Migration("20251011175138_AddSemester")]
-    partial class AddSemester
+    [Migration("20251011184319_Initial")]
+    partial class Initial
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -75,58 +75,7 @@ namespace EduApi.Data.Migrations
 
                     b.HasKey("Key");
 
-                    b.HasIndex("UserId");
-
                     b.ToTable("scores");
-                });
-
-            modelBuilder.Entity("EduApi.Data.Models.UserModel", b =>
-                {
-                    b.Property<string>("Id")
-                        .HasMaxLength(64)
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Password")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("ScoreResponsesUpdateTime")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("SemesterUpdateTime")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("TEXT");
-
-                    b.PrimitiveCollection<string>("Semesters")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Username")
-                        .IsRequired()
-                        .HasMaxLength(10)
-                        .HasColumnType("TEXT");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("users");
-                });
-
-            modelBuilder.Entity("EduApi.Data.Models.ScoreResponse", b =>
-                {
-                    b.HasOne("EduApi.Data.Models.UserModel", null)
-                        .WithMany("ScoreResponses")
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("EduApi.Data.Models.UserModel", b =>
-                {
-                    b.Navigation("ScoreResponses");
                 });
 #pragma warning restore 612, 618
         }
