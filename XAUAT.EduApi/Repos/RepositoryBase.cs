@@ -4,14 +4,10 @@ using Microsoft.EntityFrameworkCore;
 
 namespace XAUAT.EduApi.Repos;
 
-public abstract class RepositoryBase<T> : IRepository<T> where T : class
+public abstract class RepositoryBase<T>(EduContext context) : IRepository<T>
+    where T : class
 {
-    protected readonly EduContext Context;
-
-    protected RepositoryBase(EduContext context)
-    {
-        Context = context;
-    }
+    protected readonly EduContext Context = context;
 
     public async Task<T?> GetByIdAsync(string id)
     {

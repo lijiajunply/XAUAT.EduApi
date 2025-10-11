@@ -7,10 +7,7 @@ namespace EduApi.Data.Models;
 public class UserModel : DataModel
 {
     [MaxLength(10)] public string Username { get; set; } = "";
-    [MaxLength(64)] public string Password { get; set; } = "";
     [Key] [MaxLength(64)] public string Id { get; set; } = "";
     public List<ScoreResponse> ScoreResponses { get; set; } = [];
-    public List<string> Semesters { get; set; } = [];
-    [MaxLength(64)] public string SemesterUpdateTime { get; set; } = "";
     [MaxLength(64)] public string ScoreResponsesUpdateTime { get; set; } = "";
 }

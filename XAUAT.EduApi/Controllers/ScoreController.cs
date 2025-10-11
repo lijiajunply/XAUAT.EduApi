@@ -141,8 +141,6 @@ public class ScoreController(
             {
                 Id = studentId,
                 Username = studentId, // 使用学号作为默认用户名
-                Password = "", // 密码留空，因为我们通过cookie验证
-                SemesterUpdateTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
                 ScoreResponsesUpdateTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
             };
 
@@ -174,7 +172,7 @@ public class ScoreController(
         // 如果不是当前学期，先从数据库查询
         await using var context = await factory.CreateDbContextAsync();
         var dbScores = await context.Scores
-            .Where(s => s.Key.StartsWith($"{studentId}_{semester}_"))
+            .Where(s => s.UserId == studentId && s.Semester == semester)
             .ToListAsync();
 
         // 如果数据库中有数据，直接返回
@@ -191,7 +189,8 @@ public class ScoreController(
             score.Key = $"{studentId}_{semester}_{score.LessonCode}_{score.Name}".ToHash();
             // 设置外键关联
             score.UserId = studentId;
-            context.Set<ScoreResponse>().Add(score);
+            score.Semester = semester;
+            context.Scores.Add(score);
         }
 
         try

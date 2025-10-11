@@ -4,7 +4,6 @@ using Scalar.AspNetCore;
 using StackExchange.Redis;
 using XAUAT.EduApi.Repos;
 using XAUAT.EduApi.Services;
-using System.Net.Http;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -23,9 +22,25 @@ builder.Services.AddCors(options =>
     });
 });
 
-builder.Services.AddDbContextFactory<EduContext>(opt =>
-    opt.UseSqlite("Data Source=Data.db",
-        o => o.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery)));
+var sql = Environment.GetEnvironmentVariable("SQL", EnvironmentVariableTarget.Process);
+
+// if (string.IsNullOrEmpty(sql) && builder.Environment.IsDevelopment())
+// {
+//     sql = builder.Configuration["SQL"];
+// }
+
+if (string.IsNullOrEmpty(sql))
+{
+    builder.Services.AddDbContextFactory<EduContext>(opt =>
+        opt.UseSqlite("Data Source=Data.db",
+            o => o.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery)));
+}
+else
+{
+    builder.Services.AddDbContextFactory<EduContext>(opt =>
+        opt.UseNpgsql(sql,
+            o => o.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery)));
+}
 
 // Add services to the container.
 builder.Services.AddScoped<IScoreRepository, ScoreRepository>();
@@ -58,7 +73,7 @@ builder.Services.AddHttpClient("BusClient")
     {
         ServerCertificateCustomValidationCallback = (message, cert, chain, errors) => true
     });
-    
+
 builder.Services.AddHttpContextAccessor();
 
 var app = builder.Build();
@@ -68,7 +83,7 @@ app.MapOpenApi();
 using (var scope = app.Services.CreateScope())
 {
     var services = scope.ServiceProvider;
-    var context = services.GetRequiredService<EduContext>();
+    var context = services.GetRequiredService<IDbContextFactory<EduContext>>().CreateDbContext();
 
     var pending = context.Database.GetPendingMigrations();
     var enumerable = pending as string[] ?? pending.ToArray();

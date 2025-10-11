@@ -1,4 +1,3 @@
-using System.Linq;
 using EduApi.Data;
 using EduApi.Data.Models;
 using Microsoft.EntityFrameworkCore;

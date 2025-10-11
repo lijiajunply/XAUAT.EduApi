@@ -18,4 +18,5 @@ public class ScoreResponse : DataModel
     public bool IsMinor { get; set; }
     
     [JsonIgnore] [MaxLength(64)] public string UserId { get; set; } = "";
+    [JsonIgnore] [MaxLength(64)] public string Semester { get; set; } = "";
 }

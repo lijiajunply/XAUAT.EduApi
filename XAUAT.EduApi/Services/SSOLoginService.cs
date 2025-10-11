@@ -27,43 +27,47 @@ public class SSOLoginService(
 
             var response = await httpClient.GetAsync($"https://schedule.xauat.site/login/{username}/{password}");
             var content = await response.Content.ReadAsStringAsync();
-            
+
             // 检查响应状态
             if (response.StatusCode != HttpStatusCode.OK)
             {
                 logger.LogError("登录请求失败，状态码: {StatusCode}", response.StatusCode);
                 throw new Exception($"登录请求失败，状态码: {response.StatusCode}");
             }
-            
+
             var json = JObject.Parse(content);
             if (!json["success"]!.ToObject<bool>())
             {
                 logger.LogWarning("用户 {Username} 登录失败，教务系统返回失败", username);
                 throw new Exception("Login failed");
             }
-                
+
             var cookies = json["cookies"]!.ToObject<string>() ?? "";
-            var studentId = await cookieCode.GetCode(cookies);
+
+            string studentId;
 
             // 检查用户是否已存在
-            var existingUser = await context.Users.FirstOrDefaultAsync(u => u.Id == studentId);
+            var existingUser = await context.Users.FirstOrDefaultAsync(u => u.Username == username);
             if (existingUser != null)
             {
-                logger.LogInformation("用户 {Username} 已存在，ID: {StudentId}", username, studentId);
+                if (string.IsNullOrEmpty(existingUser.Id))
+                    studentId = await cookieCode.GetCode(cookies);
+                else studentId = existingUser.Id;
                 return new { Success = true, StudentId = studentId, Cookie = cookies };
             }
-            
+
+            studentId = await cookieCode.GetCode(cookies);
+
             // 创建新用户
             var newUser = new UserModel
             {
                 Id = studentId,
                 Username = username,
-                Password = DataTool.StringToHash(password)
             };
-            
+
             context.Users.Add(newUser);
             await context.SaveChangesAsync();
-            
+
             logger.LogInformation("新用户 {Username} 创建成功，ID: {StudentId}", username, studentId);
 
             return new { Success = true, StudentId = studentId, Cookie = cookies };
