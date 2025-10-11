@@ -62,7 +62,7 @@ public class SSOLoginService(
             var newUser = new UserModel
             {
                 Id = studentId,
-                Username = username,
+                Username = username
             };
 
             context.Users.Add(newUser);

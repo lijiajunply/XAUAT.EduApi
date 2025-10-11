@@ -11,15 +11,6 @@ public class EduContext(DbContextOptions<EduContext> options) : DbContext(option
 {
     public DbSet<UserModel> Users { get; set; }
     public DbSet<ScoreResponse> Scores { get; set; }
-
-    protected override void OnModelCreating(ModelBuilder modelBuilder)
-    {
-        modelBuilder.Entity<UserModel>()
-            .HasMany(u => u.ScoreResponses)
-            .WithOne()
-            .HasForeignKey(s => s.UserId)
-            .HasPrincipalKey(u => u.Id);
-    }
 }
 
 [Serializable]

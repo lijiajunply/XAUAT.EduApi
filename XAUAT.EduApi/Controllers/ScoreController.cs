@@ -93,9 +93,6 @@ public class ScoreController(
                 return BadRequest("学号或Cookie不能为空");
             }
 
-            // 确保用户存在于数据库中
-            await EnsureUserExists(studentId, cookie);
-
             var split = studentId.Split(',');
             var result = new List<ScoreResponse>();
 
@@ -120,33 +117,6 @@ public class ScoreController(
         catch (Exception ex)
         {
             return StatusCode(500, new { error = ex.Message });
-        }
-    }
-
-    /// <summary>
-    /// 确保用户存在于数据库中
-    /// </summary>
-    /// <param name="studentId"></param>
-    /// <param name="cookie"></param>
-    /// <returns></returns>
-    private async Task EnsureUserExists(string studentId, string cookie)
-    {
-        await using var context = await factory.CreateDbContextAsync();
-        var userExists = await context.Users.AnyAsync(u => u.Id == studentId);
-
-        if (!userExists)
-        {
-            // 如果用户不存在，创建一个新用户
-            var newUser = new UserModel
-            {
-                Id = studentId,
-                Username = studentId, // 使用学号作为默认用户名
-                ScoreResponsesUpdateTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
-            };
-
-            context.Users.Add(newUser);
-            await context.SaveChangesAsync();
-            logger.LogInformation("为学号 {StudentId} 创建了新用户记录", studentId);
         }
     }
 
