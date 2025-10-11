@@ -1,7 +1,4 @@
 using System.Net;
-using EduApi.Data;
-using EduApi.Data.Models;
-using Microsoft.EntityFrameworkCore;
 using Newtonsoft.Json.Linq;
 using Polly;
 
@@ -10,7 +7,6 @@ namespace XAUAT.EduApi.Services;
 public class SSOLoginService(
     IHttpClientFactory httpClientFactory,
     CookieCodeService cookieCode,
-    EduContext context,
     ILogger<SSOLoginService> logger) : ILoginService
 {
     public async Task<object> LoginAsync(string username, string password)
@@ -44,31 +40,7 @@ public class SSOLoginService(
 
             var cookies = json["cookies"]!.ToObject<string>() ?? "";
 
-            string studentId;
-
-            // 检查用户是否已存在
-            var existingUser = await context.Users.FirstOrDefaultAsync(u => u.Username == username);
-            if (existingUser != null)
-            {
-                if (string.IsNullOrEmpty(existingUser.Id))
-                    studentId = await cookieCode.GetCode(cookies);
-                else studentId = existingUser.Id;
-                return new { Success = true, StudentId = studentId, Cookie = cookies };
-            }
-
-            studentId = await cookieCode.GetCode(cookies);
-
-            // 创建新用户
-            var newUser = new UserModel
-            {
-                Id = studentId,
-                Username = username
-            };
-
-            context.Users.Add(newUser);
-            await context.SaveChangesAsync();
-
-            logger.LogInformation("新用户 {Username} 创建成功，ID: {StudentId}", username, studentId);
+            var studentId = await cookieCode.GetCode(cookies);
 
             return new { Success = true, StudentId = studentId, Cookie = cookies };
         });

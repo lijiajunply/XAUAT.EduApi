@@ -9,7 +9,6 @@ namespace EduApi.Data;
 
 public class EduContext(DbContextOptions<EduContext> options) : DbContext(options)
 {
-    public DbSet<UserModel> Users { get; set; }
     public DbSet<ScoreResponse> Scores { get; set; }
 }
 

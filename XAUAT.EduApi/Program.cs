@@ -44,7 +44,6 @@ else
 
 // Add services to the container.
 builder.Services.AddScoped<IScoreRepository, ScoreRepository>();
-builder.Services.AddScoped<IUserRepository, UserRepository>();
 
 builder.Services.AddScoped<ICodeService, CodeService>();
 builder.Services.AddScoped<ILoginService, SSOLoginService>();
