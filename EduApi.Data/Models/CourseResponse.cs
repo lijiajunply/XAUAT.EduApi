@@ -17,7 +17,7 @@ public class CourseActivity
     public List<int> WeekIndexes { get; set; } = [];
 
     public string[] Teachers { get; set; } = [];
-
+    public string Campus { get; set; } = "";
     public string Room { get; set; } = "";
 
     public string CourseName { get; set; } = "";
