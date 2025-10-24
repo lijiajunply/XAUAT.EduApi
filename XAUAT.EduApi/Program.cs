@@ -51,6 +51,8 @@ builder.Services.AddScoped<IExamService, ExamService>();
 builder.Services.AddScoped<IProgramService, ProgramService>();
 builder.Services.AddScoped<IInfoService, InfoService>();
 builder.Services.AddScoped<IPaymentService, PaymentService>();
+builder.Services.AddScoped<ICourseService, CourseService>();
+builder.Services.AddScoped<IScoreService, ScoreService>();
 builder.Services.AddScoped<CookieCodeService>();
 
 var redis = Environment.GetEnvironmentVariable("REDIS", EnvironmentVariableTarget.Process);
