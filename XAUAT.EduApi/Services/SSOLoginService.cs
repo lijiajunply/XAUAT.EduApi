@@ -4,6 +4,7 @@ using Polly;
 
 namespace XAUAT.EduApi.Services;
 
+// ReSharper disable once InconsistentNaming
 public class SSOLoginService(
     IHttpClientFactory httpClientFactory,
     CookieCodeService cookieCode,

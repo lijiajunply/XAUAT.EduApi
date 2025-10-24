@@ -30,9 +30,9 @@ public partial class CookieCodeService(IHttpClientFactory httpClientFactory)
             var a = request.RequestUri!.LocalPath.Replace("/student/precaution/index/", "");
 
             if (a != "/student/for-std/precaution") return a;
-            var Content = await response.Content.ReadAsStringAsync();
+            var content = await response.Content.ReadAsStringAsync();
 
-            var matches = MyRegex().Matches(Content);
+            var matches = MyRegex().Matches(content);
             return matches.Count >= 1 ? string.Join(',', matches.Select(m => m.Groups[1].Value)) : "";
         });
     }

@@ -16,7 +16,7 @@ public interface IProgramService
 
 public class ProgramService(IHttpClientFactory httpClientFactory, IConnectionMultiplexer muxer) : IProgramService
 {
-    private const string _baseUrl = "https://swjw.xauat.edu.cn";
+    private const string BaseUrl = "https://swjw.xauat.edu.cn";
     private readonly IDatabase _redis = muxer.GetDatabase();
 
     public async Task<List<PlanCourse>> GetAllTrainProgram(string cookie, string id)
@@ -37,7 +37,7 @@ public class ProgramService(IHttpClientFactory httpClientFactory, IConnectionMul
         return await retryPolicy.ExecuteAsync(async () =>
         {
             var request =
-                new HttpRequestMessage(HttpMethod.Get, $"{_baseUrl}/student/for-std/program/root-module-json/{id}");
+                new HttpRequestMessage(HttpMethod.Get, $"{BaseUrl}/student/for-std/program/root-module-json/{id}");
             request.Headers.Add("Cookie", cookie);
 
             using var httpClient = httpClientFactory.CreateClient(); // 使用命名客户端
@@ -66,7 +66,7 @@ public class ProgramService(IHttpClientFactory httpClientFactory, IConnectionMul
 
         foreach (var item in result.Children)
         {
-            list.AddRange(item.planCourses.Select(x => x.To()));
+            list.AddRange(item.PlanCourses.Select(x => x.To()));
             list.AddRange(GetPlanCourses(item));
         }
 
@@ -86,19 +86,19 @@ public class ProgramService(IHttpClientFactory httpClientFactory, IConnectionMul
 public class ProgramModel
 {
     [JsonPropertyName("children")] public List<ProgramModel> Children { get; init; } = [];
-    public List<PlanCourses> planCourses { get; init; } = [];
+    [JsonPropertyName("planCourses")] public List<PlanCourses> PlanCourses { get; init; } = [];
 }
 
 [Serializable]
 public class PlanCourses
 {
-    public string[] readableTerms { get; set; } = [];
-    public CourseItem course { get; set; } = new();
+    [JsonPropertyName("readableTerms")] public string[] ReadableTerms { get; set; } = [];
+    [JsonPropertyName("course")] public CourseItem Course { get; set; } = new();
 
     public PlanCourse To()
     {
         var termStr = new StringBuilder();
-        var termList = readableTerms;
+        var termList = ReadableTerms;
         for (var index = 0; index < termList.Length; index++)
         {
             termStr.Append(termList[index]);
@@ -115,11 +115,11 @@ public class PlanCourses
 
         return new PlanCourse()
         {
-            Name = course.nameZh,
-            LessonType = course.lessonType,
-            ExamMode = course.defaultExamMode.name,
-            CourseTypeName = course.courseType.name,
-            Credits = course.credits,
+            Name = Course.NameZh,
+            LessonType = Course.LessonType,
+            ExamMode = Course.DefaultExamMode.Name,
+            CourseTypeName = Course.CourseType.Name,
+            Credits = Course.Credits,
             TermStr = termStr.ToString()
         };
     }
@@ -128,24 +128,24 @@ public class PlanCourses
 [Serializable]
 public class CourseItem
 {
-    public string nameZh { get; set; } = "";
-    public string lessonType { get; set; } = "";
-    public DefaultExamMode defaultExamMode { get; set; } = new();
+    [JsonPropertyName("nameZh")] public string NameZh { get; set; } = "";
+    [JsonPropertyName("lessonType")] public string LessonType { get; set; } = "";
+    [JsonPropertyName("defaultExamMode")] public DefaultExamMode DefaultExamMode { get; set; } = new();
 
-    public CourseType courseType { get; set; } = new();
-    public double credits { get; set; }
+    [JsonPropertyName("courseType")] public CourseType CourseType { get; set; } = new();
+    [JsonPropertyName("credits")]  public double Credits { get; set; }
 }
 
 [Serializable]
 public class DefaultExamMode
 {
-    public string name { get; set; } = "";
+    [JsonPropertyName("name")] public string Name { get; set; } = "";
 }
 
 [Serializable]
 public class CourseType
 {
-    public string name { get; set; } = "";
+    [JsonPropertyName("name")] public string Name { get; set; } = "";
 }
 
 [Serializable]
