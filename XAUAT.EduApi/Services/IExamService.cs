@@ -161,6 +161,7 @@ public class ExamService(
             var jsonData = match.Groups[1].Value + "]";
             // 替换单引号为双引号
             jsonData = jsonData.Replace("'", "\"");
+            jsonData = Regex.Replace(jsonData, @"\\x[0-9A-Fa-f]{2}", "");
 
             var examData = JsonConvert.DeserializeObject<List<ExamDataRaw>>(jsonData);
             if (examData == null)

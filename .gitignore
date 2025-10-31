@@ -5,6 +5,7 @@ riderModule.iml
 /_ReSharper.Caches/
 
 appsettings.Development.json
+login.test.json
 
 *.db
 *.db-shm
