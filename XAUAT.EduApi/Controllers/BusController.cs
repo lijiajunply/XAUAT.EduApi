@@ -68,9 +68,9 @@ public class BusController(IHttpClientFactory httpClientFactory, IConnectionMult
             var timestamp = long.Parse(j["fstime"]!.ToString()) * 10000;
 
             var tricks1970 = new DateTime(1970, 1, 1, 8, 0, 0).Ticks; //1970年1月1日刻度
-            var time_tricks = tricks1970 + timestamp; //日志日期刻度
+            var timeTricks = tricks1970 + timestamp; //日志日期刻度
 
-            var runTime = new DateTime(time_tricks);
+            var runTime = new DateTime(timeTricks);
             busModel.Records.Add(new BusItem()
             {
                 LineName = $"{departure}→{arrival}",

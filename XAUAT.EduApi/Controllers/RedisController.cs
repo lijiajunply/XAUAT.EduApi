@@ -24,7 +24,7 @@ public class RedisController(
 
         var endpoints = muxer.GetEndPoints();
 
-        int yielded = 0;
+        var yielded = 0;
 
         foreach (var endpoint in endpoints)
         {
@@ -47,7 +47,7 @@ public class RedisController(
                 // 使用 StringGet 批量获取（仅适用于 string/byte[]）
                 var values = await _redis.StringGetAsync(chunk).ConfigureAwait(false);
 
-                for (int i = 0; i < chunk.Length; i++)
+                for (var i = 0; i < chunk.Length; i++)
                 {
                     if (cancellationToken.IsCancellationRequested) yield break;
 
@@ -83,20 +83,18 @@ public class RedisController(
     private static async IAsyncEnumerable<RedisKey[]> ChunkAsync(IEnumerable<RedisKey> source, int chunkSize,
         [EnumeratorCancellation] CancellationToken ct)
     {
-        if (chunkSize <= 0) throw new ArgumentOutOfRangeException(nameof(chunkSize));
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(chunkSize);
         var bucket = new List<RedisKey>(chunkSize);
 
         foreach (var item in source)
         {
             if (ct.IsCancellationRequested) yield break;
             bucket.Add(item);
-            if (bucket.Count == chunkSize)
-            {
-                yield return bucket.ToArray();
-                bucket.Clear();
-                // 给调用方机会响应取消/IO
-                await Task.Yield();
-            }
+            if (bucket.Count != chunkSize) continue;
+            yield return bucket.ToArray();
+            bucket.Clear();
+            // 给调用方机会响应取消/IO
+            await Task.Yield();
         }
 
         if (bucket.Count > 0)

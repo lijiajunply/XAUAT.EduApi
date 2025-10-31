@@ -149,7 +149,7 @@ public class PaymentService(IConnectionMultiplexer muxer, IHttpClientFactory htt
                 }
             }
 
-            const string _url = "http://ydfwpt.xauat.edu.cn/berserker-search/search/personal/turnover";
+            const string url = "http://ydfwpt.xauat.edu.cn/berserker-search/search/personal/turnover";
             var paramsDict = new Dictionary<string, string>
             {
                 { "size", "8" },
@@ -163,7 +163,7 @@ public class PaymentService(IConnectionMultiplexer muxer, IHttpClientFactory htt
                 { "synjones-auth", token }
             };
 
-            var uriBuilder = new UriBuilder(_url);
+            var uriBuilder = new UriBuilder(url);
             var query = string.Join("&", paramsDict.Select(kvp => $"{kvp.Key}={Uri.EscapeDataString(kvp.Value)}"));
             uriBuilder.Query = query;
 
@@ -224,7 +224,7 @@ public class PaymentService(IConnectionMultiplexer muxer, IHttpClientFactory htt
                 }
             }
 
-            const string _url = "https://ydfwpt.xauat.edu.cn/berserker-app/ykt/tsm/queryCard?synAccessSource=h5";
+            const string url = "https://ydfwpt.xauat.edu.cn/berserker-app/ykt/tsm/queryCard?synAccessSource=h5";
 
             var headers = new Dictionary<string, string>
             {
@@ -239,7 +239,7 @@ public class PaymentService(IConnectionMultiplexer muxer, IHttpClientFactory htt
                 client.DefaultRequestHeaders.Add(header.Key, header.Value);
             }
 
-            var response = await client.GetAsync(_url);
+            var response = await client.GetAsync(url);
 
             if (!response.IsSuccessStatusCode) return 0;
             var responseBody = await response.Content.ReadAsStringAsync();

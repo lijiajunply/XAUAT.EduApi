@@ -20,7 +20,7 @@ public class ExamService(
     IConnectionMultiplexer muxer)
     : IExamService
 {
-    private const string _baseUrl = "https://swjw.xauat.edu.cn";
+    private const string BaseUrl = "https://swjw.xauat.edu.cn";
     private readonly IDatabase _redis = muxer.GetDatabase();
 
     public async Task<ExamResponse> GetExamArrangementsAsync(string cookie, string? id)
@@ -105,7 +105,7 @@ public class ExamService(
                 }
             }
 
-            var url = $"{_baseUrl}/student/for-std/exam-arrange/";
+            var url = $"{BaseUrl}/student/for-std/exam-arrange/";
             if (!string.IsNullOrEmpty(id))
             {
                 url += $"info/{id}?";

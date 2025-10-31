@@ -25,7 +25,7 @@ public class CodeService : ICodeService
         }
 
         // 计算 SHA1
-        var encPassword = CalculateSHA1($"{parameters["salt"]}-{parameters["password"]}");
+        var encPassword = CalculateSha1($"{parameters["salt"]}-{parameters["password"]}");
 
         // 创建返回对象
         var result = new
@@ -38,7 +38,7 @@ public class CodeService : ICodeService
         return result;
     }
 
-    private static string CalculateSHA1(string input)
+    private static string CalculateSha1(string input)
     {
         var inputBytes = Encoding.UTF8.GetBytes(input);
         var hashBytes = SHA1.HashData(inputBytes);
