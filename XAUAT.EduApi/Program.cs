@@ -53,6 +53,7 @@ builder.Services.AddScoped<IInfoService, InfoService>();
 builder.Services.AddScoped<IPaymentService, PaymentService>();
 builder.Services.AddScoped<ICourseService, CourseService>();
 builder.Services.AddScoped<IScoreService, ScoreService>();
+builder.Services.AddScoped<IRedisService, RedisService>();
 builder.Services.AddScoped<CookieCodeService>();
 
 var redis = Environment.GetEnvironmentVariable("REDIS", EnvironmentVariableTarget.Process);
@@ -72,7 +73,7 @@ builder.Services.AddHttpClient();
 builder.Services.AddHttpClient("BusClient")
     .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler()
     {
-        ServerCertificateCustomValidationCallback = (message, cert, chain, errors) => true
+        ServerCertificateCustomValidationCallback = (_, _, _, _) => true
     });
 
 builder.Services.AddHttpContextAccessor();

@@ -13,4 +13,5 @@ public class ExamResponse
 {
     public List<ExamInfo> Exams { get; set; } = [];
     public bool CanClick { get; set; }
+    public string? Error { get; set; }
 }

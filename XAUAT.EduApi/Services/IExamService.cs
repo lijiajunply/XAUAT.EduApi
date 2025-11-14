@@ -142,7 +142,8 @@ public class ExamService(
                 return new ExamResponse
                 {
                     Exams = [],
-                    CanClick = false
+                    CanClick = false,
+                    Error = "登录已过期"
                 };
             }
 
@@ -154,7 +155,8 @@ public class ExamService(
                 return new ExamResponse
                 {
                     Exams = [],
-                    CanClick = true
+                    CanClick = false,
+                    Error = "Failed to match exam data pattern"
                 };
             }
 
@@ -170,7 +172,8 @@ public class ExamService(
                 return new ExamResponse
                 {
                     Exams = [],
-                    CanClick = false
+                    CanClick = false,
+                    Error = "Failed to deserialize exam data"
                 };
             }
 
@@ -205,7 +208,8 @@ public class ExamService(
             return new ExamResponse
             {
                 Exams = [],
-                CanClick = false
+                CanClick = false,
+                Error = ex.Message
             };
         }
     }
