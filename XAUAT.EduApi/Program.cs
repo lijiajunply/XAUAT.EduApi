@@ -24,10 +24,10 @@ builder.Services.AddCors(options =>
 
 var sql = Environment.GetEnvironmentVariable("SQL", EnvironmentVariableTarget.Process);
 
-if (string.IsNullOrEmpty(sql) && builder.Environment.IsDevelopment())
-{
-    sql = builder.Configuration["SQL"];
-}
+// if (string.IsNullOrEmpty(sql) && builder.Environment.IsDevelopment())
+// {
+//     sql = builder.Configuration["SQL"];
+// }
 
 if (string.IsNullOrEmpty(sql))
 {
