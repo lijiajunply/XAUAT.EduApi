@@ -34,9 +34,13 @@ builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
     {
-        policy.AllowAnyHeader()
+        policy.SetIsOriginAllowed(origin =>
+                origin.EndsWith(".zeabur.app") || // 支持所有 zeabur.app 子域名
+                origin.EndsWith(".xauat.site") || // 支持所有 xauat.site 子域名
+                origin.StartsWith("http://localhost")) // 支持本地开发环境
             .AllowAnyMethod()
-            .AllowAnyOrigin();
+            .AllowAnyHeader()
+            .AllowCredentials(); // 如果需要发送凭据（如cookies、认证头等）
     });
 });
 

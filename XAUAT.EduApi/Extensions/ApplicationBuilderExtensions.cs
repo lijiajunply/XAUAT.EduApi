@@ -54,30 +54,32 @@ public static class ApplicationBuilderExtensions
         }
     }
 
-    /// <summary>
-    /// 配置API端点
-    /// </summary>
     /// <param name="app">应用程序</param>
-    /// <returns>应用程序</returns>
-    public static WebApplication ConfigureApiEndpoints(this WebApplication app)
+    extension(WebApplication app)
     {
-        app.MapOpenApi();
-        app.MapControllers();
-        app.MapScalarApiReference();
-        return app;
-    }
+        /// <summary>
+        /// 配置API端点
+        /// </summary>
+        /// <returns>应用程序</returns>
+        public WebApplication ConfigureApiEndpoints()
+        {
+            app.MapOpenApi();
+            app.MapControllers();
+            app.MapScalarApiReference();
+            return app;
+        }
 
-    /// <summary>
-    /// 配置健康检查端点
-    /// </summary>
-    /// <param name="app">应用程序</param>
-    /// <returns>应用程序</returns>
-    public static WebApplication ConfigureHealthChecks(this WebApplication app)
-    {
-        app.MapHealthChecks("/health")
-            .WithDisplayName("健康检查")
-            .WithDescription("检查服务的健康状态");
-        return app;
+        /// <summary>
+        /// 配置健康检查端点
+        /// </summary>
+        /// <returns>应用程序</returns>
+        public WebApplication ConfigureHealthChecks()
+        {
+            app.MapHealthChecks("/health")
+                .WithDisplayName("健康检查")
+                .WithDescription("检查服务的健康状态");
+            return app;
+        }
     }
 
     /// <summary>
