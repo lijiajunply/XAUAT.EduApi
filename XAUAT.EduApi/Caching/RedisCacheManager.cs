@@ -14,17 +14,17 @@ internal class RedisCacheManager
     private readonly IConnectionMultiplexer _connection;
     private readonly CacheOptions _options;
     private readonly JsonSerializerOptions _jsonOptions;
-    
+
     // 统计信息
     private long _hitCount;
     private long _missCount;
     private long _errorCount;
-    
+
     /// <summary>
     /// Redis是否可用
     /// </summary>
     public bool IsAvailable { get; private set; }
-    
+
     /// <summary>
     /// 构造函数
     /// </summary>
@@ -41,7 +41,7 @@ internal class RedisCacheManager
             DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
             MaxDepth = 32
         };
-        
+
         try
         {
             _redis = connection.GetDatabase();
@@ -52,17 +52,18 @@ internal class RedisCacheManager
             IsAvailable = false;
             Interlocked.Increment(ref _errorCount);
         }
-        
+
         // 订阅连接事件
-        connection.ConnectionFailed += (sender, args) => IsAvailable = false;
-        connection.ConnectionRestored += (sender, args) => IsAvailable = true;
+        connection.ConnectionFailed += (_, _) => IsAvailable = false;
+        connection.ConnectionRestored += (_, _) => IsAvailable = true;
     }
-    
+
     /// <summary>
     /// 获取缓存项
     /// </summary>
     /// <typeparam name="T">缓存值类型</typeparam>
     /// <param name="key">缓存键</param>
+    /// <param name="cancellationToken">取消令牌</param>
     /// <returns>缓存项，如果不存在则返回null</returns>
     public async Task<T?> GetAsync<T>(string key, CancellationToken cancellationToken = default)
     {
@@ -71,25 +72,25 @@ internal class RedisCacheManager
             Interlocked.Increment(ref _missCount);
             return default;
         }
-        
+
         try
         {
             var fullKey = GetFullKey(key);
             var redisValue = await _redis.StringGetAsync(fullKey, CommandFlags.PreferReplica);
-            
+
             if (redisValue.IsNull)
             {
                 Interlocked.Increment(ref _missCount);
                 return default;
             }
-            
+
             var cacheItem = JsonSerializer.Deserialize<CacheItem<T>>(redisValue.ToString(), _jsonOptions);
             if (cacheItem == null)
             {
                 Interlocked.Increment(ref _missCount);
                 return default;
             }
-            
+
             // 检查是否过期
             if (cacheItem.IsExpired)
             {
@@ -97,14 +98,14 @@ internal class RedisCacheManager
                 Interlocked.Increment(ref _missCount);
                 return default;
             }
-            
+
             // 更新访问信息
             cacheItem.HitCount++;
             cacheItem.LastAccessTime = DateTime.Now;
-            
+
             // 异步更新，不阻塞主流程
-            _ = UpdateCacheItemAsync(cacheItem, cancellationToken);
-            
+            _ = UpdateCacheItemAsync(cacheItem);
+
             Interlocked.Increment(ref _hitCount);
             return cacheItem.Value;
         }
@@ -116,7 +117,7 @@ internal class RedisCacheManager
             return default;
         }
     }
-    
+
     /// <summary>
     /// 设置缓存项
     /// </summary>
@@ -127,24 +128,25 @@ internal class RedisCacheManager
     /// <param name="businessPriority">业务优先级</param>
     /// <param name="cancellationToken">取消令牌</param>
     /// <returns>是否设置成功</returns>
-    public async Task<bool> SetAsync<T>(string key, T? value, TimeSpan? expiration = null, int businessPriority = 5, CancellationToken cancellationToken = default)
+    public async Task<bool> SetAsync<T>(string key, T? value, TimeSpan? expiration = null, int businessPriority = 5,
+        CancellationToken cancellationToken = default)
     {
         if (!IsAvailable || _redis == null)
         {
             return false;
         }
-        
+
         if (value == null)
         {
             return await RemoveAsync(key, cancellationToken);
         }
-        
+
         try
         {
             var fullKey = GetFullKey(key);
             var actualExpiration = expiration ?? _options.DefaultExpiration;
             var now = DateTime.Now;
-            
+
             var cacheItem = new CacheItem<T>
             {
                 Key = key,
@@ -156,11 +158,12 @@ internal class RedisCacheManager
                 Level = CacheLevel.Distributed,
                 BusinessPriority = businessPriority
             };
-            
+
             var json = JsonSerializer.Serialize(cacheItem, _jsonOptions);
-            
-            var result = await _redis.StringSetAsync(fullKey, json, actualExpiration, When.Always, CommandFlags.FireAndForget);
-            
+
+            var result = await _redis.StringSetAsync(fullKey, json, actualExpiration, When.Always,
+                CommandFlags.FireAndForget);
+
             return result;
         }
         catch
@@ -170,7 +173,7 @@ internal class RedisCacheManager
             return false;
         }
     }
-    
+
     /// <summary>
     /// 移除缓存项
     /// </summary>
@@ -183,7 +186,7 @@ internal class RedisCacheManager
         {
             return false;
         }
-        
+
         try
         {
             var fullKey = GetFullKey(key);
@@ -197,7 +200,7 @@ internal class RedisCacheManager
             return false;
         }
     }
-    
+
     /// <summary>
     /// 检查缓存项是否存在
     /// </summary>
@@ -210,23 +213,23 @@ internal class RedisCacheManager
         {
             return false;
         }
-        
+
         try
         {
             var fullKey = GetFullKey(key);
             var exists = await _redis.KeyExistsAsync(fullKey, CommandFlags.PreferReplica);
-            
+
             if (exists)
             {
                 // 额外检查过期时间
                 var ttl = await _redis.KeyTimeToLiveAsync(fullKey);
-                if (ttl.HasValue && ttl.Value.TotalSeconds <= 0)
+                if (ttl is { TotalSeconds: <= 0 })
                 {
                     await RemoveAsync(key, cancellationToken);
                     return false;
                 }
             }
-            
+
             return exists;
         }
         catch
@@ -236,7 +239,7 @@ internal class RedisCacheManager
             return false;
         }
     }
-    
+
     /// <summary>
     /// 清除所有缓存项
     /// </summary>
@@ -248,12 +251,12 @@ internal class RedisCacheManager
         {
             return false;
         }
-        
+
         try
         {
             var pattern = GetFullKey("*");
             var endpoints = _connection.GetEndPoints();
-            
+
             foreach (var endpoint in endpoints)
             {
                 var server = _connection.GetServer(endpoint);
@@ -261,15 +264,16 @@ internal class RedisCacheManager
                 {
                     continue;
                 }
-                
+
                 // 使用SCAN命令代替KEYS，避免阻塞Redis
-                await foreach (var key in server.KeysAsync(pattern: pattern, pageSize: 1000))
+                await foreach (var key in server.KeysAsync(pattern: pattern, pageSize: 1000)
+                                   .WithCancellation(cancellationToken))
                 {
                     cancellationToken.ThrowIfCancellationRequested();
                     await _redis.KeyDeleteAsync(key, CommandFlags.FireAndForget);
                 }
             }
-            
+
             return true;
         }
         catch
@@ -279,7 +283,7 @@ internal class RedisCacheManager
             return false;
         }
     }
-    
+
     /// <summary>
     /// 批量获取缓存项
     /// </summary>
@@ -287,28 +291,30 @@ internal class RedisCacheManager
     /// <param name="keys">缓存键列表</param>
     /// <param name="cancellationToken">取消令牌</param>
     /// <returns>缓存项字典</returns>
-    public async Task<IDictionary<string, T?>> GetManyAsync<T>(IEnumerable<string> keys, CancellationToken cancellationToken = default)
+    public async Task<IDictionary<string, T?>> GetManyAsync<T>(IEnumerable<string> keys,
+        CancellationToken cancellationToken = default)
     {
         var result = new Dictionary<string, T?>();
-        
-        if (!IsAvailable || _redis == null || !keys.Any())
+
+        var enumerable = keys as string[] ?? keys.ToArray();
+        if (!IsAvailable || _redis == null || enumerable.Length == 0)
         {
             return result;
         }
-        
+
         try
         {
-            var keyArray = keys.ToArray();
+            var keyArray = enumerable.ToArray();
             var tasks = new List<Task<(string Key, T? Value)>>();
-            
+
             // 并行获取所有键
             foreach (var key in keyArray)
             {
                 tasks.Add(GetSingleAsync<T>(key, cancellationToken));
             }
-            
+
             var results = await Task.WhenAll(tasks);
-            
+
             foreach (var (key, value) in results)
             {
                 if (value != null)
@@ -316,7 +322,7 @@ internal class RedisCacheManager
                     result[key] = value;
                 }
             }
-            
+
             return result;
         }
         catch
@@ -326,7 +332,7 @@ internal class RedisCacheManager
             return result;
         }
     }
-    
+
     /// <summary>
     /// 批量设置缓存项
     /// </summary>
@@ -336,33 +342,34 @@ internal class RedisCacheManager
     /// <param name="businessPriority">业务优先级</param>
     /// <param name="cancellationToken">取消令牌</param>
     /// <returns>是否设置成功</returns>
-    public async Task<bool> SetManyAsync<T>(IDictionary<string, T?> items, TimeSpan? expiration = null, int businessPriority = 5, CancellationToken cancellationToken = default)
+    public async Task<bool> SetManyAsync<T>(IDictionary<string, T?> items, TimeSpan? expiration = null,
+        int businessPriority = 5, CancellationToken cancellationToken = default)
     {
         if (!IsAvailable || _redis == null || !items.Any())
         {
             return false;
         }
-        
+
         try
         {
             var actualExpiration = expiration ?? _options.DefaultExpiration;
             var now = DateTime.Now;
-            
+
             // 使用事务批量设置
             var batch = _redis.CreateBatch();
             var tasks = new List<Task>();
-            
+
             foreach (var (key, value) in items)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                
+
                 if (value == null)
                 {
                     var removeTask = batch.KeyDeleteAsync(GetFullKey(key), CommandFlags.FireAndForget);
                     tasks.Add(removeTask);
                     continue;
                 }
-                
+
                 var cacheItem = new CacheItem<T>
                 {
                     Key = key,
@@ -374,15 +381,16 @@ internal class RedisCacheManager
                     Level = CacheLevel.Distributed,
                     BusinessPriority = businessPriority
                 };
-                
+
                 var json = JsonSerializer.Serialize(cacheItem, _jsonOptions);
-                var setTask = batch.StringSetAsync(GetFullKey(key), json, actualExpiration, When.Always, CommandFlags.FireAndForget);
+                var setTask = batch.StringSetAsync(GetFullKey(key), json, actualExpiration, When.Always,
+                    CommandFlags.FireAndForget);
                 tasks.Add(setTask);
             }
-            
+
             batch.Execute();
             await Task.WhenAll(tasks);
-            
+
             return true;
         }
         catch
@@ -392,7 +400,7 @@ internal class RedisCacheManager
             return false;
         }
     }
-    
+
     /// <summary>
     /// 批量移除缓存项
     /// </summary>
@@ -401,29 +409,30 @@ internal class RedisCacheManager
     /// <returns>是否移除成功</returns>
     public async Task<bool> RemoveManyAsync(IEnumerable<string> keys, CancellationToken cancellationToken = default)
     {
-        if (!IsAvailable || _redis == null || !keys.Any())
+        var enumerable = keys as string[] ?? keys.ToArray();
+        if (!IsAvailable || _redis == null || !enumerable.Any())
         {
             return false;
         }
-        
+
         try
         {
-            var keyArray = keys.ToArray();
-            
+            var keyArray = enumerable.ToArray();
+
             // 使用事务批量删除
             var batch = _redis.CreateBatch();
             var tasks = new List<Task>();
-            
+
             foreach (var key in keyArray)
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 var task = batch.KeyDeleteAsync(GetFullKey(key), CommandFlags.FireAndForget);
                 tasks.Add(task);
             }
-            
+
             batch.Execute();
             await Task.WhenAll(tasks);
-            
+
             return true;
         }
         catch
@@ -433,40 +442,42 @@ internal class RedisCacheManager
             return false;
         }
     }
-    
+
     /// <summary>
     /// 搜索缓存键
     /// </summary>
     /// <param name="pattern">键匹配模式</param>
     /// <param name="cancellationToken">取消令牌</param>
     /// <returns>匹配的缓存键列表</returns>
-    public IAsyncEnumerable<string> SearchKeysAsync(string pattern, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    public IAsyncEnumerable<string> SearchKeysAsync(string pattern,
+        CancellationToken cancellationToken = default)
     {
         return SearchKeysInternalAsync(pattern, cancellationToken);
     }
-    
+
     /// <summary>
     /// 搜索缓存键内部实现
     /// </summary>
     /// <param name="pattern">键匹配模式</param>
     /// <param name="cancellationToken">取消令牌</param>
     /// <returns>匹配的缓存键列表</returns>
-    private async IAsyncEnumerable<string> SearchKeysInternalAsync(string pattern, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    private async IAsyncEnumerable<string> SearchKeysInternalAsync(string pattern,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         if (!IsAvailable || _redis == null)
         {
             yield break;
         }
-        
+
         var fullPattern = GetFullKey(pattern);
         var endpoints = _connection.GetEndPoints();
-        
+
         foreach (var endpoint in endpoints)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            
-            IServer? server = null;
-            
+
+            IServer? server;
+
             // 尝试获取服务器，单独处理可能的异常
             try
             {
@@ -477,24 +488,25 @@ internal class RedisCacheManager
                 Interlocked.Increment(ref _errorCount);
                 continue;
             }
-            
-            if (server == null || !server.IsConnected)
+
+            if (server is not { IsConnected: true })
             {
                 continue;
             }
-            
+
             // 遍历键，不使用try-catch包裹yield return
-            await foreach (var key in server.KeysAsync(pattern: fullPattern, pageSize: 1000))
+            await foreach (var key in server.KeysAsync(pattern: fullPattern, pageSize: 1000)
+                               .WithCancellation(cancellationToken))
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                
+
                 // 移除键前缀
                 var originalKey = key.ToString().Substring(_options.KeyPrefix.Length);
                 yield return originalKey;
             }
         }
     }
-    
+
     /// <summary>
     /// 获取Redis缓存统计信息
     /// </summary>
@@ -506,7 +518,7 @@ internal class RedisCacheManager
             var hitCount = Interlocked.Read(ref _hitCount);
             var missCount = Interlocked.Read(ref _missCount);
             var errorCount = Interlocked.Read(ref _errorCount);
-            
+
             return new RedisCacheStatistics
             {
                 IsAvailable = IsAvailable,
@@ -527,9 +539,9 @@ internal class RedisCacheManager
             };
         }
     }
-    
+
     #region 私有辅助方法
-    
+
     /// <summary>
     /// 单个键获取辅助方法
     /// </summary>
@@ -538,25 +550,24 @@ internal class RedisCacheManager
         var value = await GetAsync<T>(key, cancellationToken);
         return (key, value);
     }
-    
+
     /// <summary>
     /// 更新缓存项
     /// </summary>
     /// <typeparam name="T">缓存值类型</typeparam>
     /// <param name="cacheItem">缓存项</param>
-    /// <param name="cancellationToken">取消令牌</param>
-    private async Task UpdateCacheItemAsync<T>(CacheItem<T> cacheItem, CancellationToken cancellationToken = default)
+    private async Task UpdateCacheItemAsync<T>(CacheItem<T> cacheItem)
     {
         if (!IsAvailable || _redis == null)
         {
             return;
         }
-        
+
         try
         {
             var fullKey = GetFullKey(cacheItem.Key);
             var json = JsonSerializer.Serialize(cacheItem, _jsonOptions);
-            
+
             // 使用现有过期时间
             var ttl = cacheItem.RemainingTime;
             if (ttl.HasValue && ttl.Value > TimeSpan.Zero)
@@ -570,7 +581,7 @@ internal class RedisCacheManager
             IsAvailable = false;
         }
     }
-    
+
     /// <summary>
     /// 获取带前缀的完整缓存键
     /// </summary>
@@ -580,39 +591,40 @@ internal class RedisCacheManager
     {
         return $"{_options.KeyPrefix}{key}";
     }
-    
+
     #endregion
-    
+
     /// <summary>
     /// Redis缓存统计信息
     /// </summary>
+    [Serializable]
     public class RedisCacheStatistics
     {
         /// <summary>
         /// Redis是否可用
         /// </summary>
         public bool IsAvailable { get; set; }
-        
+
         /// <summary>
         /// 命中次数
         /// </summary>
         public long HitCount { get; set; }
-        
+
         /// <summary>
         /// 未命中次数
         /// </summary>
         public long MissCount { get; set; }
-        
+
         /// <summary>
         /// 错误次数
         /// </summary>
         public long ErrorCount { get; set; }
-        
+
         /// <summary>
         /// 命中率
         /// </summary>
         public double HitRate { get; set; }
-        
+
         /// <summary>
         /// 总请求次数
         /// </summary>

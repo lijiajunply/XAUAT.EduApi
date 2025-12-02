@@ -1,5 +1,5 @@
 using System.Collections.Concurrent;
-using System.Runtime.CompilerServices;
+using JetBrains.Annotations;
 using Microsoft.Extensions.Caching.Memory;
 
 namespace XAUAT.EduApi.Caching;
@@ -13,12 +13,12 @@ internal class LocalCacheManager
     private readonly CacheOptions _options;
     private readonly ConcurrentDictionary<string, CacheItemMetadata> _metadata;
     private readonly ReaderWriterLockSlim _lock;
-    
+
     // 统计信息
     private long _hitCount;
     private long _missCount;
     private long _expiredItems;
-    
+
     /// <summary>
     /// 构造函数
     /// </summary>
@@ -27,7 +27,7 @@ internal class LocalCacheManager
     {
         _options = options;
         _lock = new ReaderWriterLockSlim();
-        
+
         // 创建内存缓存配置
         var cacheOptions = new MemoryCacheOptions
         {
@@ -35,11 +35,11 @@ internal class LocalCacheManager
             ExpirationScanFrequency = _options.RefreshInterval,
             CompactionPercentage = 0.1
         };
-        
+
         _cache = new MemoryCache(cacheOptions);
         _metadata = new ConcurrentDictionary<string, CacheItemMetadata>();
     }
-    
+
     /// <summary>
     /// 获取缓存项
     /// </summary>
@@ -51,23 +51,23 @@ internal class LocalCacheManager
         try
         {
             _lock.EnterReadLock();
-            
+
             if (_cache.TryGetValue(key, out CacheItem<T>? cacheItem))
             {
-                if (cacheItem != null && !cacheItem.IsExpired)
+                if (cacheItem is { IsExpired: false })
                 {
                     // 更新访问信息
                     cacheItem.HitCount++;
                     cacheItem.LastAccessTime = DateTime.Now;
-                    
+
                     // 更新缓存项
                     Set(key, cacheItem.Value, cacheItem.RemainingTime, cacheItem.BusinessPriority);
-                    
+
                     Interlocked.Increment(ref _hitCount);
                     return cacheItem.Value;
                 }
             }
-            
+
             Interlocked.Increment(ref _missCount);
             return default;
         }
@@ -76,7 +76,7 @@ internal class LocalCacheManager
             _lock.ExitReadLock();
         }
     }
-    
+
     /// <summary>
     /// 设置缓存项
     /// </summary>
@@ -91,15 +91,15 @@ internal class LocalCacheManager
         try
         {
             _lock.EnterWriteLock();
-            
+
             if (value == null)
             {
                 return Remove(key);
             }
-            
+
             var actualExpiration = expiration ?? _options.DefaultExpiration;
             var now = DateTime.Now;
-            
+
             var cacheItem = new CacheItem<T>
             {
                 Key = key,
@@ -111,7 +111,7 @@ internal class LocalCacheManager
                 Level = CacheLevel.Local,
                 BusinessPriority = businessPriority
             };
-            
+
             // 创建缓存项选项
             var cacheEntryOptions = new MemoryCacheEntryOptions
             {
@@ -119,7 +119,7 @@ internal class LocalCacheManager
                 Size = 1, // 每个缓存项大小为1
                 Priority = businessPriority >= 8 ? CacheItemPriority.NeverRemove : CacheItemPriority.Normal
             };
-            
+
             // 添加过期回调
             cacheEntryOptions.RegisterPostEvictionCallback((cacheKey, cacheValue, reason, state) =>
             {
@@ -132,10 +132,10 @@ internal class LocalCacheManager
                     }
                 }
             });
-            
+
             // 设置缓存
             _cache.Set(key, cacheItem, cacheEntryOptions);
-            
+
             // 更新元数据
             _metadata[key] = new CacheItemMetadata
             {
@@ -146,7 +146,7 @@ internal class LocalCacheManager
                 HitCount = 0,
                 LastAccessTime = now
             };
-            
+
             return true;
         }
         finally
@@ -154,7 +154,7 @@ internal class LocalCacheManager
             _lock.ExitWriteLock();
         }
     }
-    
+
     /// <summary>
     /// 移除缓存项
     /// </summary>
@@ -165,7 +165,7 @@ internal class LocalCacheManager
         try
         {
             _lock.EnterWriteLock();
-            
+
             _cache.Remove(key);
             return _metadata.TryRemove(key, out _);
         }
@@ -174,7 +174,7 @@ internal class LocalCacheManager
             _lock.ExitWriteLock();
         }
     }
-    
+
     /// <summary>
     /// 检查缓存项是否存在
     /// </summary>
@@ -185,19 +185,19 @@ internal class LocalCacheManager
         try
         {
             _lock.EnterReadLock();
-            
+
             if (_cache.TryGetValue(key, out CacheItem<object>? cacheItem))
             {
-                if (cacheItem != null && !cacheItem.IsExpired)
+                if (cacheItem is { IsExpired: false })
                 {
                     return true;
                 }
-                
+
                 // 如果已过期，移除它
                 Remove(key);
                 Interlocked.Increment(ref _expiredItems);
             }
-            
+
             return false;
         }
         finally
@@ -205,7 +205,7 @@ internal class LocalCacheManager
             _lock.ExitReadLock();
         }
     }
-    
+
     /// <summary>
     /// 清除所有缓存项
     /// </summary>
@@ -214,13 +214,13 @@ internal class LocalCacheManager
         try
         {
             _lock.EnterWriteLock();
-            
+
             // 清除所有缓存项
             foreach (var key in _metadata.Keys.ToList())
             {
                 _cache.Remove(key);
             }
-            
+
             _metadata.Clear();
         }
         finally
@@ -228,27 +228,28 @@ internal class LocalCacheManager
             _lock.ExitWriteLock();
         }
     }
-    
+
     /// <summary>
     /// 搜索缓存键
     /// </summary>
     /// <param name="pattern">键匹配模式</param>
     /// <param name="cancellationToken">取消令牌</param>
     /// <returns>匹配的缓存键列表</returns>
-    public IAsyncEnumerable<string> SearchKeysAsync(string pattern, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    public IAsyncEnumerable<string> SearchKeysAsync(string pattern,
+        CancellationToken cancellationToken = default)
     {
-        return new AsyncEnumerableWrapper<string>(() =>
+        return new AsyncEnumerableWrapper<string>([MustDisposeResource]() =>
         {
             try
             {
                 _lock.EnterReadLock();
-                
-                var keys = _metadata.Keys.Where(key => 
+
+                var keys = _metadata.Keys.Where(key =>
                 {
                     cancellationToken.ThrowIfCancellationRequested();
                     return WildcardMatch(key, pattern);
                 });
-                
+
                 return keys.GetEnumerator();
             }
             finally
@@ -257,7 +258,7 @@ internal class LocalCacheManager
             }
         });
     }
-    
+
     /// <summary>
     /// 获取缓存统计信息
     /// </summary>
@@ -267,12 +268,12 @@ internal class LocalCacheManager
         try
         {
             _lock.EnterReadLock();
-            
+
             var totalItems = _metadata.Count;
             var hitCount = Interlocked.Read(ref _hitCount);
             var missCount = Interlocked.Read(ref _missCount);
             var expiredItems = Interlocked.Read(ref _expiredItems);
-            
+
             return new LocalCacheStatistics
             {
                 TotalItems = totalItems,
@@ -288,7 +289,7 @@ internal class LocalCacheManager
             _lock.ExitReadLock();
         }
     }
-    
+
     /// <summary>
     /// 通配符匹配
     /// </summary>
@@ -301,60 +302,46 @@ internal class LocalCacheManager
         {
             return string.IsNullOrEmpty(input);
         }
-        
+
         var regexPattern = "^" + System.Text.RegularExpressions.Regex.Escape(pattern).Replace("\\*", ".*") + "$";
-        return System.Text.RegularExpressions.Regex.IsMatch(input, regexPattern, System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        return System.Text.RegularExpressions.Regex.IsMatch(input, regexPattern,
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
     }
-    
+
     /// <summary>
     /// 异步可枚举包装器
     /// </summary>
     /// <typeparam name="T">元素类型</typeparam>
-    private class AsyncEnumerableWrapper<T> : IAsyncEnumerable<T>
+    private class AsyncEnumerableWrapper<T>(Func<IEnumerator<T>> enumeratorFactory) : IAsyncEnumerable<T>
     {
-        private readonly Func<IEnumerator<T>> _enumeratorFactory;
-        
-        public AsyncEnumerableWrapper(Func<IEnumerator<T>> enumeratorFactory)
-        {
-            _enumeratorFactory = enumeratorFactory;
-        }
-        
         public IAsyncEnumerator<T> GetAsyncEnumerator(CancellationToken cancellationToken = default)
         {
-            return new AsyncEnumeratorWrapper<T>(_enumeratorFactory(), cancellationToken);
+            return new AsyncEnumeratorWrapper<T>(enumeratorFactory(), cancellationToken);
         }
     }
-    
+
     /// <summary>
     /// 异步枚举器包装器
     /// </summary>
     /// <typeparam name="T">元素类型</typeparam>
-    private class AsyncEnumeratorWrapper<T> : IAsyncEnumerator<T>
+    private class AsyncEnumeratorWrapper<T>(IEnumerator<T> enumerator, CancellationToken cancellationToken)
+        : IAsyncEnumerator<T>
     {
-        private readonly IEnumerator<T> _enumerator;
-        private readonly CancellationToken _cancellationToken;
-        
-        public AsyncEnumeratorWrapper(IEnumerator<T> enumerator, CancellationToken cancellationToken)
-        {
-            _enumerator = enumerator;
-            _cancellationToken = cancellationToken;
-        }
-        
-        public T Current => _enumerator.Current;
-        
+        public T Current => enumerator.Current;
+
         public ValueTask DisposeAsync()
         {
-            _enumerator.Dispose();
+            enumerator.Dispose();
             return ValueTask.CompletedTask;
         }
-        
+
         public ValueTask<bool> MoveNextAsync()
         {
-            _cancellationToken.ThrowIfCancellationRequested();
-            return ValueTask.FromResult(_enumerator.MoveNext());
+            cancellationToken.ThrowIfCancellationRequested();
+            return ValueTask.FromResult(enumerator.MoveNext());
         }
     }
-    
+
     /// <summary>
     /// 缓存项元数据
     /// </summary>
@@ -364,33 +351,33 @@ internal class LocalCacheManager
         /// 缓存键
         /// </summary>
         public string Key { get; set; } = string.Empty;
-        
+
         /// <summary>
         /// 创建时间
         /// </summary>
         public DateTime CreatedTime { get; set; }
-        
+
         /// <summary>
         /// 过期时间
         /// </summary>
         public DateTime? ExpirationTime { get; set; }
-        
+
         /// <summary>
         /// 业务优先级
         /// </summary>
         public int BusinessPriority { get; set; }
-        
+
         /// <summary>
         /// 命中次数
         /// </summary>
         public int HitCount { get; set; }
-        
+
         /// <summary>
         /// 最后访问时间
         /// </summary>
         public DateTime LastAccessTime { get; set; }
     }
-    
+
     /// <summary>
     /// 本地缓存统计信息
     /// </summary>
@@ -400,27 +387,27 @@ internal class LocalCacheManager
         /// 缓存项总数
         /// </summary>
         public long TotalItems { get; set; }
-        
+
         /// <summary>
         /// 命中次数
         /// </summary>
         public long HitCount { get; set; }
-        
+
         /// <summary>
         /// 未命中次数
         /// </summary>
         public long MissCount { get; set; }
-        
+
         /// <summary>
         /// 命中率
         /// </summary>
         public double HitRate { get; set; }
-        
+
         /// <summary>
         /// 过期项数量
         /// </summary>
         public long ExpiredItems { get; set; }
-        
+
         /// <summary>
         /// 内存大小（字节）
         /// </summary>

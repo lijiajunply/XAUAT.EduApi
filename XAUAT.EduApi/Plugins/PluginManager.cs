@@ -12,13 +12,13 @@ public class PluginManager : IDisposable
     private readonly IConfiguration _configuration;
     private readonly List<IPlugin> _plugins = [];
     private readonly string _pluginsDirectory;
-    private bool _isInitialized = false;
-    
+    private bool _isInitialized;
+
     /// <summary>
     /// 已加载的插件列表
     /// </summary>
     public IReadOnlyList<IPlugin> Plugins => _plugins.AsReadOnly();
-    
+
     /// <summary>
     /// 构造函数
     /// </summary>
@@ -35,7 +35,7 @@ public class PluginManager : IDisposable
         _configuration = configuration;
         _pluginsDirectory = configuration.GetValue<string>("Plugins:Directory") ?? "./Plugins";
     }
-    
+
     /// <summary>
     /// 初始化插件管理器
     /// </summary>
@@ -45,15 +45,15 @@ public class PluginManager : IDisposable
         {
             return;
         }
-        
+
         _logger.LogInformation("Initializing plugin manager");
-        
+
         // 确保插件目录存在
         Directory.CreateDirectory(_pluginsDirectory);
-        
+
         _isInitialized = true;
     }
-    
+
     /// <summary>
     /// 加载所有插件
     /// </summary>
@@ -63,14 +63,14 @@ public class PluginManager : IDisposable
         {
             Initialize();
         }
-        
+
         _logger.LogInformation("Loading plugins from directory: {Directory}", _pluginsDirectory);
-        
+
         try
         {
             // 首先加载内置插件
             LoadBuiltInPlugins();
-            
+
             // 然后加载外部插件
             LoadExternalPlugins();
         }
@@ -79,18 +79,18 @@ public class PluginManager : IDisposable
             _logger.LogError(ex, "Failed to load plugins");
         }
     }
-    
+
     /// <summary>
     /// 加载内置插件（同一程序集中的插件）
     /// </summary>
     private void LoadBuiltInPlugins()
     {
         _logger.LogInformation("Loading built-in plugins");
-        
+
         var assembly = Assembly.GetExecutingAssembly();
         var pluginTypes = assembly.GetTypes()
-            .Where(t => typeof(IPlugin).IsAssignableFrom(t) && !t.IsAbstract && t.IsClass);
-        
+            .Where(t => typeof(IPlugin).IsAssignableFrom(t) && t is { IsAbstract: false, IsClass: true });
+
         foreach (var pluginType in pluginTypes)
         {
             try
@@ -104,28 +104,28 @@ public class PluginManager : IDisposable
             }
         }
     }
-    
+
     /// <summary>
     /// 加载外部插件（从DLL文件加载）
     /// </summary>
     private void LoadExternalPlugins()
     {
         _logger.LogInformation("Loading external plugins");
-        
+
         // 获取插件目录中的所有DLL文件
         var dllFiles = Directory.GetFiles(_pluginsDirectory, "*.dll", SearchOption.AllDirectories);
-        
+
         foreach (var dllFile in dllFiles)
         {
             try
             {
                 // 加载程序集
                 var assembly = Assembly.LoadFrom(dllFile);
-                
+
                 // 查找所有实现了IPlugin接口的类型
                 var pluginTypes = assembly.GetTypes()
-                    .Where(t => typeof(IPlugin).IsAssignableFrom(t) && !t.IsAbstract && t.IsClass);
-                
+                    .Where(t => typeof(IPlugin).IsAssignableFrom(t) && t is { IsAbstract: false, IsClass: true });
+
                 foreach (var pluginType in pluginTypes)
                 {
                     try
@@ -145,7 +145,7 @@ public class PluginManager : IDisposable
             }
         }
     }
-    
+
     /// <summary>
     /// 加载单个插件
     /// </summary>
@@ -157,9 +157,9 @@ public class PluginManager : IDisposable
             _logger.LogWarning("Plugin {PluginName} is already loaded, skipping", plugin.Name);
             return;
         }
-        
+
         _logger.LogInformation("Loading plugin: {PluginName} v{Version}", plugin.Name, plugin.Version);
-        
+
         try
         {
             // 创建插件上下文
@@ -168,16 +168,16 @@ public class PluginManager : IDisposable
             // 注意：这是一个简化实现，实际应用中可能需要更复杂的服务转换
             var loggerFactory = _serviceProvider.GetRequiredService<ILoggerFactory>();
             var pluginContext = new PluginContext(services, _configuration, loggerFactory);
-            
+
             // 初始化插件
             plugin.Initialize(pluginContext);
-            
+
             // 启动插件
             plugin.Start();
-            
+
             // 添加到插件列表
             _plugins.Add(plugin);
-            
+
             _logger.LogInformation("Plugin {PluginName} loaded successfully", plugin.Name);
         }
         catch (Exception ex)
@@ -185,14 +185,14 @@ public class PluginManager : IDisposable
             _logger.LogError(ex, "Failed to initialize or start plugin: {PluginName}", plugin.Name);
         }
     }
-    
+
     /// <summary>
     /// 启动所有插件
     /// </summary>
     public void StartAllPlugins()
     {
         _logger.LogInformation("Starting all plugins");
-        
+
         foreach (var plugin in _plugins)
         {
             try
@@ -206,14 +206,14 @@ public class PluginManager : IDisposable
             }
         }
     }
-    
+
     /// <summary>
     /// 停止所有插件
     /// </summary>
     public void StopAllPlugins()
     {
         _logger.LogInformation("Stopping all plugins");
-        
+
         foreach (var plugin in _plugins)
         {
             try
@@ -227,14 +227,14 @@ public class PluginManager : IDisposable
             }
         }
     }
-    
+
     /// <summary>
     /// 卸载所有插件
     /// </summary>
     public void UnloadAllPlugins()
     {
         _logger.LogInformation("Unloading all plugins");
-        
+
         foreach (var plugin in _plugins.ToList())
         {
             try
@@ -249,7 +249,7 @@ public class PluginManager : IDisposable
             }
         }
     }
-    
+
     /// <summary>
     /// 根据名称查找插件
     /// </summary>
@@ -259,7 +259,7 @@ public class PluginManager : IDisposable
     {
         return _plugins.FirstOrDefault(p => p.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
     }
-    
+
     /// <summary>
     /// 释放资源
     /// </summary>

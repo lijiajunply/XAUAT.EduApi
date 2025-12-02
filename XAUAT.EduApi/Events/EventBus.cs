@@ -8,8 +8,8 @@ public class EventBus : IEventBus
     private readonly ILogger<EventBus> _logger;
     private readonly IServiceProvider _serviceProvider;
     private readonly Dictionary<Type, List<Func<IEvent, CancellationToken, Task>>> _handlers = [];
-    private readonly object _lock = new();
-    
+    private readonly Lock _lock = new();
+
     /// <summary>
     /// 构造函数
     /// </summary>
@@ -20,7 +20,7 @@ public class EventBus : IEventBus
         _serviceProvider = serviceProvider;
         _logger = logger;
     }
-    
+
     /// <summary>
     /// 发布事件
     /// </summary>
@@ -28,14 +28,15 @@ public class EventBus : IEventBus
     /// <param name="cancellationToken">取消令牌</param>
     /// <typeparam name="TEvent">事件类型</typeparam>
     /// <returns>任务</returns>
-    public async Task PublishAsync<TEvent>(TEvent @event, CancellationToken cancellationToken = default) where TEvent : IEvent
+    public async Task PublishAsync<TEvent>(TEvent @event, CancellationToken cancellationToken = default)
+        where TEvent : IEvent
     {
         ArgumentNullException.ThrowIfNull(@event);
-        
+
         _logger.LogInformation("Publishing event: {EventType} (ID: {EventId})", @event.EventType, @event.Id);
-        
+
         var eventType = typeof(TEvent);
-        
+
         // 直接调用已注册的处理程序
         List<Func<IEvent, CancellationToken, Task>>? handlers;
         lock (_lock)
@@ -45,26 +46,27 @@ public class EventBus : IEventBus
                 _logger.LogWarning("No handlers found for event: {EventType}", @event.EventType);
                 return;
             }
-            
+
             // 创建处理程序列表的副本，避免在处理过程中修改
             handlers = new List<Func<IEvent, CancellationToken, Task>>(handlers);
         }
-        
+
         // 使用依赖注入创建的处理程序
         await using var scope = _serviceProvider.CreateAsyncScope();
         var scopeProvider = scope.ServiceProvider;
         var eventHandlers = scopeProvider.GetServices<IEventHandler<TEvent>>();
-        
+
         // 合并所有处理程序
         var allHandlers = handlers.Select(handler => handler(@event, cancellationToken))
             .Concat(eventHandlers.Select(handler => handler.HandleAsync(@event, cancellationToken)));
-        
+
         // 并行执行所有处理程序
         await Task.WhenAll(allHandlers);
-        
-        _logger.LogInformation("Event published successfully: {EventType} (ID: {EventId})", @event.EventType, @event.Id);
+
+        _logger.LogInformation("Event published successfully: {EventType} (ID: {EventId})", @event.EventType,
+            @event.Id);
     }
-    
+
     /// <summary>
     /// 订阅事件
     /// </summary>
@@ -73,22 +75,22 @@ public class EventBus : IEventBus
     public void Subscribe<TEvent>(Func<TEvent, CancellationToken, Task> handler) where TEvent : IEvent
     {
         ArgumentNullException.ThrowIfNull(handler);
-        
+
         var eventType = typeof(TEvent);
-        
+
         lock (_lock)
         {
             if (!_handlers.ContainsKey(eventType))
             {
                 _handlers[eventType] = [];
             }
-            
+
             _handlers[eventType].Add((e, ct) => handler((TEvent)e, ct));
         }
-        
+
         _logger.LogInformation("Subscribed to event: {EventType}", eventType.Name);
     }
-    
+
     /// <summary>
     /// 订阅事件
     /// </summary>
@@ -97,9 +99,10 @@ public class EventBus : IEventBus
     public void Subscribe<TEvent, THandler>() where TEvent : IEvent where THandler : IEventHandler<TEvent>
     {
         // 这种订阅方式依赖于依赖注入容器，在发布事件时通过服务提供程序获取处理程序
-        _logger.LogInformation("Subscribed to event: {EventType} with handler: {HandlerType}", typeof(TEvent).Name, typeof(THandler).Name);
+        _logger.LogInformation("Subscribed to event: {EventType} with handler: {HandlerType}", typeof(TEvent).Name,
+            typeof(THandler).Name);
     }
-    
+
     /// <summary>
     /// 取消订阅事件
     /// </summary>
@@ -108,9 +111,9 @@ public class EventBus : IEventBus
     public void Unsubscribe<TEvent>(Func<TEvent, CancellationToken, Task> handler) where TEvent : IEvent
     {
         ArgumentNullException.ThrowIfNull(handler);
-        
+
         var eventType = typeof(TEvent);
-        
+
         lock (_lock)
         {
             if (_handlers.TryGetValue(eventType, out var handlers))
@@ -125,7 +128,7 @@ public class EventBus : IEventBus
             }
         }
     }
-    
+
     /// <summary>
     /// 取消订阅所有事件处理程序
     /// </summary>
@@ -133,7 +136,7 @@ public class EventBus : IEventBus
     public void UnsubscribeAll<TEvent>() where TEvent : IEvent
     {
         var eventType = typeof(TEvent);
-        
+
         lock (_lock)
         {
             if (_handlers.Remove(eventType))
@@ -142,7 +145,7 @@ public class EventBus : IEventBus
             }
         }
     }
-    
+
     /// <summary>
     /// 获取指定事件类型的处理程序数量
     /// </summary>
@@ -151,7 +154,7 @@ public class EventBus : IEventBus
     public int GetHandlerCount<TEvent>() where TEvent : IEvent
     {
         var eventType = typeof(TEvent);
-        
+
         lock (_lock)
         {
             return _handlers.TryGetValue(eventType, out var handlers) ? handlers.Count : 0;

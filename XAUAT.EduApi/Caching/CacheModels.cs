@@ -1,5 +1,3 @@
-using System.ComponentModel.DataAnnotations;
-
 namespace XAUAT.EduApi.Caching;
 
 /// <summary>
