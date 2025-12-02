@@ -1,6 +1,7 @@
 using System.Net;
 using Newtonsoft.Json.Linq;
 using Polly;
+using XAUAT.EduApi.Interfaces;
 
 namespace XAUAT.EduApi.Services;
 

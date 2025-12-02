@@ -29,7 +29,7 @@ public class ExamService : IExamService
         _info = info;
         
         _redisAvailable = muxer != null;
-        if (_redisAvailable)
+        if (_redisAvailable && muxer != null)
         {
             try
             {
@@ -106,29 +106,36 @@ public class ExamService : IExamService
         return await retryPolicy.ExecuteAsync(async () =>
         {
             using var client = _httpClientFactory.CreateClient();
-            client.SetRealisticHeaders();
-            client.Timeout = TimeSpan.FromSeconds(5); // 修改为5秒超时
-            client.DefaultRequestHeaders.Add("Cookie", cookie);
-            var html = await client.GetStringAsync("https://swjw.xauat.edu.cn/student/for-std/course-table");
-
-            var data = html.ParseNow(_info);
-
-            // 缓存到Redis，设置1小时过期时间
-            if (_redisAvailable && _redis != null)
+            if (client != null)
             {
-                try
-                {
-                    await _redis.StringSetAsync("thisSemester", JsonConvert.SerializeObject(data),
-                        expiry: TimeSpan.FromHours(1));
-                    _logger.LogInformation("学期数据已缓存到Redis");
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Redis缓存写入失败");
-                }
-            }
+                client.SetRealisticHeaders();
+                client.Timeout = TimeSpan.FromSeconds(5); // 修改为5秒超时
+                client.DefaultRequestHeaders.Add("Cookie", cookie);
+                var html = await client.GetStringAsync("https://swjw.xauat.edu.cn/student/for-std/course-table");
 
-            return data;
+                var data = html.ParseNow(_info);
+
+                // 缓存到Redis，设置1小时过期时间
+                if (_redisAvailable && _redis != null)
+                {
+                    try
+                    {
+                        await _redis.StringSetAsync("thisSemester", JsonConvert.SerializeObject(data),
+                            expiry: TimeSpan.FromHours(1));
+                        _logger.LogInformation("学期数据已缓存到Redis");
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Redis缓存写入失败");
+                    }
+                }
+
+                return data;
+            }
+            
+            // 如果client为null，返回默认值
+            _logger.LogError("HttpClient创建失败");
+            return new SemesterItem { Value = string.Empty, Text = string.Empty };
         });
     }
 

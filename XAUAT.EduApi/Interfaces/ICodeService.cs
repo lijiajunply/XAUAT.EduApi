@@ -3,7 +3,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 
-namespace XAUAT.EduApi.Services;
+namespace XAUAT.EduApi.Interfaces;
 
 public interface ICodeService
 {

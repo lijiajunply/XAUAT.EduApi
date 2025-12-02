@@ -9,10 +9,34 @@ namespace XAUAT.EduApi.Controllers;
 
 [ApiController]
 [Route("[controller]")]
-public class BusController(IHttpClientFactory httpClientFactory, IConnectionMultiplexer muxer)
-    : ControllerBase
+public class BusController : ControllerBase
 {
-    private readonly IDatabase _redis = muxer.GetDatabase();
+    private readonly IHttpClientFactory _httpClientFactory;
+    private readonly IDatabase? _redis;
+    private readonly bool _redisAvailable;
+    
+    public BusController(IHttpClientFactory httpClientFactory, IConnectionMultiplexer? muxer, ILogger<BusController>? logger = null)
+    {
+        _httpClientFactory = httpClientFactory;
+        _redisAvailable = muxer != null;
+        if (_redisAvailable && muxer != null)
+        {
+            try
+            {
+                _redis = muxer.GetDatabase();
+                logger?.LogInformation("Redis连接成功");
+            }
+            catch (Exception ex)
+            {
+                logger?.LogError(ex, "Redis连接失败");
+                _redisAvailable = false;
+            }
+        }
+        else
+        {
+            logger?.LogWarning("Redis未配置");
+        }
+    }
 
     [HttpGet("{time?}")]
     public async Task<IActionResult> GetBus(string? time)
@@ -30,18 +54,21 @@ public class BusController(IHttpClientFactory httpClientFactory, IConnectionMult
     public async Task<IActionResult> GetBusFromNewData(string? time, string loc = "ALL")
     {
         // 使用专门配置的HttpClient（跳过SSL验证）
-        using var client = httpClientFactory.CreateClient("BusClient");
+        using var client = _httpClientFactory.CreateClient("BusClient");
         client.SetRealisticHeaders();
         client.Timeout = new TimeSpan(0, 0, 0, 1, 0);
         time ??= DateTime.Today.ToString("yyyy-MM-dd");
 
         var key = "bus_new_data:" + time;
 
-        var bus = await _redis.StringGetAsync(key);
-
-        if (bus.HasValue)
+        // 尝试从Redis获取数据
+        if (_redisAvailable && _redis != null)
         {
-            return Ok(JsonConvert.DeserializeObject<BusModel>(bus.ToString()));
+            var bus = await _redis.StringGetAsync(key);
+            if (bus.HasValue)
+            {
+                return Ok(JsonConvert.DeserializeObject<BusModel>(bus.ToString()));
+            }
         }
 
         var response =
@@ -84,7 +111,7 @@ public class BusController(IHttpClientFactory httpClientFactory, IConnectionMult
 
         busModel.Total = busModel.Records.Count;
 
-        if (busModel.Total != 0)
+        if (busModel.Total != 0 && _redisAvailable && _redis != null)
             await _redis.StringSetAsync(key, JsonConvert.SerializeObject(busModel),
                 expiry: new TimeSpan(0, 12, 0, 0));
 
@@ -95,15 +122,18 @@ public class BusController(IHttpClientFactory httpClientFactory, IConnectionMult
     public async Task<BusModel> GetBusFromOldData(string? time, bool isShow = false)
     {
         // 使用专门配置的HttpClient（跳过SSL验证）
-        using var client = httpClientFactory.CreateClient("BusClient");
+        using var client = _httpClientFactory.CreateClient("BusClient");
         client.SetRealisticHeaders();
         time ??= DateTime.Today.ToString("yyyy-MM-dd");
 
-        var bus = await _redis.StringGetAsync("bus:" + time);
-
-        if (bus.HasValue)
+        // 尝试从Redis获取数据
+        if (_redisAvailable && _redis != null)
         {
-            return JsonConvert.DeserializeObject<BusModel>(bus.ToString()) ?? new BusModel();
+            var bus = await _redis.StringGetAsync("bus:" + time);
+            if (bus.HasValue)
+            {
+                return JsonConvert.DeserializeObject<BusModel>(bus.ToString()) ?? new BusModel();
+            }
         }
 
         var response =
@@ -128,7 +158,7 @@ public class BusController(IHttpClientFactory httpClientFactory, IConnectionMult
             });
         }
 
-        if (busModel.Total != 0)
+        if (busModel.Total != 0 && _redisAvailable && _redis != null)
             await _redis.StringSetAsync("bus:" + time, JsonConvert.SerializeObject(busModel),
                 expiry: new TimeSpan(0, 12, 0, 0));
 
