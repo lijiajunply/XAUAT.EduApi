@@ -1,14 +1,15 @@
 using EduApi.Data;
 using Microsoft.EntityFrameworkCore;
-using Prometheus.Client.AspNetCore;
-using Scalar.AspNetCore;
 using Serilog;
+using XAUAT.EduApi.Caching;
 using XAUAT.EduApi.Extensions;
-using XAUAT.EduApi.Middlewares;
+using XAUAT.EduApi.Plugins;
+using XAUAT.EduApi.ServiceDiscovery;
 
 // 先创建builder对象
 var builder = WebApplication.CreateBuilder(args);
 
+// 启用顶级语句异步支持
 // 配置Serilog
 Log.Logger = new LoggerConfiguration()
     .ReadFrom.Configuration(builder.Configuration)
@@ -22,6 +23,7 @@ builder.Host.UseSerilog();
 
 // 基础服务配置
 builder.Services.AddControllers();
+builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddOpenApi();
 builder.Services.AddHttpContextAccessor();
 
@@ -46,6 +48,38 @@ builder.Services.AddAllServices(serviceConfig);
 
 var app = builder.Build();
 
+// 初始化插件系统
+var pluginManager = app.Services.GetRequiredService<PluginManager>();
+pluginManager.Initialize();
+pluginManager.LoadPlugins();
+
+// 注册当前服务实例到服务注册中心
+var serviceRegistry = app.Services.GetRequiredService<IServiceRegistry>();
+var configuration = app.Configuration;
+
+var serviceName = configuration.GetValue<string>("Service:Name") ?? "XAUAT.EduApi";
+var instanceId = configuration.GetValue<string>("Service:InstanceId") ?? $"{serviceName}-{Guid.NewGuid()}";
+var host = configuration.GetValue<string>("Service:Host") ?? "localhost";
+var port = configuration.GetValue("Service:Port", 8080);
+var isHttps = configuration.GetValue("Service:IsHttps", false);
+
+var serviceInstance = new ServiceInstance
+{
+    ServiceName = serviceName,
+    InstanceId = instanceId,
+    Host = host,
+    Port = port,
+    IsHttps = isHttps,
+    Metadata = new Dictionary<string, string>
+    {
+        { "Version", "1.0.0" },
+        { "Environment", configuration.GetValue<string>("ASPNETCORE_ENVIRONMENT") ?? "Development" }
+    },
+    HealthCheckUrl = $"{(isHttps ? "https" : "http")}://{host}:{port}/health"
+};
+
+await serviceRegistry.RegisterAsync(serviceInstance);
+
 // 配置中间件管道
 app
     .UseErrorHandling()
@@ -69,7 +103,7 @@ using (var scope = app.Services.CreateScope())
     var logger = services.GetRequiredService<ILogger<Program>>();
 
     var pending = context.Database.GetPendingMigrations();
-    var enumerable = pending as string[] ?? pending.ToArray();
+    var enumerable = (pending as string[]) ?? pending.ToArray();
 
     if (enumerable.Length != 0)
     {
@@ -93,6 +127,64 @@ using (var scope = app.Services.CreateScope())
     await context.SaveChangesAsync();
     await context.DisposeAsync();
 }
+
+// 执行缓存预热（异步执行，不阻塞启动）
+_ = Task.Run(async () =>
+{
+    using var scope = app.Services.CreateScope();
+    var cacheService = scope.ServiceProvider.GetRequiredService<ICacheService>();
+    var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+    
+    try
+    {
+        logger.LogInformation("Starting cache warmup...");
+        var startTime = DateTime.Now;
+        
+        // 添加关键业务数据预热任务
+        // 示例：添加学期信息预热
+        cacheService.AddWarmupTask(new CacheWarmupItem
+        {
+            Key = "cache:semesters",
+            ValueFactory = async () =>
+            {
+                // 这里可以替换为实际的业务逻辑，例如从数据库或外部API获取数据
+                return new List<string> { "2025-2026-1", "2025-2026-2", "2024-2025-1", "2024-2025-2" };
+            },
+            Expiration = TimeSpan.FromDays(7),
+            Priority = 10,
+            BusinessTags = ["core", "semester"]
+        });
+        
+        // 执行预热
+        var successCount = await cacheService.ExecuteWarmupAsync();
+        
+        var elapsed = DateTime.Now - startTime;
+        logger.LogInformation("Cache warmup completed successfully. Warmed up {SuccessCount} items in {ElapsedMilliseconds}ms", 
+            successCount, elapsed.TotalMilliseconds);
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "Error during cache warmup: {Message}", ex.Message);
+    }
+});
+
+// 注册应用程序停止事件，用于清理资源
+AppDomain.CurrentDomain.ProcessExit += async (_, _) =>
+{
+    // 注销服务实例
+    await serviceRegistry.DeregisterAsync(serviceName, instanceId);
+
+    // 停止所有插件
+    pluginManager.StopAllPlugins();
+    pluginManager.UnloadAllPlugins();
+
+    // 确保所有日志都被正确写入
+    Log.CloseAndFlush();
+};
+
+// 注册应用程序取消事件
+var cts = new CancellationTokenSource();
+app.Lifetime.ApplicationStopping.Register(() => { cts.Cancel(); });
 
 app.Run();
 

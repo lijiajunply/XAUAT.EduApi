@@ -1,6 +1,11 @@
 using EduApi.Data;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using StackExchange.Redis;
+using XAUAT.EduApi.Caching;
+using XAUAT.EduApi.Events;
+using XAUAT.EduApi.Plugins;
+using XAUAT.EduApi.ServiceDiscovery;
 using XAUAT.EduApi.HealthChecks;
 using XAUAT.EduApi.Interfaces;
 using XAUAT.EduApi.Repos;
@@ -150,6 +155,56 @@ public static class ServiceCollectionExtensions
     }
     
     /// <summary>
+    /// 注册事件驱动服务
+    /// </summary>
+    /// <returns>服务集合</returns>
+    public static IServiceCollection AddEventDrivenServices(this IServiceCollection services)
+    {
+        // 注册事件总线
+        services.TryAddSingleton<IEventBus, EventBus>();
+        
+        // 注册所有实现了IEventHandler接口的类型
+        var handlerTypes = AppDomain.CurrentDomain.GetAssemblies()
+            .SelectMany(assembly => assembly.GetTypes())
+            .Where(t => t.IsClass && !t.IsAbstract && t.GetInterfaces()
+                .Any(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IEventHandler<>)));
+        
+        foreach (var handlerType in handlerTypes)
+        {
+            var interfaceType = handlerType.GetInterfaces()
+                .First(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IEventHandler<>));
+            
+            services.AddTransient(interfaceType, handlerType);
+        }
+        
+        return services;
+    }
+    
+    /// <summary>
+    /// 注册服务发现服务
+    /// </summary>
+    /// <returns>服务集合</returns>
+    public static IServiceCollection AddServiceDiscoveryServices(this IServiceCollection services)
+    {
+        // 注册服务注册中心
+        services.TryAddSingleton<IServiceRegistry, InMemoryServiceRegistry>();
+        
+        return services;
+    }
+    
+    /// <summary>
+    /// 注册插件系统服务
+    /// </summary>
+    /// <returns>服务集合</returns>
+    public static IServiceCollection AddPluginServices(this IServiceCollection services)
+    {
+        // 注册插件管理器
+        services.TryAddSingleton<PluginManager>();
+        
+        return services;
+    }
+    
+    /// <summary>
     /// 注册所有服务
     /// </summary>
     /// <param name="services">服务集合</param>
@@ -176,9 +231,14 @@ public static class ServiceCollectionExtensions
         var serviceCollection = services
             .AddDatabaseServices(configuration.SqlConnectionString)
             .AddRedisServices(configuration.RedisConnectionString)
+            .AddCacheServices() // 添加缓存服务
             .AddRepositoryServices()
             .AddBusinessServices()
-            .AddHttpClientServices();
+            .AddHttpClientServices()
+            // 添加新架构服务
+            .AddEventDrivenServices()
+            .AddServiceDiscoveryServices()
+            .AddPluginServices();
         
         if (configuration.EnablePrometheus)
         {

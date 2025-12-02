@@ -7,14 +7,25 @@ using XAUAT.EduApi.Services;
 
 namespace XAUAT.EduApi.Controllers;
 
+/// <summary>
+/// 校车时刻表控制器
+/// 提供校车运行时刻表查询功能，支持从新旧两个数据平台获取数据
+/// </summary>
 [ApiController]
 [Route("[controller]")]
+[Produces("application/json")]
 public class BusController : ControllerBase
 {
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly IDatabase? _redis;
     private readonly bool _redisAvailable;
     
+    /// <summary>
+    /// BusController构造函数
+    /// </summary>
+    /// <param name="httpClientFactory">HttpClient工厂，用于创建HTTP客户端</param>
+    /// <param name="muxer">Redis连接多路复用器，用于缓存数据</param>
+    /// <param name="logger">日志记录器，用于记录日志信息</param>
     public BusController(IHttpClientFactory httpClientFactory, IConnectionMultiplexer? muxer, ILogger<BusController>? logger = null)
     {
         _httpClientFactory = httpClientFactory;
@@ -38,19 +49,48 @@ public class BusController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// 获取校车时刻表
+    /// 从旧数据平台获取指定日期的校车运行时刻表
+    /// </summary>
+    /// <param name="time">可选，查询日期，格式为YYYY-MM-DD，默认为当天</param>
+    /// <returns>校车时刻表数据，包含所有线路的发车时间、站点等信息</returns>
+    /// <response code="200">成功获取校车时刻表</response>
+    /// <response code="500">服务器内部错误，无法获取校车数据</response>
+    /// <remarks>
+    /// 示例请求：
+    /// GET /Bus
+    /// 
+    /// 获取指定日期的校车时刻表：
+    /// GET /Bus/2024-12-01
+    /// </remarks>
     [HttpGet("{time?}")]
+    [ProducesResponseType(typeof(BusModel), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(string), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> GetBus(string? time)
     {
         return Ok(await GetBusFromOldData(time));
     }
 
     /// <summary>
-    /// 新数据平台
+    /// 从新数据平台获取校车时刻表
+    /// 从新的校车数据平台获取指定日期和校区的校车运行时刻表
     /// </summary>
-    /// <param name="loc">All,雁塔,草堂</param>
-    /// <param name="time"></param>
-    /// <returns></returns>
+    /// <param name="time">可选，查询日期，格式为YYYY-MM-DD，默认为当天</param>
+    /// <param name="loc">校区过滤条件，可选值：ALL（所有校区）、雁塔、草堂，默认为ALL</param>
+    /// <returns>校车时刻表数据，包含所有线路的发车时间、站点等信息</returns>
+    /// <response code="200">成功获取校车时刻表</response>
+    /// <response code="500">服务器内部错误，无法获取校车数据</response>
+    /// <remarks>
+    /// 示例请求：
+    /// GET /Bus/NewData
+    /// 
+    /// 获取指定日期和校区的校车时刻表：
+    /// GET /Bus/NewData/2024-12-01?loc=雁塔
+    /// </remarks>
     [HttpGet("NewData/{time?}")]
+    [ProducesResponseType(typeof(BusModel), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(string), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> GetBusFromNewData(string? time, string loc = "ALL")
     {
         // 使用专门配置的HttpClient（跳过SSL验证）
@@ -118,7 +158,15 @@ public class BusController : ControllerBase
         return Ok(busModel);
     }
 
+    /// <summary>
+    /// 从旧数据平台获取校车时刻表
+    /// 从旧的校车数据平台获取指定日期的校车运行时刻表
+    /// </summary>
+    /// <param name="time">可选，查询日期，格式为YYYY-MM-DD，默认为当天</param>
+    /// <param name="isShow">可选，是否显示数据来源标识，默认为false</param>
+    /// <returns>校车时刻表数据，包含所有线路的发车时间、站点等信息</returns>
     [HttpGet("OldData/{time?}")]
+    [ProducesResponseType(typeof(BusModel), StatusCodes.Status200OK)]
     public async Task<BusModel> GetBusFromOldData(string? time, bool isShow = false)
     {
         // 使用专门配置的HttpClient（跳过SSL验证）
