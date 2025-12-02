@@ -1,16 +1,32 @@
 using EduApi.Data;
 using Microsoft.EntityFrameworkCore;
+using Prometheus.Client.AspNetCore;
 using Scalar.AspNetCore;
-using StackExchange.Redis;
-using XAUAT.EduApi.Repos;
-using XAUAT.EduApi.Services;
+using Serilog;
+using XAUAT.EduApi.Extensions;
+using XAUAT.EduApi.Middlewares;
 
+// 先创建builder对象
 var builder = WebApplication.CreateBuilder(args);
+
+// 配置Serilog
+Log.Logger = new LoggerConfiguration()
+    .ReadFrom.Configuration(builder.Configuration)
+    .Enrich.FromLogContext()
+    .CreateLogger();
+
+// 使用Serilog作为日志提供程序
+builder.Host.UseSerilog();
 
 // Add services to the container.
 
+// 基础服务配置
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
+builder.Services.AddHttpContextAccessor();
+
+// 添加Prometheus监控服务
+builder.Services.AddPrometheus();
 
 builder.Services.AddCors(options =>
 {
@@ -22,100 +38,63 @@ builder.Services.AddCors(options =>
     });
 });
 
-var sql = Environment.GetEnvironmentVariable("SQL", EnvironmentVariableTarget.Process);
+// 获取配置
+var serviceConfig = ServiceConfiguration.FromConfiguration(builder.Configuration);
 
-// if (string.IsNullOrEmpty(sql) && builder.Environment.IsDevelopment())
-// {
-//     sql = builder.Configuration["SQL"];
-// }
-
-if (string.IsNullOrEmpty(sql))
-{
-    builder.Services.AddDbContextFactory<EduContext>(opt =>
-        opt.UseSqlite("Data Source=Data.db",
-            o => o.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery)));
-}
-else
-{
-    builder.Services.AddDbContextFactory<EduContext>(opt =>
-        opt.UseNpgsql(sql,
-            o => o.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery)));
-}
-
-// Add services to the container.
-builder.Services.AddScoped<IScoreRepository, ScoreRepository>();
-
-builder.Services.AddScoped<ICodeService, CodeService>();
-builder.Services.AddScoped<ILoginService, SSOLoginService>();
-builder.Services.AddScoped<IExamService, ExamService>();
-builder.Services.AddScoped<IProgramService, ProgramService>();
-builder.Services.AddScoped<IInfoService, InfoService>();
-builder.Services.AddScoped<IPaymentService, PaymentService>();
-builder.Services.AddScoped<ICourseService, CourseService>();
-builder.Services.AddScoped<IScoreService, ScoreService>();
-builder.Services.AddScoped<IRedisService, RedisService>();
-builder.Services.AddScoped<CookieCodeService>();
-
-var redis = Environment.GetEnvironmentVariable("REDIS", EnvironmentVariableTarget.Process);
-if (string.IsNullOrEmpty(redis) && builder.Environment.IsDevelopment())
-{
-    redis = builder.Configuration["Redis"];
-}
-
-if (!string.IsNullOrEmpty(redis))
-{
-    builder.Services.AddSingleton<IConnectionMultiplexer>(ConnectionMultiplexer.Connect(redis));
-}
-
-// 配置默认的HttpClient（不跳过SSL验证）
-builder.Services.AddHttpClient();
-// 配置专门用于BusController的HttpClient（跳过SSL验证）
-builder.Services.AddHttpClient("BusClient")
-    .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler()
-    {
-        ServerCertificateCustomValidationCallback = (_, _, _, _) => true
-    });
-
-builder.Services.AddHttpContextAccessor();
+// 模块化服务注册
+builder.Services.AddAllServices(serviceConfig);
 
 var app = builder.Build();
 
-app.MapOpenApi();
+// 配置中间件管道
+app
+    .UseErrorHandling()
+    .UseAuthorization()
+    .UseCustomCors()
+    .UseMetricsCollection()
+    .UsePrometheusMonitoring();
 
+// 配置端点
+app
+    .ConfigureApiEndpoints()
+    .ConfigureHealthChecks();
+
+// Prometheus指标端点已通过UsePrometheusServer()配置，默认路径为/metrics
+
+// 应用数据库迁移
 using (var scope = app.Services.CreateScope())
 {
     var services = scope.ServiceProvider;
     var context = services.GetRequiredService<IDbContextFactory<EduContext>>().CreateDbContext();
+    var logger = services.GetRequiredService<ILogger<Program>>();
 
     var pending = context.Database.GetPendingMigrations();
     var enumerable = pending as string[] ?? pending.ToArray();
 
     if (enumerable.Length != 0)
     {
-        Console.WriteLine("Pending migrations: " + string.Join("; ", enumerable));
+        logger.LogInformation("Pending migrations: {Migrations}", string.Join(", ", enumerable));
         try
         {
             await context.Database.MigrateAsync();
-            Console.WriteLine("Migrations applied successfully.");
+            logger.LogInformation("Migrations applied successfully.");
         }
         catch (Exception ex)
         {
-            Console.WriteLine("Migration error: " + ex);
+            logger.LogError(ex, "Migration error: {Message}", ex.Message);
             throw; // 让异常冒泡，方便定位问题
         }
     }
     else
     {
-        Console.WriteLine("No pending migrations.");
+        logger.LogInformation("No pending migrations.");
     }
 
     await context.SaveChangesAsync();
     await context.DisposeAsync();
 }
 
-app.UseAuthorization();
-app.UseCors();
-app.MapControllers();
-app.MapScalarApiReference();
-
 app.Run();
+
+// 确保所有日志都被正确写入
+Log.CloseAndFlush();

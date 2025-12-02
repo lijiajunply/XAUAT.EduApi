@@ -13,15 +13,40 @@ public interface IExamService
     Task<SemesterItem> GetThisSemester(string cookie);
 }
 
-public class ExamService(
-    IHttpClientFactory httpClientFactory,
-    ILogger<ExamService> logger,
-    IInfoService info,
-    IConnectionMultiplexer muxer)
-    : IExamService
+public class ExamService : IExamService
 {
     private const string BaseUrl = "https://swjw.xauat.edu.cn";
-    private readonly IDatabase _redis = muxer.GetDatabase();
+    private readonly IDatabase? _redis;
+    private readonly bool _redisAvailable;
+    private readonly IHttpClientFactory _httpClientFactory;
+    private readonly ILogger<ExamService> _logger;
+    private readonly IInfoService _info;
+
+    public ExamService(IHttpClientFactory httpClientFactory, ILogger<ExamService> logger, IInfoService info, IConnectionMultiplexer? muxer)
+    {
+        _httpClientFactory = httpClientFactory;
+        _logger = logger;
+        _info = info;
+        
+        _redisAvailable = muxer != null;
+        if (_redisAvailable && muxer != null)
+        {
+            try
+            {
+                _redis = muxer.GetDatabase();
+                _logger.LogInformation("Redis连接成功");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Redis连接失败");
+                _redisAvailable = false;
+            }
+        }
+        else
+        {
+            _logger.LogWarning("Redis未配置，将使用数据库作为缓存");
+        }
+    }
 
     public async Task<ExamResponse> GetExamArrangementsAsync(string cookie, string? id)
     {
@@ -48,17 +73,28 @@ public class ExamService(
     /// <returns></returns>
     public async Task<SemesterItem> GetThisSemester(string cookie)
     {
-        logger.LogInformation("开始抓取学期数据");
+        _logger.LogInformation("开始抓取学期数据");
 
-        var thisSemester = await _redis.StringGetAsync("thisSemester");
-
-        if (thisSemester is { HasValue: true, IsNullOrEmpty: false })
+        // 尝试从Redis获取缓存，设置1小时过期时间
+        if (_redisAvailable && _redis != null)
         {
-            var item = JsonConvert.DeserializeObject<SemesterItem>(thisSemester.ToString()) ?? new SemesterItem();
-            if (!string.IsNullOrEmpty(item.Value))
+            try
             {
-                logger.LogInformation("已提取到缓存信息");
-                return item;
+                var thisSemester = await _redis.StringGetAsync("thisSemester");
+
+                if (thisSemester is { HasValue: true, IsNullOrEmpty: false })
+                {
+                    var item = JsonConvert.DeserializeObject<SemesterItem>(thisSemester.ToString()) ?? new SemesterItem();
+                    if (!string.IsNullOrEmpty(item.Value))
+                    {
+                        _logger.LogInformation("已提取到缓存信息");
+                        return item;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Redis操作失败，将直接请求数据");
             }
         }
 
@@ -69,18 +105,37 @@ public class ExamService(
 
         return await retryPolicy.ExecuteAsync(async () =>
         {
-            using var client = httpClientFactory.CreateClient();
-            client.SetRealisticHeaders();
-            client.Timeout = TimeSpan.FromSeconds(5); // 修改为5秒超时
-            client.DefaultRequestHeaders.Add("Cookie", cookie);
-            var html = await client.GetStringAsync("https://swjw.xauat.edu.cn/student/for-std/course-table");
+            using var client = _httpClientFactory.CreateClient();
+            if (client != null)
+            {
+                client.SetRealisticHeaders();
+                client.Timeout = TimeSpan.FromSeconds(5); // 修改为5秒超时
+                client.DefaultRequestHeaders.Add("Cookie", cookie);
+                var html = await client.GetStringAsync("https://swjw.xauat.edu.cn/student/for-std/course-table");
 
-            var data = html.ParseNow(info);
+                var data = html.ParseNow(_info);
 
-            await _redis.StringSetAsync("thisSemester", JsonConvert.SerializeObject(data),
-                expiry: new TimeSpan(2, 0, 0, 0));
+                // 缓存到Redis，设置1小时过期时间
+                if (_redisAvailable && _redis != null)
+                {
+                    try
+                    {
+                        await _redis.StringSetAsync("thisSemester", JsonConvert.SerializeObject(data),
+                            expiry: TimeSpan.FromHours(1));
+                        _logger.LogInformation("学期数据已缓存到Redis");
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Redis缓存写入失败");
+                    }
+                }
 
-            return data;
+                return data;
+            }
+            
+            // 如果client为null，返回默认值
+            _logger.LogError("HttpClient创建失败");
+            return new SemesterItem { Value = string.Empty, Text = string.Empty };
         });
     }
 
@@ -95,13 +150,22 @@ public class ExamService(
         try
         {
             var cacheKey = $"exam_arrangement_{id}";
-            if (!string.IsNullOrEmpty(id) && _redis.KeyExists(cacheKey))
+            
+            // 尝试从Redis获取缓存，设置1小时过期时间
+            if (_redisAvailable && _redis != null && !string.IsNullOrEmpty(id))
             {
-                var redisResult = _redis.StringGet(cacheKey);
-                if (redisResult.HasValue)
+                try
                 {
-                    var a = JsonConvert.DeserializeObject<ExamResponse>(redisResult.ToString());
-                    if (a is { CanClick: true }) return a;
+                    var redisResult = await _redis.StringGetAsync(cacheKey);
+                    if (redisResult.HasValue)
+                    {
+                        var a = JsonConvert.DeserializeObject<ExamResponse>(redisResult.ToString());
+                        if (a is { CanClick: true }) return a;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Redis操作失败，将直接请求数据");
                 }
             }
 
@@ -114,14 +178,14 @@ public class ExamService(
             var request = new HttpRequestMessage(HttpMethod.Get, url);
             request.Headers.Add("Cookie", cookie);
 
-            using var httpClient = httpClientFactory.CreateClient(); // 使用命名客户端
+            using var httpClient = _httpClientFactory.CreateClient(); // 使用注入的HttpClientFactory
             httpClient.SetRealisticHeaders();
             httpClient.Timeout = TimeSpan.FromSeconds(5); // 修改为5秒超时
 
             // 设置 CancellationToken
             var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
 
-            // 添加重试逻辑（示例）
+            // 添加重试逻辑
             var retryPolicy = Policy
                 .Handle<HttpRequestException>()
                 .Or<TaskCanceledException>()
@@ -151,7 +215,7 @@ public class ExamService(
             var match = Regex.Match(content, @"var studentExamInfoVms = (.*?)\];", RegexOptions.Singleline);
             if (!match.Success)
             {
-                logger.LogWarning("Failed to match exam data pattern");
+                _logger.LogWarning("Failed to match exam data pattern");
                 return new ExamResponse
                 {
                     Exams = [],
@@ -168,7 +232,7 @@ public class ExamService(
             var examData = JsonConvert.DeserializeObject<List<ExamDataRaw>>(jsonData);
             if (examData == null)
             {
-                logger.LogWarning("Failed to deserialize exam data");
+                _logger.LogWarning("Failed to deserialize exam data");
                 return new ExamResponse
                 {
                     Exams = [],
@@ -190,10 +254,21 @@ public class ExamService(
             };
 
             if (string.IsNullOrEmpty(id)) return result;
-            jsonData = JsonConvert.SerializeObject(result);
-
-            await _redis.StringSetAsync(cacheKey, jsonData,
-                expiry: new TimeSpan(0, 1, 0, 0));
+            
+            // 缓存到Redis，设置1小时过期时间
+            if (_redisAvailable && _redis != null)
+            {
+                try
+                {
+                    await _redis.StringSetAsync(cacheKey, JsonConvert.SerializeObject(result),
+                        expiry: TimeSpan.FromHours(1));
+                    _logger.LogInformation("考试安排数据已缓存到Redis");
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Redis缓存写入失败");
+                }
+            }
 
             return result;
 
@@ -204,7 +279,7 @@ public class ExamService(
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Error getting exam arrangements");
+            _logger.LogError(ex, "Error getting exam arrangements");
             return new ExamResponse
             {
                 Exams = [],

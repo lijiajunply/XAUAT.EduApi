@@ -47,6 +47,9 @@ public static class UserAgentRotator
 
     public static void SetRealisticHeaders(this HttpClient client)
     {
-        client.DefaultRequestHeaders.Add("User-Agent", GetRandomUserAgent());
+        if (client != null && client.DefaultRequestHeaders != null)
+        {
+            client.DefaultRequestHeaders.Add("User-Agent", GetRandomUserAgent());
+        }
     }
 }

@@ -10,3 +10,5 @@ login.test.json
 *.db
 *.db-shm
 *.db-wal
+
+logs/

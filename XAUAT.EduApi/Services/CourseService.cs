@@ -3,6 +3,11 @@ using Newtonsoft.Json;
 
 namespace XAUAT.EduApi.Services;
 
+public interface ICourseService
+{
+    Task<List<CourseActivity>> GetCoursesAsync(string studentId, string cookie);
+}
+
 public class CourseService(
     IHttpClientFactory httpClientFactory,
     ILogger<CourseService> logger,

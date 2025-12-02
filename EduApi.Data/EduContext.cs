@@ -10,6 +10,18 @@ namespace EduApi.Data;
 public class EduContext(DbContextOptions<EduContext> options) : DbContext(options)
 {
     public DbSet<ScoreResponse> Scores { get; set; }
+    
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<ScoreResponse>(entity =>
+        {
+            entity.HasIndex(e => e.UserId);
+            entity.HasIndex(e => e.Semester);
+            entity.HasIndex(e => new { e.UserId, e.Semester });
+        });
+        
+        base.OnModelCreating(modelBuilder);
+    }
 }
 
 [Serializable]
