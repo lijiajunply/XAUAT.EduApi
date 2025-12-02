@@ -17,7 +17,7 @@ public class CourseService(
     public async Task<List<CourseActivity>> GetCoursesAsync(string studentId, string cookie)
     {
         logger.LogInformation("开始抓取课程");
-        
+
         if (string.IsNullOrEmpty(studentId) || string.IsNullOrEmpty(cookie))
         {
             throw new Exception("学号或Cookie不能为空");
@@ -36,7 +36,7 @@ public class CourseService(
         {
             throw new InvalidOperationException("无法获取当前学期信息");
         }
-        
+
         foreach (var a in split)
         {
             var response = await client.GetAsync(
@@ -62,7 +62,7 @@ public class CourseService(
         {
             throw new InvalidOperationException("未找到课程数据");
         }
-        
+
         foreach (var item in courses)
         {
             item.WeekIndexes = item.WeekIndexes.OrderBy(x => x).ToList();

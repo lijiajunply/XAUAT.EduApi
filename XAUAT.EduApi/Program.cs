@@ -134,32 +134,31 @@ _ = Task.Run(async () =>
     using var scope = app.Services.CreateScope();
     var cacheService = scope.ServiceProvider.GetRequiredService<ICacheService>();
     var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
-    
+
     try
     {
         logger.LogInformation("Starting cache warmup...");
         var startTime = DateTime.Now;
-        
+
         // 添加关键业务数据预热任务
         // 示例：添加学期信息预热
         cacheService.AddWarmupTask(new CacheWarmupItem
         {
             Key = "cache:semesters",
-            ValueFactory = async () =>
-            {
-                // 这里可以替换为实际的业务逻辑，例如从数据库或外部API获取数据
-                return new List<string> { "2025-2026-1", "2025-2026-2", "2024-2025-1", "2024-2025-2" };
-            },
+            ValueFactory = () =>
+                Task.FromResult<object>(
+                    new List<string> { "2025-2026-1", "2025-2026-2", "2024-2025-1", "2024-2025-2" }),
             Expiration = TimeSpan.FromDays(7),
             Priority = 10,
             BusinessTags = ["core", "semester"]
         });
-        
+
         // 执行预热
         var successCount = await cacheService.ExecuteWarmupAsync();
-        
+
         var elapsed = DateTime.Now - startTime;
-        logger.LogInformation("Cache warmup completed successfully. Warmed up {SuccessCount} items in {ElapsedMilliseconds}ms", 
+        logger.LogInformation(
+            "Cache warmup completed successfully. Warmed up {SuccessCount} items in {ElapsedMilliseconds}ms",
             successCount, elapsed.TotalMilliseconds);
     }
     catch (Exception ex)
