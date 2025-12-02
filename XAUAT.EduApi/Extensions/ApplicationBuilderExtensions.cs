@@ -10,50 +10,50 @@ namespace XAUAT.EduApi.Extensions;
 /// </summary>
 public static class ApplicationBuilderExtensions
 {
-    /// <summary>
-    /// 使用错误处理中间件
-    /// </summary>
     /// <param name="app">应用程序构建器</param>
-    /// <returns>应用程序构建器</returns>
-    public static IApplicationBuilder UseErrorHandling(this IApplicationBuilder app)
+    extension(IApplicationBuilder app)
     {
-        app.UseErrorHandlingMiddleware();
-        return app;
+        /// <summary>
+        /// 使用错误处理中间件
+        /// </summary>
+        /// <returns>应用程序构建器</returns>
+        public IApplicationBuilder UseErrorHandling()
+        {
+            app.UseErrorHandlingMiddleware();
+            return app;
+        }
+
+        /// <summary>
+        /// 使用CORS中间件
+        /// </summary>
+        /// <returns>应用程序构建器</returns>
+        public IApplicationBuilder UseCustomCors()
+        {
+            app.UseCors();
+            return app;
+        }
+
+        /// <summary>
+        /// 使用指标收集中间件
+        /// </summary>
+        /// <returns>应用程序构建器</returns>
+        public IApplicationBuilder UseMetricsCollection()
+        {
+            app.UseMiddleware<MetricsMiddleware>();
+            return app;
+        }
+
+        /// <summary>
+        /// 使用Prometheus监控中间件
+        /// </summary>
+        /// <returns>应用程序构建器</returns>
+        public IApplicationBuilder UsePrometheusMonitoring()
+        {
+            app.UsePrometheusServer();
+            return app;
+        }
     }
-    
-    /// <summary>
-    /// 使用CORS中间件
-    /// </summary>
-    /// <param name="app">应用程序构建器</param>
-    /// <returns>应用程序构建器</returns>
-    public static IApplicationBuilder UseCustomCors(this IApplicationBuilder app)
-    {
-        app.UseCors();
-        return app;
-    }
-    
-    /// <summary>
-    /// 使用指标收集中间件
-    /// </summary>
-    /// <param name="app">应用程序构建器</param>
-    /// <returns>应用程序构建器</returns>
-    public static IApplicationBuilder UseMetricsCollection(this IApplicationBuilder app)
-    {
-        app.UseMiddleware<MetricsMiddleware>();
-        return app;
-    }
-    
-    /// <summary>
-    /// 使用Prometheus监控中间件
-    /// </summary>
-    /// <param name="app">应用程序构建器</param>
-    /// <returns>应用程序构建器</returns>
-    public static IApplicationBuilder UsePrometheusMonitoring(this IApplicationBuilder app)
-    {
-        app.UsePrometheusServer();
-        return app;
-    }
-    
+
     /// <summary>
     /// 配置API端点
     /// </summary>
@@ -66,7 +66,7 @@ public static class ApplicationBuilderExtensions
         app.MapScalarApiReference();
         return app;
     }
-    
+
     /// <summary>
     /// 配置健康检查端点
     /// </summary>
@@ -79,7 +79,7 @@ public static class ApplicationBuilderExtensions
             .WithDescription("检查服务的健康状态");
         return app;
     }
-    
+
     /// <summary>
     /// 配置完整的中间件管道
     /// </summary>
@@ -94,7 +94,7 @@ public static class ApplicationBuilderExtensions
             .UseMetricsCollection()
             .UsePrometheusMonitoring();
     }
-    
+
     /// <summary>
     /// 配置完整的应用程序
     /// </summary>
@@ -104,11 +104,11 @@ public static class ApplicationBuilderExtensions
     {
         // 配置中间件管道
         app.ConfigureMiddlewarePipeline();
-        
+
         // 配置端点
         app.ConfigureApiEndpoints();
         app.ConfigureHealthChecks();
-        
+
         return app;
     }
 }

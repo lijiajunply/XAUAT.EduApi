@@ -1,7 +1,6 @@
 using Moq;
 using StackExchange.Redis;
 using XAUAT.EduApi.Services;
-using Xunit;
 
 namespace XAUAT.EduApi.Tests.Services;
 

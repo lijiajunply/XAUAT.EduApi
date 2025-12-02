@@ -10,27 +10,27 @@ public class ServiceConfiguration
     /// SQL连接字符串
     /// </summary>
     public string? SqlConnectionString { get; set; }
-    
+
     /// <summary>
     /// Redis连接字符串
     /// </summary>
     public string? RedisConnectionString { get; set; }
-    
+
     /// <summary>
     /// 是否启用Prometheus监控
     /// </summary>
     public bool EnablePrometheus { get; set; } = true;
-    
+
     /// <summary>
     /// 是否启用日志
     /// </summary>
     public bool EnableLogging { get; set; } = true;
-    
+
     /// <summary>
     /// 是否启用健康检查
     /// </summary>
     public bool EnableHealthChecks { get; set; } = true;
-    
+
     /// <summary>
     /// 从配置中创建ServiceConfiguration实例
     /// </summary>
@@ -41,8 +41,8 @@ public class ServiceConfiguration
         return new ServiceConfiguration
         {
             SqlConnectionString = Environment.GetEnvironmentVariable("SQL", EnvironmentVariableTarget.Process),
-            RedisConnectionString = Environment.GetEnvironmentVariable("REDIS", EnvironmentVariableTarget.Process) ?? 
-                                   (configuration["Redis"] != null ? configuration["Redis"] : null),
+            RedisConnectionString = Environment.GetEnvironmentVariable("REDIS", EnvironmentVariableTarget.Process) ??
+                                    configuration["Redis"],
             EnablePrometheus = configuration.GetValue<bool>("Prometheus:Enabled", true),
             EnableLogging = configuration.GetValue<bool>("Logging:Enabled", true),
             EnableHealthChecks = configuration.GetValue<bool>("HealthChecks:Enabled", true)

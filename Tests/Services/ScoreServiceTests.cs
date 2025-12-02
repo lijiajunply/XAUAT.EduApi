@@ -142,4 +142,192 @@ public class ScoreServiceTests
         Assert.NotNull(result);
         Assert.Empty(result);
     }
+    
+    /// <summary>
+    /// 测试GetScoresAsync方法，验证当学生ID为null时是否抛出异常
+    /// </summary>
+    [Fact]
+    public async Task GetScoresAsync_ShouldThrowArgumentNullException_WhenStudentIdIsNull()
+    {
+        // Arrange
+        var studentId = (string)null;
+        var semester = "2025-2026-1";
+        var cookie = "test-cookie";
+        
+        // Act & Assert
+        await Assert.ThrowsAsync<ArgumentNullException>(() => 
+            _scoreService.GetScoresAsync(studentId, semester, cookie));
+    }
+    
+    /// <summary>
+    /// 测试GetScoresAsync方法，验证当Cookie为null时是否抛出异常
+    /// </summary>
+    [Fact]
+    public async Task GetScoresAsync_ShouldThrowArgumentNullException_WhenCookieIsNull()
+    {
+        // Arrange
+        var studentId = "123456";
+        var semester = "2025-2026-1";
+        var cookie = (string)null;
+        
+        // Act & Assert
+        await Assert.ThrowsAsync<ArgumentNullException>(() => 
+            _scoreService.GetScoresAsync(studentId, semester, cookie));
+    }
+    
+    /// <summary>
+    /// 测试GetScoresAsync方法，验证当学期字符串为空时是否能正常处理
+    /// </summary>
+    [Fact]
+    public async Task GetScoresAsync_ShouldHandleEmptySemester()
+    {
+        // Arrange
+        var studentId = "123456";
+        var semester = string.Empty;
+        var cookie = "test-cookie";
+        
+        // 模拟当前学期
+        var currentSemester = new SemesterItem { Value = "2025-2026-1", Text = "2025-2026学年第一学期" };
+        _examServiceMock.Setup(m => m.GetThisSemester(cookie)).ReturnsAsync(currentSemester);
+        
+        // 模拟数据库查询返回空列表
+        _scoreRepositoryMock.Setup(m => m.GetByUserIdAsync(studentId)).ReturnsAsync(new List<ScoreResponse>());
+        
+        // Act
+        var result = await _scoreService.GetScoresAsync(studentId, semester, cookie);
+        
+        // Assert
+        Assert.NotNull(result);
+        Assert.Empty(result);
+    }
+    
+    /// <summary>
+    /// 测试GetScoresAsync方法，验证当学生ID包含特殊字符时是否能正常处理
+    /// </summary>
+    [Fact]
+    public async Task GetScoresAsync_ShouldHandleSpecialCharactersInStudentId()
+    {
+        // Arrange
+        var studentId = "123456!@#$%^&*()_+";
+        var semester = "2025-2026-1";
+        var cookie = "test-cookie";
+        
+        // 模拟当前学期
+        var currentSemester = new SemesterItem { Value = semester, Text = "2025-2026学年第一学期" };
+        _examServiceMock.Setup(m => m.GetThisSemester(cookie)).ReturnsAsync(currentSemester);
+        
+        // 模拟数据库查询返回空列表
+        _scoreRepositoryMock.Setup(m => m.GetByUserIdAsync(studentId)).ReturnsAsync(new List<ScoreResponse>());
+        
+        // Act
+        var result = await _scoreService.GetScoresAsync(studentId, semester, cookie);
+        
+        // Assert
+        Assert.NotNull(result);
+        Assert.Empty(result);
+    }
+    
+    /// <summary>
+    /// 测试GetScoresAsync方法，验证当学生ID包含多个ID时是否能正常处理
+    /// </summary>
+    [Fact]
+    public async Task GetScoresAsync_ShouldHandleMultipleStudentIds()
+    {
+        // Arrange
+        var studentId = "123456,789012,345678";
+        var semester = "2025-2026-1";
+        var cookie = "test-cookie";
+        
+        // 模拟当前学期
+        var currentSemester = new SemesterItem { Value = semester, Text = "2025-2026学年第一学期" };
+        _examServiceMock.Setup(m => m.GetThisSemester(cookie)).ReturnsAsync(currentSemester);
+        
+        // 模拟数据库查询返回空列表
+        _scoreRepositoryMock.Setup(m => m.GetByUserIdAsync(It.IsAny<string>())).ReturnsAsync(new List<ScoreResponse>());
+        
+        // Act
+        var result = await _scoreService.GetScoresAsync(studentId, semester, cookie);
+        
+        // Assert
+        Assert.NotNull(result);
+        Assert.Empty(result);
+    }
+    
+    /// <summary>
+    /// 测试GetScoresAsync方法，验证当Redis不可用时是否能正常处理
+    /// </summary>
+    [Fact]
+    public async Task GetScoresAsync_ShouldHandleRedisUnavailable()
+    {
+        // Arrange
+        var studentId = "123456";
+        var semester = "2025-2026-1";
+        var cookie = "test-cookie";
+        
+        // 创建一个不使用Redis的ScoreService实例
+        var scoreServiceWithoutRedis = new ScoreService(
+            _httpClientFactoryMock.Object,
+            _loggerMock.Object,
+            _examServiceMock.Object,
+            null, // Redis连接为null
+            _scoreRepositoryMock.Object);
+        
+        // 模拟当前学期
+        var currentSemester = new SemesterItem { Value = semester, Text = "2025-2026学年第一学期" };
+        _examServiceMock.Setup(m => m.GetThisSemester(cookie)).ReturnsAsync(currentSemester);
+        
+        // 模拟数据库查询返回空列表
+        _scoreRepositoryMock.Setup(m => m.GetByUserIdAsync(studentId)).ReturnsAsync(new List<ScoreResponse>());
+        
+        // Act
+        var result = await scoreServiceWithoutRedis.GetScoresAsync(studentId, semester, cookie);
+        
+        // Assert
+        Assert.NotNull(result);
+        Assert.Empty(result);
+    }
+    
+    /// <summary>
+    /// 测试GetScoresAsync方法，验证当数据库返回大量数据时是否能正常处理
+    /// </summary>
+    [Fact]
+    public async Task GetScoresAsync_ShouldHandleLargeDataFromDatabase()
+    {
+        // Arrange
+        var studentId = "123456";
+        var semester = "2025-2026-1";
+        var cookie = "test-cookie";
+        
+        // 创建大量测试数据
+        var largeScoreList = new List<ScoreResponse>();
+        for (int i = 0; i < 1000; i++)
+        {
+            largeScoreList.Add(new ScoreResponse
+            {
+                Key = $"{studentId}_{semester}_CS{i.ToString("D3")}_Course{i}",
+                Name = $"Course{i}",
+                Credit = "2.0",
+                LessonCode = $"CS{i.ToString("D3")}",
+                LessonName = $"Course{i}",
+                Grade = (80 + i % 20).ToString(),
+                Gpa = (3.0 + (i % 20) * 0.1).ToString("F1"),
+                UserId = studentId,
+                Semester = semester
+            });
+        }
+        
+        // 模拟当前学期
+        var currentSemester = new SemesterItem { Value = semester, Text = "2025-2026学年第一学期" };
+        _examServiceMock.Setup(m => m.GetThisSemester(cookie)).ReturnsAsync(currentSemester);
+        
+        // 模拟数据库查询返回大量数据
+        _scoreRepositoryMock.Setup(m => m.GetByUserIdAsync(studentId)).ReturnsAsync(largeScoreList);
+        
+        // Act
+        var result = await _scoreService.GetScoresAsync(studentId, semester, cookie);
+        
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(largeScoreList.Count, result.Count);
+    }
 }

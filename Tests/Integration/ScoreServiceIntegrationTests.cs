@@ -36,9 +36,17 @@ public class ScoreServiceIntegrationTests : IDisposable
         _dbContext.Database.EnsureCreated();
         
         // 创建依赖项
-        var httpClientFactory = new Mock<IHttpClientFactory>().Object;
+        var httpClientFactoryMock = new Mock<IHttpClientFactory>();
+        // 创建一个 HttpClient，设置一个无效的 BaseAddress，这样请求会失败，从而触发错误处理逻辑，返回空列表
+        var httpClient = new HttpClient { BaseAddress = new Uri("http://localhost:9999/") };
+        httpClientFactoryMock.Setup(m => m.CreateClient(It.IsAny<string>())).Returns(httpClient);
+        var httpClientFactory = httpClientFactoryMock.Object;
         var logger = new Mock<ILogger<ScoreService>>().Object;
-        var examService = new Mock<IExamService>().Object;
+        var examServiceMock = new Mock<IExamService>();
+        // 设置 GetThisSemester 方法，防止返回 null
+        examServiceMock.Setup(m => m.GetThisSemester(It.IsAny<string>()))
+            .ReturnsAsync(new SemesterItem { Value = "2025-2026-1", Text = "2025-2026学年第一学期" });
+        var examService = examServiceMock.Object;
         var redisConnection = new Mock<IConnectionMultiplexer>().Object;
         
         // 创建仓库和服务

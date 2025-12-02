@@ -8,48 +8,50 @@ namespace XAUAT.EduApi.Extensions;
 /// </summary>
 public static class RedisExtensions
 {
-    /// <summary>
-    /// 安全获取Redis数据库
-    /// </summary>
     /// <param name="muxer">Redis连接多路复用器</param>
-    /// <param name="logger">日志记录器</param>
-    /// <param name="redisAvailable">Redis是否可用</param>
-    /// <returns>Redis数据库实例，或null如果连接失败</returns>
-    public static IDatabase? SafeGetDatabase(this IConnectionMultiplexer? muxer, ILogger? logger, out bool redisAvailable)
+    extension(IConnectionMultiplexer? muxer)
     {
-        redisAvailable = false;
-        if (muxer == null)
+        /// <summary>
+        /// 安全获取Redis数据库
+        /// </summary>
+        /// <param name="logger">日志记录器</param>
+        /// <param name="redisAvailable">Redis是否可用</param>
+        /// <returns>Redis数据库实例，或null如果连接失败</returns>
+        public IDatabase? SafeGetDatabase(ILogger? logger, out bool redisAvailable)
         {
-            logger?.LogWarning("Redis连接多路复用器为空");
-            return null;
+            redisAvailable = false;
+            if (muxer == null)
+            {
+                logger?.LogWarning("Redis连接多路复用器为空");
+                return null;
+            }
+
+            try
+            {
+                var database = muxer.GetDatabase();
+                redisAvailable = true;
+                logger?.LogInformation("Redis连接成功");
+                return database;
+            }
+            catch (Exception ex)
+            {
+                logger?.LogError(ex, "Redis连接失败");
+                redisAvailable = false;
+                return null;
+            }
         }
 
-        try
+        /// <summary>
+        /// 安全获取Redis数据库
+        /// </summary>
+        /// <param name="redisAvailable">Redis是否可用</param>
+        /// <returns>Redis数据库实例，或null如果连接失败</returns>
+        public IDatabase? SafeGetDatabase(out bool redisAvailable)
         {
-            var database = muxer.GetDatabase();
-            redisAvailable = true;
-            logger?.LogInformation("Redis连接成功");
-            return database;
-        }
-        catch (Exception ex)
-        {
-            logger?.LogError(ex, "Redis连接失败");
-            redisAvailable = false;
-            return null;
+            return muxer.SafeGetDatabase(null, out redisAvailable);
         }
     }
-    
-    /// <summary>
-    /// 安全获取Redis数据库
-    /// </summary>
-    /// <param name="muxer">Redis连接多路复用器</param>
-    /// <param name="redisAvailable">Redis是否可用</param>
-    /// <returns>Redis数据库实例，或null如果连接失败</returns>
-    public static IDatabase? SafeGetDatabase(this IConnectionMultiplexer? muxer, out bool redisAvailable)
-    {
-        return muxer.SafeGetDatabase(null, out redisAvailable);
-    }
-    
+
     /// <summary>
     /// 安全执行Redis操作
     /// </summary>
@@ -71,7 +73,7 @@ public static class RedisExtensions
             }
         }
     }
-    
+
     /// <summary>
     /// 安全执行异步Redis操作
     /// </summary>
@@ -80,7 +82,8 @@ public static class RedisExtensions
     /// <param name="func">要执行的异步Redis操作</param>
     /// <typeparam name="T">操作结果类型</typeparam>
     /// <returns>操作结果，或默认值如果操作失败</returns>
-    public static async Task<T?> SafeExecuteAsync<T>(this IDatabase? database, bool redisAvailable, Func<IDatabase, Task<T>> func)
+    public static async Task<T?> SafeExecuteAsync<T>(this IDatabase? database, bool redisAvailable,
+        Func<IDatabase, Task<T>> func)
     {
         if (redisAvailable && database != null)
         {
@@ -94,7 +97,7 @@ public static class RedisExtensions
                 Console.WriteLine($"Redis操作异常: {ex.Message}");
             }
         }
-        
+
         return default;
     }
 }
