@@ -204,7 +204,7 @@ public class ScoreService : IScoreService
 
         // 再判断是否为当前学期
         var thisSemester = await _examService.GetThisSemester(cookie).ConfigureAwait(false);
-        var isCurrentSemester = thisSemester.Value == semester;
+        var isCurrentSemester = thisSemester != null! && thisSemester.Value == semester;
 
         var crawledScores = await CrawlScores(studentId, semester, cookie).ConfigureAwait(false);
         var scoresToSave = crawledScores.Select(score =>
