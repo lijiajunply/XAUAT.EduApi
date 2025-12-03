@@ -1,4 +1,6 @@
+using System.Net.Http;
 using XAUAT.EduApi.Services;
+using Xunit;
 
 namespace XAUAT.EduApi.Tests.Services;
 
@@ -34,7 +36,7 @@ public class UserAgentRotatorTests
         HttpClient? client = null;
         
         // Act & Assert
-        client?.SetRealisticHeaders(); // 不应该抛出异常
+        client.SetRealisticHeaders(); // 不应该抛出异常
     }
     
     /// <summary>
