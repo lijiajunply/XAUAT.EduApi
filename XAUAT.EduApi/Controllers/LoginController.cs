@@ -44,7 +44,7 @@ public class LoginController(ILoginService loginService, ILogger<LoginController
             {
                 return BadRequest("用户名或密码不能为空");
             }
-            
+
             var result = await loginService.LoginAsync(request.Username, request.Password);
             logger.LogInformation("用户 {Username} 登录成功", request.Username);
             return Ok(result);

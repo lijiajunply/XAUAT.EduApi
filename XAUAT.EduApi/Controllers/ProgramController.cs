@@ -56,6 +56,7 @@ public class ProgramController(
             {
                 result = result.Where(x => x.Name.Contains(name)).ToList();
             }
+
             return Ok(result);
         }
         catch (Exceptions.UnAuthenticationError)

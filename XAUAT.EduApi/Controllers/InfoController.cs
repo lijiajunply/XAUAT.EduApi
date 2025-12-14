@@ -49,15 +49,15 @@ public class InfoController(IHttpClientFactory httpClientFactory, ILogger<Course
         client.SetRealisticHeaders();
         client.Timeout = TimeSpan.FromSeconds(6); // 添加超时控制
         client.DefaultRequestHeaders.Add("Cookie", cookie);
-        var response = 
+        var response =
             await client.GetAsync("https://swjw.xauat.edu.cn/student/ws/student/home-page/programCompletionPreview");
         var content = await response.Content.ReadAsStringAsync();
-        
+
         if (content.Contains("登入页面"))
         {
             throw new Exceptions.UnAuthenticationError();
         }
-        
+
         return Content(content);
     }
 
