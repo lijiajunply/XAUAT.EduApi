@@ -32,6 +32,11 @@ public partial class CookieCodeService(IHttpClientFactory httpClientFactory)
             if (a != "/student/for-std/precaution") return a;
             var content = await response.Content.ReadAsStringAsync();
 
+            if (content.Contains("登入页面"))
+            {
+                throw new Exceptions.UnAuthenticationError();
+            }
+
             var matches = MyRegex().Matches(content);
             return matches.Count >= 1 ? string.Join(',', matches.Select(m => m.Groups[1].Value)) : "";
         });

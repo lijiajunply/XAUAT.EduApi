@@ -52,6 +52,12 @@ public class InfoController(IHttpClientFactory httpClientFactory, ILogger<Course
         var response = 
             await client.GetAsync("https://swjw.xauat.edu.cn/student/ws/student/home-page/programCompletionPreview");
         var content = await response.Content.ReadAsStringAsync();
+        
+        if (content.Contains("登入页面"))
+        {
+            throw new Exceptions.UnAuthenticationError();
+        }
+        
         return Content(content);
     }
 

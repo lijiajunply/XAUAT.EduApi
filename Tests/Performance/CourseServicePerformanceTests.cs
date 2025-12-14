@@ -1,11 +1,11 @@
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
-using Moq;
-using Microsoft.Extensions.Logging;
-using XAUAT.EduApi.Services;
 using EduApi.Data.Models;
+using Microsoft.Extensions.Logging;
+using Moq;
+using XAUAT.EduApi.Services;
 
-namespace XAUAT.EduAp.Tests.Performance;
+namespace XAUAT.EduApi.Tests.Performance;
 
 /// <summary>
 /// CourseService性能测试

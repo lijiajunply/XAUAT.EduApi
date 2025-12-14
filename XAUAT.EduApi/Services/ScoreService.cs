@@ -162,6 +162,12 @@ public class ScoreService : IScoreService
         }
 
         var html = await client.GetStringAsync(url).ConfigureAwait(false);
+        
+        if (html.Contains("登入页面"))
+        {
+            throw new Exceptions.UnAuthenticationError();
+        }
+        
         var result = new SemesterResult();
         result.Parse(html);
 
@@ -255,6 +261,10 @@ public class ScoreService : IScoreService
         if (content.StartsWith('<'))
         {
             _logger.LogWarning("获取成绩数据失败，返回了HTML内容而非JSON，可能Cookie已过期");
+            if (content.Contains("登入页面"))
+            {
+                throw new Exceptions.UnAuthenticationError();
+            }
             return [];
         }
 

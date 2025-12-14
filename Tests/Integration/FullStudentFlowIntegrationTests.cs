@@ -1,13 +1,13 @@
-using Moq;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
-using StackExchange.Redis;
-using XAUAT.EduApi.Services;
-using XAUAT.EduApi.Repos;
 using EduApi.Data;
 using EduApi.Data.Models;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using Moq;
+using StackExchange.Redis;
+using XAUAT.EduApi.Repos;
+using XAUAT.EduApi.Services;
 
-namespace XAUAT.EduAp.Tests.Integration;
+namespace XAUAT.EduApi.Tests.Integration;
 
 /// <summary>
 /// 完整学生业务流程集成测试

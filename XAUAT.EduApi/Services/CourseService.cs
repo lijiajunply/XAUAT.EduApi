@@ -48,6 +48,10 @@ public class CourseService(
             }
 
             var jsonString = await response.Content.ReadAsStringAsync();
+            if (jsonString.Contains("登入页面"))
+            {
+                throw new Exceptions.UnAuthenticationError();
+            }
             var jsonResponse = JsonConvert.DeserializeObject<CourseResponse>(jsonString);
 
             if (jsonResponse?.StudentTableVm == null)

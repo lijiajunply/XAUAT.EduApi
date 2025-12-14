@@ -58,6 +58,10 @@ public class ProgramController(
             }
             return Ok(result);
         }
+        catch (Exceptions.UnAuthenticationError)
+        {
+            return Unauthorized("认证失败，请重新登录");
+        }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to get training program");
@@ -100,6 +104,10 @@ public class ProgramController(
 
             var result = await program.GetAllTrainPrograms(cookie, id);
             return Ok(result);
+        }
+        catch (Exceptions.UnAuthenticationError)
+        {
+            return Unauthorized("认证失败，请重新登录");
         }
         catch (Exception ex)
         {
