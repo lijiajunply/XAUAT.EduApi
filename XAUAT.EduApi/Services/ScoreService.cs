@@ -70,7 +70,7 @@ public class ScoreService : IScoreService
                 if (redisResult.HasValue)
                 {
                     var cachedScores = JsonConvert.DeserializeObject<List<ScoreResponse>>(redisResult.ToString());
-                    if (cachedScores != null && cachedScores.Count > 0)
+                    if (cachedScores is { Count: > 0 })
                     {
                         _logger.LogInformation("已从缓存获取考试分数");
                         return cachedScores;
@@ -162,12 +162,12 @@ public class ScoreService : IScoreService
         }
 
         var html = await client.GetStringAsync(url).ConfigureAwait(false);
-        
+
         if (html.Contains("登入页面"))
         {
             throw new Exceptions.UnAuthenticationError();
         }
-        
+
         var result = new SemesterResult();
         result.Parse(html);
 
@@ -196,22 +196,25 @@ public class ScoreService : IScoreService
 
     private async Task<IEnumerable<ScoreResponse>> GetScoreResponse(string studentId, string semester, string cookie)
     {
-        // 先从数据库查询，无论是否为当前学期
-        var dbScores = await _scoreRepository.GetByUserIdAsync(studentId).ConfigureAwait(false);
-        dbScores = dbScores.Where(s => s.Semester == semester);
-
-        // 如果数据库中有数据，直接返回
-        var enumerable = dbScores as ScoreResponse[] ?? dbScores.ToArray();
-        var scoreResponses = dbScores as ScoreResponse[] ?? enumerable.ToArray();
-        if (scoreResponses.Length != 0)
-        {
-            return scoreResponses;
-        }
-
-        // 再判断是否为当前学期
+        // 判断是否为当前学期
         var thisSemester = await _examService.GetThisSemester(cookie).ConfigureAwait(false);
         var isCurrentSemester = thisSemester != null! && thisSemester.Value == semester;
 
+        if (!isCurrentSemester)
+        {
+            // 从数据库查询
+            var dbScores = await _scoreRepository.GetByUserIdAsync(studentId).ConfigureAwait(false);
+            dbScores = dbScores.Where(s => s.Semester == semester);
+
+            // 如果数据库中有数据，直接返回
+            var enumerable = dbScores as ScoreResponse[] ?? dbScores.ToArray();
+            var scoreResponses = dbScores as ScoreResponse[] ?? enumerable.ToArray();
+            if (scoreResponses.Length != 0)
+            {
+                return scoreResponses;
+            }
+        }
+        
         var crawledScores = await CrawlScores(studentId, semester, cookie).ConfigureAwait(false);
         var scoresToSave = crawledScores.Select(score =>
         {
@@ -223,7 +226,11 @@ public class ScoreService : IScoreService
             return score;
         }).ToList();
 
-        if (isCurrentSemester) return crawledScores;
+        if (isCurrentSemester)
+        {
+            return crawledScores;
+        }
+
         try
         {
             await _scoreRepository.AddRangeAsync(scoresToSave).ConfigureAwait(false);
@@ -265,6 +272,7 @@ public class ScoreService : IScoreService
             {
                 throw new Exceptions.UnAuthenticationError();
             }
+
             return [];
         }
 
