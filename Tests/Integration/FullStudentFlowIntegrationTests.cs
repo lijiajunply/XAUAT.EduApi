@@ -6,6 +6,7 @@ using Moq;
 using StackExchange.Redis;
 using XAUAT.EduApi.Repos;
 using XAUAT.EduApi.Services;
+using XAUAT.EduApi.Caching;
 
 namespace XAUAT.EduApi.Tests.Integration;
 
@@ -25,6 +26,7 @@ public class FullStudentFlowIntegrationTests : IDisposable
     private readonly Mock<IConnectionMultiplexer> _redisConnectionMock;
     private readonly Mock<IDatabase> _redisDatabaseMock;
     private readonly Mock<IHttpClientFactory> _httpClientFactoryMock;
+    private readonly Mock<ICacheService> _cacheServiceMock;
 
     /// <summary>
     /// 构造函数，初始化测试依赖
@@ -61,6 +63,18 @@ public class FullStudentFlowIntegrationTests : IDisposable
         _httpClientFactoryMock.Setup(x => x.CreateClient(It.IsAny<string>()))
             .Returns(new HttpClient());
 
+        // 创建CacheService模拟
+        _cacheServiceMock = new Mock<ICacheService>();
+        _cacheServiceMock.Setup(x => x.GetOrCreateAsync(
+            It.IsAny<string>(),
+            It.IsAny<Func<Task<List<CourseActivity>>>>(),
+            It.IsAny<TimeSpan?>(),
+            It.IsAny<CacheLevel>(),
+            It.IsAny<int>(),
+            It.IsAny<CancellationToken>()))
+            .Returns<string, Func<Task<List<CourseActivity>>>, TimeSpan?, CacheLevel, int, CancellationToken>(
+                async (key, factory, expiration, level, priority, token) => await factory());
+
         // 创建日志模拟
         var courseLogger = new Mock<ILogger<CourseService>>().Object;
         var scoreLogger = new Mock<ILogger<ScoreService>>().Object;
@@ -78,7 +92,8 @@ public class FullStudentFlowIntegrationTests : IDisposable
         _courseService = new CourseService(
             _httpClientFactoryMock.Object,
             courseLogger,
-            _examServiceMock.Object);
+            _examServiceMock.Object,
+            _cacheServiceMock.Object);
 
         // 创建支付服务
         _paymentService = new PaymentService(

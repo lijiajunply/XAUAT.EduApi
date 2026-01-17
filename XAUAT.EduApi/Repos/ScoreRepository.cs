@@ -8,14 +8,14 @@ public class ScoreRepository(EduContext context) : RepositoryBase<ScoreResponse>
 {
     public async Task<IEnumerable<ScoreResponse>> GetByUserIdAsync(string userId)
     {
-        return await Context.Scores
+        return await Context.Scores.AsNoTracking()
             .Where(s => EF.Property<string>(s, "UserId") == userId)
             .ToListAsync();
     }
 
     public async Task<ScoreResponse?> GetByUserAndLessonAsync(string userId, string lessonCode)
     {
-        return await Context.Scores
+        return await Context.Scores.AsNoTracking()
             .FirstOrDefaultAsync(s => EF.Property<string>(s, "UserId") == userId && s.LessonCode == lessonCode);
     }
 

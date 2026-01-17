@@ -6,6 +6,7 @@ using XAUAT.EduApi.Services;
 using XAUAT.EduApi.Repos;
 using EduApi.Data;
 using EduApi.Data.Models;
+using XAUAT.EduApi.Caching;
 
 namespace XAUAT.EduApi.Tests.Integration;
 
@@ -56,11 +57,24 @@ public class CourseAndScoreIntegrationTests : IDisposable
         var httpClientFactoryMock = new Mock<IHttpClientFactory>();
         httpClientFactoryMock.Setup(x => x.CreateClient(It.IsAny<string>()))
             .Returns(new HttpClient());
+
+        // 创建CacheService模拟
+        var cacheServiceMock = new Mock<ICacheService>();
+        cacheServiceMock.Setup(x => x.GetOrCreateAsync(
+            It.IsAny<string>(),
+            It.IsAny<Func<Task<List<CourseActivity>>>>(),
+            It.IsAny<TimeSpan?>(),
+            It.IsAny<CacheLevel>(),
+            It.IsAny<int>(),
+            It.IsAny<CancellationToken>()))
+            .Returns<string, Func<Task<List<CourseActivity>>>, TimeSpan?, CacheLevel, int, CancellationToken>(
+                async (key, factory, expiration, level, priority, token) => await factory());
         
         _courseService = new CourseService(
             httpClientFactoryMock.Object,
             courseLogger,
-            _examServiceMock.Object);
+            _examServiceMock.Object,
+            cacheServiceMock.Object);
 
         // 创建成绩仓库和服务
         var scoreLogger = new Mock<ILogger<ScoreService>>().Object;

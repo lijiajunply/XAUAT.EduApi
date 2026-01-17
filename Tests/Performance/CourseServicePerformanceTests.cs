@@ -4,6 +4,7 @@ using EduApi.Data.Models;
 using Microsoft.Extensions.Logging;
 using Moq;
 using XAUAT.EduApi.Services;
+using XAUAT.EduApi.Caching;
 
 namespace XAUAT.EduApi.Tests.Performance;
 
@@ -19,6 +20,7 @@ public class CourseServicePerformanceTests
     private Mock<IHttpClientFactory>? _httpClientFactoryMock;
     private Mock<ILogger<CourseService>>? _loggerMock;
     private Mock<IExamService>? _examServiceMock;
+    private Mock<ICacheService>? _cacheServiceMock;
     private const string StudentId = "123456";
     private const string Cookie = "test-cookie";
     private const string SemesterValue = "2025-2026-1";
@@ -43,11 +45,24 @@ public class CourseServicePerformanceTests
         _examServiceMock.Setup(m => m.GetThisSemester(It.IsAny<string>()))
             .ReturnsAsync(new SemesterItem { Value = SemesterValue, Text = SemesterText });
 
+        // 创建CacheService模拟
+        _cacheServiceMock = new Mock<ICacheService>();
+        _cacheServiceMock.Setup(x => x.GetOrCreateAsync(
+            It.IsAny<string>(),
+            It.IsAny<Func<Task<List<CourseActivity>>>>(),
+            It.IsAny<TimeSpan?>(),
+            It.IsAny<CacheLevel>(),
+            It.IsAny<int>(),
+            It.IsAny<CancellationToken>()))
+            .Returns<string, Func<Task<List<CourseActivity>>>, TimeSpan?, CacheLevel, int, CancellationToken>(
+                async (key, factory, expiration, level, priority, token) => await factory());
+
         // 创建课程服务
         _courseService = new CourseService(
             _httpClientFactoryMock.Object,
             _loggerMock.Object,
-            _examServiceMock.Object);
+            _examServiceMock.Object,
+            _cacheServiceMock.Object);
     }
 
     /// <summary>

@@ -16,12 +16,12 @@ public abstract class RepositoryBase<T>(EduContext context) : IRepository<T>
 
     public async Task<IEnumerable<T>> GetAllAsync()
     {
-        return await Context.Set<T>().ToListAsync();
+        return await Context.Set<T>().AsNoTracking().ToListAsync();
     }
 
     public async Task<IEnumerable<T>> FindAsync(Expression<Func<T, bool>> predicate)
     {
-        return await Context.Set<T>().Where(predicate).ToListAsync();
+        return await Context.Set<T>().AsNoTracking().Where(predicate).ToListAsync();
     }
 
     public async Task AddAsync(T entity)

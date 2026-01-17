@@ -1,5 +1,6 @@
 using EduApi.Data.Models;
 using Newtonsoft.Json;
+using XAUAT.EduApi.Caching;
 
 namespace XAUAT.EduApi.Services;
 
@@ -11,10 +12,20 @@ public interface ICourseService
 public class CourseService(
     IHttpClientFactory httpClientFactory,
     ILogger<CourseService> logger,
-    IExamService examService)
+    IExamService examService,
+    ICacheService cacheService)
     : ICourseService
 {
     public async Task<List<CourseActivity>> GetCoursesAsync(string studentId, string cookie)
+    {
+        // 使用缓存，Key 包含 studentId，过期时间设为1天
+        return await cacheService.GetOrCreateAsync(
+            $"courses:{studentId}",
+            async () => await FetchCoursesFromRemoteAsync(studentId, cookie),
+            TimeSpan.FromDays(1));
+    }
+
+    private async Task<List<CourseActivity>> FetchCoursesFromRemoteAsync(string studentId, string cookie)
     {
         logger.LogInformation("开始抓取课程");
 

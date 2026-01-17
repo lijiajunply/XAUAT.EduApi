@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using Moq;
 using Moq.Protected;
 using XAUAT.EduApi.Services;
+using XAUAT.EduApi.Caching;
 
 namespace XAUAT.EduApi.Tests.Services;
 
@@ -14,6 +15,7 @@ public class CourseServiceTests
     private readonly Mock<IHttpClientFactory> _httpClientFactoryMock;
     private readonly Mock<ILogger<CourseService>> _loggerMock;
     private readonly Mock<IExamService> _examServiceMock;
+    private readonly Mock<ICacheService> _cacheServiceMock;
     private readonly CourseService _courseService;
 
     /// <summary>
@@ -24,6 +26,18 @@ public class CourseServiceTests
         _httpClientFactoryMock = new Mock<IHttpClientFactory>();
         _loggerMock = new Mock<ILogger<CourseService>>();
         _examServiceMock = new Mock<IExamService>();
+        _cacheServiceMock = new Mock<ICacheService>();
+
+        // Mock CacheService.GetOrCreateAsync to simply execute the factory
+        _cacheServiceMock.Setup(x => x.GetOrCreateAsync(
+            It.IsAny<string>(),
+            It.IsAny<Func<Task<List<CourseActivity>>>>(),
+            It.IsAny<TimeSpan?>(),
+            It.IsAny<CacheLevel>(),
+            It.IsAny<int>(),
+            It.IsAny<CancellationToken>()))
+            .Returns<string, Func<Task<List<CourseActivity>>>, TimeSpan?, CacheLevel, int, CancellationToken>(
+                async (key, factory, expiration, level, priority, token) => await factory());
 
         // 设置HttpClientFactory返回一个有效的HttpClient实例
         var httpClient = new HttpClient();
@@ -33,7 +47,8 @@ public class CourseServiceTests
         _courseService = new CourseService(
             _httpClientFactoryMock.Object,
             _loggerMock.Object,
-            _examServiceMock.Object);
+            _examServiceMock.Object,
+            _cacheServiceMock.Object);
     }
 
     /// <summary>
