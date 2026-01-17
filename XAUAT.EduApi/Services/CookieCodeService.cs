@@ -1,10 +1,11 @@
 using System.Text;
 using System.Text.RegularExpressions;
 using Polly;
+using XAUAT.EduApi.Interfaces;
 
 namespace XAUAT.EduApi.Services;
 
-public partial class CookieCodeService(IHttpClientFactory httpClientFactory)
+public partial class CookieCodeService(IHttpClientFactory httpClientFactory) : ICookieCodeService
 {
     public async Task<string> GetCode(string cookies)
     {

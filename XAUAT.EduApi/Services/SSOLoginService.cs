@@ -8,7 +8,7 @@ namespace XAUAT.EduApi.Services;
 // ReSharper disable once InconsistentNaming
 public class SSOLoginService(
     IHttpClientFactory httpClientFactory,
-    CookieCodeService cookieCode,
+    ICookieCodeService cookieCode,
     ILogger<SSOLoginService> logger) : ILoginService
 {
     public async Task<object> LoginAsync(string username, string password)

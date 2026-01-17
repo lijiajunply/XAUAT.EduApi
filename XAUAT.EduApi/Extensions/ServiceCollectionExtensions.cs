@@ -94,7 +94,7 @@ public static class ServiceCollectionExtensions
             services.AddScoped<ICourseService, CourseService>();
             services.AddScoped<IScoreService, ScoreService>();
             services.AddScoped<IRedisService, RedisService>();
-            services.AddScoped<CookieCodeService>();
+            services.AddScoped<ICookieCodeService, CookieCodeService>();
 
             // 添加监控服务
             services.AddSingleton<IMonitoringService, MonitoringService>();
