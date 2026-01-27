@@ -3,8 +3,6 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using StackExchange.Redis;
 using XAUAT.EduApi.Caching;
-using XAUAT.EduApi.Events;
-using XAUAT.EduApi.Plugins;
 using XAUAT.EduApi.ServiceDiscovery;
 using XAUAT.EduApi.HealthChecks;
 using XAUAT.EduApi.Interfaces;
@@ -96,7 +94,7 @@ public static class ServiceCollectionExtensions
             services.AddScoped<ICourseService, CourseService>();
             services.AddScoped<IScoreService, ScoreService>();
             services.AddScoped<IRedisService, RedisService>();
-            services.AddScoped<CookieCodeService>();
+            services.AddScoped<ICookieCodeService, CookieCodeService>();
 
             // 添加监控服务
             services.AddSingleton<IMonitoringService, MonitoringService>();
@@ -154,31 +152,7 @@ public static class ServiceCollectionExtensions
             return services;
         }
 
-        /// <summary>
-        /// 注册事件驱动服务
-        /// </summary>
-        /// <returns>服务集合</returns>
-        public IServiceCollection AddEventDrivenServices()
-        {
-            // 注册事件总线
-            services.TryAddSingleton<IEventBus, EventBus>();
 
-            // 注册所有实现了IEventHandler接口的类型
-            var handlerTypes = AppDomain.CurrentDomain.GetAssemblies()
-                .SelectMany(assembly => assembly.GetTypes())
-                .Where(t => t.IsClass && !t.IsAbstract && t.GetInterfaces()
-                    .Any(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IEventHandler<>)));
-
-            foreach (var handlerType in handlerTypes)
-            {
-                var interfaceType = handlerType.GetInterfaces()
-                    .First(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IEventHandler<>));
-
-                services.AddTransient(interfaceType, handlerType);
-            }
-
-            return services;
-        }
 
         /// <summary>
         /// 注册服务发现服务
@@ -192,17 +166,7 @@ public static class ServiceCollectionExtensions
             return services;
         }
 
-        /// <summary>
-        /// 注册插件系统服务
-        /// </summary>
-        /// <returns>服务集合</returns>
-        public IServiceCollection AddPluginServices()
-        {
-            // 注册插件管理器
-            services.TryAddSingleton<PluginManager>();
 
-            return services;
-        }
 
         /// <summary>
         /// 注册所有服务
@@ -234,9 +198,7 @@ public static class ServiceCollectionExtensions
                 .AddBusinessServices()
                 .AddHttpClientServices()
                 // 添加新架构服务
-                .AddEventDrivenServices()
-                .AddServiceDiscoveryServices()
-                .AddPluginServices();
+                .AddServiceDiscoveryServices();
 
             if (configuration.EnablePrometheus)
             {

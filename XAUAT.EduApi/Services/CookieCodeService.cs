@@ -1,10 +1,11 @@
 using System.Text;
 using System.Text.RegularExpressions;
 using Polly;
+using XAUAT.EduApi.Interfaces;
 
 namespace XAUAT.EduApi.Services;
 
-public partial class CookieCodeService(IHttpClientFactory httpClientFactory)
+public partial class CookieCodeService(IHttpClientFactory httpClientFactory) : ICookieCodeService
 {
     public async Task<string> GetCode(string cookies)
     {
@@ -31,6 +32,11 @@ public partial class CookieCodeService(IHttpClientFactory httpClientFactory)
 
             if (a != "/student/for-std/precaution") return a;
             var content = await response.Content.ReadAsStringAsync();
+
+            if (content.Contains("登入页面"))
+            {
+                throw new Exceptions.UnAuthenticationError();
+            }
 
             var matches = MyRegex().Matches(content);
             return matches.Count >= 1 ? string.Join(',', matches.Select(m => m.Groups[1].Value)) : "";

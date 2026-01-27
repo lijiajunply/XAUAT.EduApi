@@ -47,6 +47,11 @@ public class ProgramService(IHttpClientFactory httpClientFactory, IConnectionMul
             if (!response.IsSuccessStatusCode) return [];
             var content = await response.Content.ReadAsStringAsync();
 
+        if (content.Contains("登入页面"))
+        {
+            throw new Exceptions.UnAuthenticationError();
+        }
+
             var result = JsonSerializer.Deserialize<ProgramModel>(content) ?? new ProgramModel();
 
             var list = GetPlanCourses(result);
@@ -133,7 +138,7 @@ public class CourseItem
     [JsonPropertyName("defaultExamMode")] public DefaultExamMode DefaultExamMode { get; set; } = new();
 
     [JsonPropertyName("courseType")] public CourseType CourseType { get; set; } = new();
-    [JsonPropertyName("credits")]  public double Credits { get; set; }
+    [JsonPropertyName("credits")] public double Credits { get; set; }
 }
 
 [Serializable]

@@ -44,6 +44,10 @@ namespace XAUAT.EduApi.Controllers
                 var result = await scoreService.ParseSemesterAsync(studentId, cookie);
                 return result;
             }
+            catch (Exceptions.UnAuthenticationError)
+            {
+                return Unauthorized("认证失败，请重新登录");
+            }
             catch (Exception ex)
             {
                 logger.LogError(ex, "解析学期数据时出错");
@@ -77,6 +81,10 @@ namespace XAUAT.EduApi.Controllers
 
                 return await scoreService.GetThisSemesterAsync(cookie);
             }
+            catch (Exceptions.UnAuthenticationError)
+            {
+                return Unauthorized("认证失败，请重新登录");
+            }
             catch (Exception ex)
             {
                 logger.LogError(ex, "获取当前学期时出错");
@@ -96,7 +104,7 @@ namespace XAUAT.EduApi.Controllers
         /// <response code="500">服务器内部错误</response>
         /// <remarks>
         /// 示例请求：
-        /// GET /Score?studentId=123456&semester=2024-2025-2
+        /// GET /Score?studentId=123456 & semester=2024-2025-2
         /// </remarks>
         [HttpGet]
         [ProducesResponseType(typeof(List<ScoreResponse>), StatusCodes.Status200OK)]
@@ -120,6 +128,10 @@ namespace XAUAT.EduApi.Controllers
             {
                 logger.LogWarning(ex, "参数错误");
                 return BadRequest(new { error = ex.Message });
+            }
+            catch (Exceptions.UnAuthenticationError)
+            {
+                return Unauthorized("认证失败，请重新登录");
             }
             catch (Exception ex)
             {

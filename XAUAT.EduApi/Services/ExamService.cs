@@ -22,12 +22,13 @@ public class ExamService : IExamService
     private readonly ILogger<ExamService> _logger;
     private readonly IInfoService _info;
 
-    public ExamService(IHttpClientFactory httpClientFactory, ILogger<ExamService> logger, IInfoService info, IConnectionMultiplexer? muxer)
+    public ExamService(IHttpClientFactory httpClientFactory, ILogger<ExamService> logger, IInfoService info,
+        IConnectionMultiplexer? muxer)
     {
         _httpClientFactory = httpClientFactory;
         _logger = logger;
         _info = info;
-        
+
         _redisAvailable = muxer != null;
         if (_redisAvailable && muxer != null)
         {
@@ -84,7 +85,8 @@ public class ExamService : IExamService
 
                 if (thisSemester is { HasValue: true, IsNullOrEmpty: false })
                 {
-                    var item = JsonConvert.DeserializeObject<SemesterItem>(thisSemester.ToString()) ?? new SemesterItem();
+                    var item = JsonConvert.DeserializeObject<SemesterItem>(thisSemester.ToString()) ??
+                               new SemesterItem();
                     if (!string.IsNullOrEmpty(item.Value))
                     {
                         _logger.LogInformation("已提取到缓存信息");
@@ -106,36 +108,28 @@ public class ExamService : IExamService
         return await retryPolicy.ExecuteAsync(async () =>
         {
             using var client = _httpClientFactory.CreateClient();
-            if (client != null)
+
+            client.SetRealisticHeaders();
+            client.Timeout = TimeSpan.FromSeconds(5); // 修改为5秒超时
+            client.DefaultRequestHeaders.Add("Cookie", cookie);
+            var html = await client.GetStringAsync("https://swjw.xauat.edu.cn/student/for-std/course-table");
+
+            var data = html.ParseNow(_info);
+
+            // 缓存到Redis，设置1小时过期时间
+            if (!_redisAvailable || _redis == null) return data;
+            try
             {
-                client.SetRealisticHeaders();
-                client.Timeout = TimeSpan.FromSeconds(5); // 修改为5秒超时
-                client.DefaultRequestHeaders.Add("Cookie", cookie);
-                var html = await client.GetStringAsync("https://swjw.xauat.edu.cn/student/for-std/course-table");
-
-                var data = html.ParseNow(_info);
-
-                // 缓存到Redis，设置1小时过期时间
-                if (_redisAvailable && _redis != null)
-                {
-                    try
-                    {
-                        await _redis.StringSetAsync("thisSemester", JsonConvert.SerializeObject(data),
-                            expiry: TimeSpan.FromHours(1));
-                        _logger.LogInformation("学期数据已缓存到Redis");
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError(ex, "Redis缓存写入失败");
-                    }
-                }
-
-                return data;
+                await _redis.StringSetAsync("thisSemester", JsonConvert.SerializeObject(data),
+                    expiry: TimeSpan.FromHours(1));
+                _logger.LogInformation("学期数据已缓存到Redis");
             }
-            
-            // 如果client为null，返回默认值
-            _logger.LogError("HttpClient创建失败");
-            return new SemesterItem { Value = string.Empty, Text = string.Empty };
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Redis缓存写入失败");
+            }
+
+            return data;
         });
     }
 
@@ -150,7 +144,7 @@ public class ExamService : IExamService
         try
         {
             var cacheKey = $"exam_arrangement_{id}";
-            
+
             // 尝试从Redis获取缓存，设置1小时过期时间
             if (_redisAvailable && _redis != null && !string.IsNullOrEmpty(id))
             {
@@ -203,12 +197,7 @@ public class ExamService : IExamService
             // 检查是否重定向到登录页面
             if (content.Contains("登入页面"))
             {
-                return new ExamResponse
-                {
-                    Exams = [],
-                    CanClick = false,
-                    Error = "登录已过期"
-                };
+                throw new Exceptions.UnAuthenticationError();
             }
 
             // 解析数据
@@ -254,7 +243,7 @@ public class ExamService : IExamService
             };
 
             if (string.IsNullOrEmpty(id)) return result;
-            
+
             // 缓存到Redis，设置1小时过期时间
             if (_redisAvailable && _redis != null)
             {

@@ -45,11 +45,8 @@ public static class UserAgentRotator
         return UserAgents[Random.Shared.Next(UserAgents.Length)];
     }
 
-    public static void SetRealisticHeaders(this HttpClient client)
+    public static void SetRealisticHeaders(this HttpClient? client)
     {
-        if (client != null && client.DefaultRequestHeaders != null)
-        {
-            client.DefaultRequestHeaders.Add("User-Agent", GetRandomUserAgent());
-        }
+        client?.DefaultRequestHeaders.Add("User-Agent", GetRandomUserAgent());
     }
 }

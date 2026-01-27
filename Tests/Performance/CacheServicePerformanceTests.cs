@@ -5,7 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using XAUAT.EduApi.Caching;
 
-namespace Tests.Performance;
+namespace XAUAT.EduApi.Tests.Performance;
 
 /// <summary>
 /// 缓存服务性能测试

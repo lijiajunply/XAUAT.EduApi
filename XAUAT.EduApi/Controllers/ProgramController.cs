@@ -56,7 +56,12 @@ public class ProgramController(
             {
                 result = result.Where(x => x.Name.Contains(name)).ToList();
             }
+
             return Ok(result);
+        }
+        catch (Exceptions.UnAuthenticationError)
+        {
+            return Unauthorized("认证失败，请重新登录");
         }
         catch (Exception ex)
         {
@@ -100,6 +105,10 @@ public class ProgramController(
 
             var result = await program.GetAllTrainPrograms(cookie, id);
             return Ok(result);
+        }
+        catch (Exceptions.UnAuthenticationError)
+        {
+            return Unauthorized("认证失败，请重新登录");
         }
         catch (Exception ex)
         {

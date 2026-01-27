@@ -56,6 +56,10 @@ public class CourseController(ILogger<CourseController> logger, ICourseService c
                 ExpirationTime = DateTime.Now.AddDays(7)
             });
         }
+        catch (Exceptions.UnAuthenticationError)
+        {
+            return Unauthorized(new { Success = false, Message = "认证失败，请重新登录" });
+        }
         catch (ArgumentNullException ex)
         {
             logger.LogWarning(ex, "参数错误");
