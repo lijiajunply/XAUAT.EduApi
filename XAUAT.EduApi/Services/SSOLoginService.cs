@@ -43,7 +43,7 @@ public class SSOLoginService(
             var cookies = json["cookies"]!.ToObject<string>() ?? "";
 
             var studentId = await cookieCode.GetCode(cookies);
-            if (string.IsNullOrEmpty(studentId))
+            if (string.IsNullOrEmpty(studentId) || studentId == "/student/login")
             {
                 logger.LogWarning("用户 {Username} 登录失败，Cookie 解析失败", username);
                 return new { Success = false, StudentId = "", Cookie = "" };
