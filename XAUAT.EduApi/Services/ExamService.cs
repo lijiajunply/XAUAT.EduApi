@@ -114,6 +114,12 @@ public class ExamService : IExamService
             client.DefaultRequestHeaders.Add("Cookie", cookie);
             var html = await client.GetStringAsync("https://swjw.xauat.edu.cn/student/for-std/course-table");
 
+            // 检查是否重定向到登录页面
+            if (html.Contains("登入页面"))
+            {
+                throw new Exceptions.UnAuthenticationError();
+            }
+
             var data = html.ParseNow(_info);
 
             // 缓存到Redis，设置1小时过期时间
