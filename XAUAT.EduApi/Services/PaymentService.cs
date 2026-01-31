@@ -3,6 +3,7 @@ using EduApi.Data.Models;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using StackExchange.Redis;
+using XAUAT.EduApi.Extensions;
 using JsonSerializer = System.Text.Json.JsonSerializer;
 
 namespace XAUAT.EduApi.Services;
@@ -13,24 +14,32 @@ public interface IPaymentService
     Task<PaymentData> GetTurnoverAsync(string cardNum);
 }
 
-public class PaymentService(IConnectionMultiplexer muxer, IHttpClientFactory httpClientFactory, ILogger<PaymentService> logger) : IPaymentService
+public class PaymentService : IPaymentService
 {
-    private readonly IDatabase _redis = muxer.GetDatabase();
+    private readonly IDatabase? _redis;
+    private readonly bool _redisAvailable;
+    private readonly IHttpClientFactory _httpClientFactory;
+    private readonly ILogger<PaymentService> _logger;
+
+    public PaymentService(IConnectionMultiplexer? muxer, IHttpClientFactory httpClientFactory, ILogger<PaymentService> logger)
+    {
+        _httpClientFactory = httpClientFactory;
+        _logger = logger;
+
+        // 使用扩展方法初始化Redis连接
+        _redis = muxer.SafeGetDatabase(logger, out _redisAvailable);
+    }
 
     public async Task<string> Login(string cardNum)
     {
         try
         {
-            var key = $"payment-{cardNum}";
-            var paymentValue = await _redis.StringGetAsync(key);
-
-            if (paymentValue is { HasValue: true, IsNullOrEmpty: false })
+            // 使用统一的缓存键
+            var cacheKey = CacheKeys.PaymentToken(cardNum);
+            var cachedToken = await _redis.GetStringCacheAsync(_redisAvailable, cacheKey, _logger);
+            if (!string.IsNullOrEmpty(cachedToken))
             {
-                var item = paymentValue.ToString();
-                if (!string.IsNullOrEmpty(item))
-                {
-                    return item;
-                }
+                return cachedToken;
             }
 
             const string url = "https://ydfwpt.xauat.edu.cn/berserker-auth/oauth/token";
@@ -52,8 +61,9 @@ public class PaymentService(IConnectionMultiplexer muxer, IHttpClientFactory htt
                 Authorization = "Basic bW9iaWxlX3NlcnZpY2VfcGxhdGZvcm06bW9iaWxlX3NlcnZpY2VfcGxhdGZvcm1fc2VjcmV0"
             };
 
-            using var client = httpClientFactory.CreateClient();
-            client.Timeout = TimeSpan.FromSeconds(15); // 添加超时控制
+            using var client = _httpClientFactory.CreateClient();
+            client.Timeout = HttpTimeouts.Slow; // 使用统一的慢速超时配置
+
             // Step 1: Get the keyboard data
             var keyboardResponse =
                 await client.GetAsync(
@@ -97,7 +107,8 @@ public class PaymentService(IConnectionMultiplexer muxer, IHttpClientFactory htt
             var responseData = JObject.Parse(responseJson);
             var accessToken = responseData["access_token"]!.ToObject<string>() ?? "";
 
-            await _redis.StringSetAsync(key, accessToken, TimeSpan.FromHours(1));
+            // 使用统一的缓存方法
+            await _redis.SetStringCacheAsync(_redisAvailable, cacheKey, accessToken, TimeSpan.FromHours(1), _logger);
             return accessToken;
         }
         catch (HttpRequestException ex)
@@ -119,12 +130,17 @@ public class PaymentService(IConnectionMultiplexer muxer, IHttpClientFactory htt
         try
         {
             var token = await Login(cardNum);
-            var payments = await GetPayments(token, cardNum);
-            var t = await GetBalanceAsync(token, cardNum);
+
+            // 并行获取支付列表和余额，解决 N+1 问题
+            var paymentsTask = GetPayments(token, cardNum);
+            var balanceTask = GetBalanceAsync(token, cardNum);
+
+            await Task.WhenAll(paymentsTask, balanceTask).ConfigureAwait(false);
+
             return new PaymentData()
             {
-                Records = payments,
-                Total = t
+                Records = await paymentsTask,
+                Total = await balanceTask
             };
         }
         catch (Exception ex)
@@ -137,16 +153,12 @@ public class PaymentService(IConnectionMultiplexer muxer, IHttpClientFactory htt
     {
         try
         {
-            var key = $"paymentList-{cardNum}";
-            var paymentValue = await _redis.StringGetAsync(key);
-
-            if (paymentValue is { HasValue: true, IsNullOrEmpty: false })
+            // 使用统一的缓存键
+            var cacheKey = CacheKeys.PaymentList(cardNum);
+            var cachedPayments = await _redis.GetCacheAsync<List<PaymentModel>>(_redisAvailable, cacheKey, _logger);
+            if (cachedPayments is { Count: > 0 })
             {
-                var item = paymentValue.ToString();
-                if (!string.IsNullOrEmpty(item))
-                {
-                    return JsonConvert.DeserializeObject<List<PaymentModel>>(item) ?? [];
-                }
+                return cachedPayments;
             }
 
             const string url = "http://ydfwpt.xauat.edu.cn/berserker-search/search/personal/turnover";
@@ -167,8 +179,8 @@ public class PaymentService(IConnectionMultiplexer muxer, IHttpClientFactory htt
             var query = string.Join("&", paramsDict.Select(kvp => $"{kvp.Key}={Uri.EscapeDataString(kvp.Value)}"));
             uriBuilder.Query = query;
 
-            using var client = httpClientFactory.CreateClient();
-            client.Timeout = TimeSpan.FromSeconds(6); // 添加超时控制
+            using var client = _httpClientFactory.CreateClient();
+            client.Timeout = HttpTimeouts.EduSystem; // 使用统一的超时配置
             foreach (var header in headers)
             {
                 client.DefaultRequestHeaders.Add(header.Key, header.Value);
@@ -186,11 +198,12 @@ public class PaymentService(IConnectionMultiplexer muxer, IHttpClientFactory htt
                 var records = recordsElement.Deserialize<List<Dictionary<string, JsonElement>>>();
                 var a = records?.Select(PaymentModel.FromJson).ToList() ?? [];
 
-                await _redis.StringSetAsync(key, JsonConvert.SerializeObject(a), TimeSpan.FromMinutes(20));
+                // 使用统一的缓存方法
+                await _redis.SetCacheAsync(_redisAvailable, cacheKey, a, TimeSpan.FromMinutes(20), _logger);
                 return a;
             }
 
-            logger.LogWarning("获取支付列表失败，状态码: {StatusCode}", response.StatusCode);
+            _logger.LogWarning("获取支付列表失败，状态码: {StatusCode}", response.StatusCode);
 
             return [];
         }
@@ -212,16 +225,12 @@ public class PaymentService(IConnectionMultiplexer muxer, IHttpClientFactory htt
     {
         try
         {
-            var key = $"ele-acc-{cardNum}";
-            var paymentValue = await _redis.StringGetAsync(key);
-
-            if (paymentValue is { HasValue: true, IsNullOrEmpty: false })
+            // 使用统一的缓存键
+            var cacheKey = CacheKeys.ElectronicAccount(cardNum);
+            var cachedBalance = await _redis.GetStringCacheAsync(_redisAvailable, cacheKey, _logger);
+            if (!string.IsNullOrEmpty(cachedBalance) && double.TryParse(cachedBalance, out var balance))
             {
-                var item = paymentValue.ToString();
-                if (!string.IsNullOrEmpty(item))
-                {
-                    return double.Parse(item) / 100;
-                }
+                return balance / 100;
             }
 
             const string url = "https://ydfwpt.xauat.edu.cn/berserker-app/ykt/tsm/queryCard?synAccessSource=h5";
@@ -232,8 +241,8 @@ public class PaymentService(IConnectionMultiplexer muxer, IHttpClientFactory htt
                 { "synjones-auth", token }
             };
 
-            using var client = httpClientFactory.CreateClient();
-            client.Timeout = TimeSpan.FromSeconds(6); // 添加超时控制
+            using var client = _httpClientFactory.CreateClient();
+            client.Timeout = HttpTimeouts.EduSystem; // 使用统一的超时配置
             foreach (var header in headers)
             {
                 client.DefaultRequestHeaders.Add(header.Key, header.Value);
@@ -247,7 +256,9 @@ public class PaymentService(IConnectionMultiplexer muxer, IHttpClientFactory htt
             if (data == null || !data.TryGetValue("data", out var dataPart)) return 0;
             if (!dataPart.TryGetProperty("card", out var balanceElement) ||
                 !balanceElement[0].TryGetProperty("elec_accamt", out var element)) return 0;
-            await _redis.StringSetAsync(key, element.GetInt32().ToString(), TimeSpan.FromMinutes(20));
+
+            // 使用统一的缓存方法
+            await _redis.SetStringCacheAsync(_redisAvailable, cacheKey, element.GetInt32().ToString(), TimeSpan.FromMinutes(20), _logger);
             return element.GetDouble() / 100;
         }
         catch (HttpRequestException ex)

@@ -42,11 +42,16 @@ public class ExamService : IExamService
         }
 
         var split = id.Split(',');
+
+        // 使用 Task.WhenAll 并行获取所有学生的考试安排，解决 N+1 问题
+        var tasks = split.Select(s => GetExamArrangementAsync(cookie, s)).ToArray();
+        var allResults = await Task.WhenAll(tasks).ConfigureAwait(false);
+
+        // 合并结果
         var examResponse = new ExamResponse();
-        foreach (var s in split)
+        foreach (var result in allResults)
         {
-            var e1 = await GetExamArrangementAsync(cookie, s);
-            examResponse.Exams.AddRange(e1.Exams);
+            examResponse.Exams.AddRange(result.Exams);
         }
 
         return examResponse;
@@ -77,7 +82,7 @@ public class ExamService : IExamService
         {
             using var client = _httpClientFactory.CreateClient();
             client.SetRealisticHeaders();
-            client.Timeout = TimeSpan.FromSeconds(5);
+            client.Timeout = HttpTimeouts.EduSystem;
             client.DefaultRequestHeaders.Add("Cookie", cookie);
 
             var html = await client.GetStringAsync("https://swjw.xauat.edu.cn/student/for-std/course-table");
@@ -125,14 +130,12 @@ public class ExamService : IExamService
                 url += $"info/{id}?";
             }
 
-            var request = new HttpRequestMessage(HttpMethod.Get, url).WithCookie(cookie);
-
             using var httpClient = _httpClientFactory.CreateClient();
             httpClient.SetRealisticHeaders();
-            httpClient.Timeout = TimeSpan.FromSeconds(5);
+            httpClient.Timeout = HttpTimeouts.EduSystem;
 
             // 设置 CancellationToken
-            var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            using var cts = new CancellationTokenSource(HttpTimeouts.EduSystem);
 
             // 添加重试逻辑
             var retryPolicy = Policy

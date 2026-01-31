@@ -54,23 +54,13 @@ public class ScoreService : IScoreService
         }
 
         var split = studentId.Split(',');
-        var result = new List<ScoreResponse>();
 
-        for (var i = 0; i < split.Length; i++)
-        {
-            var s = split[i];
-            var scoreResponse = await GetScoreResponse(s, semester, cookie).ConfigureAwait(false);
-            var scoreResponses = scoreResponse as ScoreResponse[] ?? scoreResponse.ToArray();
-            if (i != 0)
-            {
-                foreach (var t in scoreResponses)
-                {
-                    t.IsMinor = true;
-                }
-            }
+        // 使用 Task.WhenAll 并行获取所有学生的成绩，解决 N+1 问题
+        var tasks = split.Select((s, index) => GetScoreResponseWithIndex(s, semester, cookie, index)).ToArray();
+        var allResults = await Task.WhenAll(tasks).ConfigureAwait(false);
 
-            result.AddRange(scoreResponses);
-        }
+        // 合并结果
+        var result = allResults.SelectMany(r => r).ToList();
 
         // 将结果缓存到Redis
         if (result.Count > 0)
@@ -79,6 +69,26 @@ public class ScoreService : IScoreService
         }
 
         return result;
+    }
+
+    /// <summary>
+    /// 获取成绩并标记是否为辅修
+    /// </summary>
+    private async Task<List<ScoreResponse>> GetScoreResponseWithIndex(string studentId, string semester, string cookie, int index)
+    {
+        var scoreResponse = await GetScoreResponse(studentId, semester, cookie).ConfigureAwait(false);
+        var scoreResponses = scoreResponse.ToList();
+
+        // 非第一个学号的成绩标记为辅修
+        if (index != 0)
+        {
+            foreach (var t in scoreResponses)
+            {
+                t.IsMinor = true;
+            }
+        }
+
+        return scoreResponses;
     }
 
     public async Task<SemesterResult> ParseSemesterAsync(string? studentId, string cookie)
@@ -94,7 +104,7 @@ public class ScoreService : IScoreService
         }
 
         using var client = _httpClientFactory.CreateClient();
-        client.ConfigureForEduSystem(cookie, TimeSpan.FromSeconds(3));
+        client.ConfigureForEduSystem(cookie, HttpTimeouts.EduSystem);
 
         var url = "https://swjw.xauat.edu.cn/student/for-std/grade/sheet";
         if (!string.IsNullOrEmpty(studentId))
@@ -186,7 +196,7 @@ public class ScoreService : IScoreService
     private async Task<List<ScoreResponse>> CrawlScores(string studentId, string semester, string cookie)
     {
         using var client = _httpClientFactory.CreateClient();
-        client.ConfigureForEduSystem(cookie);
+        client.ConfigureForEduSystem(cookie, HttpTimeouts.EduSystem);
 
         var response = await client.GetAsync(
                 $"https://swjw.xauat.edu.cn/student/for-std/grade/sheet/info/{studentId}?semester={semester}")

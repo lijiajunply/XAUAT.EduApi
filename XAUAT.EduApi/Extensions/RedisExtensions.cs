@@ -243,14 +243,27 @@ public static class CacheKeys
     private const string Prefix = "eduapi";
 
     /// <summary>
+    /// 对包含特殊字符的参数进行安全编码
+    /// 将逗号、冒号等特殊字符替换为安全字符
+    /// </summary>
+    private static string SafeEncode(string? value)
+    {
+        if (string.IsNullOrEmpty(value)) return "null";
+        // 将可能导致冲突的字符替换为安全字符
+        return value.Replace(":", "_c_").Replace(",", "_m_");
+    }
+
+    /// <summary>
     /// 生成成绩缓存键
     /// </summary>
-    public static string Scores(string studentId, string semester) => $"{Prefix}:scores:{studentId}:{semester}";
+    public static string Scores(string studentId, string semester)
+        => $"{Prefix}:scores:{SafeEncode(studentId)}:{SafeEncode(semester)}";
 
     /// <summary>
     /// 生成学期结果缓存键
     /// </summary>
-    public static string SemesterResult(string? studentId) => $"{Prefix}:semester_result:{studentId}";
+    public static string SemesterResult(string? studentId)
+        => $"{Prefix}:semester_result:{SafeEncode(studentId)}";
 
     /// <summary>
     /// 生成当前学期缓存键
@@ -260,35 +273,48 @@ public static class CacheKeys
     /// <summary>
     /// 生成考试安排缓存键
     /// </summary>
-    public static string ExamArrangement(string? id) => $"{Prefix}:exam_arrangement:{id}";
+    public static string ExamArrangement(string? id)
+        => $"{Prefix}:exam_arrangement:{SafeEncode(id)}";
 
     /// <summary>
     /// 生成支付Token缓存键
     /// </summary>
-    public static string PaymentToken(string cardNum) => $"{Prefix}:payment:{cardNum}";
+    public static string PaymentToken(string cardNum)
+        => $"{Prefix}:payment:{SafeEncode(cardNum)}";
 
     /// <summary>
     /// 生成支付列表缓存键
     /// </summary>
-    public static string PaymentList(string cardNum) => $"{Prefix}:paymentList:{cardNum}";
+    public static string PaymentList(string cardNum)
+        => $"{Prefix}:paymentList:{SafeEncode(cardNum)}";
 
     /// <summary>
     /// 生成电子账户余额缓存键
     /// </summary>
-    public static string ElectronicAccount(string cardNum) => $"{Prefix}:ele_acc:{cardNum}";
+    public static string ElectronicAccount(string cardNum)
+        => $"{Prefix}:ele_acc:{SafeEncode(cardNum)}";
 
     /// <summary>
     /// 生成培养方案缓存键
     /// </summary>
-    public static string TrainProgram(string id) => $"{Prefix}:train_program:{id}";
+    public static string TrainProgram(string id)
+        => $"{Prefix}:train_program:{SafeEncode(id)}";
 
     /// <summary>
     /// 生成校车缓存键
     /// </summary>
-    public static string Bus(string time) => $"{Prefix}:bus:{time}";
+    public static string Bus(string time)
+        => $"{Prefix}:bus:{SafeEncode(time)}";
 
     /// <summary>
     /// 生成新校车数据缓存键
     /// </summary>
-    public static string BusNewData(string time) => $"{Prefix}:bus_new_data:{time}";
+    public static string BusNewData(string time)
+        => $"{Prefix}:bus_new_data:{SafeEncode(time)}";
+
+    /// <summary>
+    /// 生成课程缓存键
+    /// </summary>
+    public static string Courses(string studentId)
+        => $"{Prefix}:courses:{SafeEncode(studentId)}";
 }
