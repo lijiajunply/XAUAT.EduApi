@@ -46,7 +46,6 @@ public class LoginController(ILoginService loginService, ILogger<LoginController
             }
 
             var result = await loginService.LoginAsync(request.Username, request.Password);
-            logger.LogInformation("用户 {Username} 登录成功", request.Username);
             return Ok(result);
         }
         catch (Exception ex)

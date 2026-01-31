@@ -25,6 +25,6 @@ public class InfoService : IInfoService
     public bool IsInSchool()
     {
         var time = GetTime();
-        return DateTime.Now >= DateTime.Parse(time.StartTime) && DateTime.Now <= DateTime.Parse(time.EndTime);
+        return DateTime.Now >= DateTime.Parse(time.StartTime);
     }
 }

@@ -200,6 +200,14 @@ public class ScoreService : IScoreService
         var thisSemester = await _examService.GetThisSemester(cookie).ConfigureAwait(false);
         var isCurrentSemester = thisSemester != null! && thisSemester.Value == semester;
 
+        if (!isCurrentSemester && thisSemester != null)
+        {
+            if (int.TryParse(semester, out var theSemesterInt) && int.TryParse(thisSemester.Value, out var thisSemesterInt))
+            {
+                isCurrentSemester = Math.Abs(thisSemesterInt - theSemesterInt) <= 60;
+            }
+        }
+
         if (!isCurrentSemester)
         {
             // 从数据库查询
