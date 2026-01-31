@@ -3,7 +3,6 @@ using Moq.Protected;
 using Newtonsoft.Json;
 using StackExchange.Redis;
 using System.Net;
-using System.Text.Json;
 using XAUAT.EduApi.Services;
 using JsonSerializer = System.Text.Json.JsonSerializer;
 

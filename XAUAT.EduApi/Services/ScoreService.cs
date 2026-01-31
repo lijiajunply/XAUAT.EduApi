@@ -3,6 +3,7 @@ using EduApi.Data.Models;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using StackExchange.Redis;
+using XAUAT.EduApi.Extensions;
 using XAUAT.EduApi.Repos;
 
 namespace XAUAT.EduApi.Services;
@@ -31,24 +32,8 @@ public class ScoreService : IScoreService
         _examService = examService;
         _scoreRepository = scoreRepository;
 
-        _redisAvailable = muxer != null;
-        if (_redisAvailable && muxer != null)
-        {
-            try
-            {
-                _redis = muxer.GetDatabase();
-                _logger.LogInformation("Redis连接成功");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Redis连接失败");
-                _redisAvailable = false;
-            }
-        }
-        else
-        {
-            _logger.LogWarning("Redis未配置，将使用数据库作为缓存");
-        }
+        // 使用扩展方法初始化Redis连接
+        _redis = muxer.SafeGetDatabase(_logger, out _redisAvailable);
     }
 
     public async Task<List<ScoreResponse>> GetScoresAsync(string studentId, string semester, string cookie)
@@ -60,27 +45,12 @@ public class ScoreService : IScoreService
             throw new ArgumentNullException(nameof(studentId));
         }
 
-        // 尝试从Redis获取缓存，设置1小时过期时间
-        var cacheKey = $"scores_{studentId}_{semester}";
-        if (_redisAvailable && _redis != null)
+        // 尝试从Redis获取缓存
+        var cacheKey = CacheKeys.Scores(studentId, semester);
+        var cachedScores = await _redis.GetCacheAsync<List<ScoreResponse>>(_redisAvailable, cacheKey, _logger);
+        if (cachedScores is { Count: > 0 })
         {
-            try
-            {
-                var redisResult = await _redis.StringGetAsync(cacheKey).ConfigureAwait(false);
-                if (redisResult.HasValue)
-                {
-                    var cachedScores = JsonConvert.DeserializeObject<List<ScoreResponse>>(redisResult.ToString());
-                    if (cachedScores is { Count: > 0 })
-                    {
-                        _logger.LogInformation("已从缓存获取考试分数");
-                        return cachedScores;
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Redis缓存读取失败，将直接查询数据");
-            }
+            return cachedScores;
         }
 
         var split = studentId.Split(',');
@@ -102,19 +72,10 @@ public class ScoreService : IScoreService
             result.AddRange(scoreResponses);
         }
 
-        // 将结果缓存到Redis，设置1小时过期时间
-        if (_redisAvailable && _redis != null && result.Count > 0)
+        // 将结果缓存到Redis
+        if (result.Count > 0)
         {
-            try
-            {
-                await _redis.StringSetAsync(cacheKey, JsonConvert.SerializeObject(result), TimeSpan.FromHours(1))
-                    .ConfigureAwait(false);
-                _logger.LogInformation("考试分数已缓存到Redis");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Redis缓存写入失败");
-            }
+            await _redis.SetCacheAsync(_redisAvailable, cacheKey, result, TimeSpan.FromHours(1), _logger);
         }
 
         return result;
@@ -124,34 +85,16 @@ public class ScoreService : IScoreService
     {
         _logger.LogInformation("开始解析学期数据");
 
-        // 尝试从Redis获取缓存，设置1小时过期时间
-        var cacheKey = $"semester_result_{studentId}";
-        if (_redisAvailable && _redis != null)
+        // 尝试从Redis获取缓存
+        var cacheKey = CacheKeys.SemesterResult(studentId);
+        var cachedResult = await _redis.GetCacheAsync<SemesterResult>(_redisAvailable, cacheKey, _logger);
+        if (cachedResult != null)
         {
-            try
-            {
-                var redisResult = await _redis.StringGetAsync(cacheKey).ConfigureAwait(false);
-                if (redisResult.HasValue)
-                {
-                    var cachedResult = JsonConvert.DeserializeObject<SemesterResult>(redisResult.ToString());
-                    if (cachedResult != null)
-                    {
-                        _logger.LogInformation("已从缓存获取学期数据");
-                        return cachedResult;
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Redis缓存读取失败，将直接查询数据");
-            }
+            return cachedResult;
         }
 
         using var client = _httpClientFactory.CreateClient();
-        client.DefaultRequestHeaders.Add("User-Agent",
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0");
-        client.DefaultRequestHeaders.Add("Cookie", cookie);
-        client.Timeout = TimeSpan.FromSeconds(3);
+        client.ConfigureForEduSystem(cookie, TimeSpan.FromSeconds(3));
 
         var url = "https://swjw.xauat.edu.cn/student/for-std/grade/sheet";
         if (!string.IsNullOrEmpty(studentId))
@@ -171,20 +114,8 @@ public class ScoreService : IScoreService
         var result = new SemesterResult();
         result.Parse(html);
 
-        // 将结果缓存到Redis，设置1小时过期时间
-        if (_redisAvailable && _redis != null)
-        {
-            try
-            {
-                await _redis.StringSetAsync(cacheKey, JsonConvert.SerializeObject(result), TimeSpan.FromHours(1))
-                    .ConfigureAwait(false);
-                _logger.LogInformation("学期数据已缓存到Redis");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Redis缓存写入失败");
-            }
-        }
+        // 将结果缓存到Redis
+        await _redis.SetCacheAsync(_redisAvailable, cacheKey, result, TimeSpan.FromHours(1), _logger);
 
         return result;
     }
@@ -222,7 +153,7 @@ public class ScoreService : IScoreService
                 return scoreResponses;
             }
         }
-        
+
         var crawledScores = await CrawlScores(studentId, semester, cookie).ConfigureAwait(false);
         var scoresToSave = crawledScores.Select(score =>
         {
@@ -255,10 +186,7 @@ public class ScoreService : IScoreService
     private async Task<List<ScoreResponse>> CrawlScores(string studentId, string semester, string cookie)
     {
         using var client = _httpClientFactory.CreateClient();
-
-        client.DefaultRequestHeaders.Add("User-Agent",
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0");
-        client.DefaultRequestHeaders.Add("Cookie", cookie);
+        client.ConfigureForEduSystem(cookie);
 
         var response = await client.GetAsync(
                 $"https://swjw.xauat.edu.cn/student/for-std/grade/sheet/info/{studentId}?semester={semester}")
@@ -310,25 +238,11 @@ public class ScoreService : IScoreService
 
         if (list.Count == 0) return list;
 
-        // 缓存当前学期信息，设置1小时过期时间
-        if (_redisAvailable && _redis != null)
+        // 缓存当前学期信息
+        var thisSemesterCache = await _redis.GetStringCacheAsync(_redisAvailable, CacheKeys.ThisSemester, _logger);
+        if (string.IsNullOrEmpty(thisSemesterCache))
         {
-            try
-            {
-                var thisSemesterCache = await _redis.StringGetAsync("thisSemester").ConfigureAwait(false);
-                if (!thisSemesterCache.HasValue || thisSemesterCache.IsNullOrEmpty)
-                {
-                    await _examService.GetThisSemester(cookie).ConfigureAwait(false);
-                }
-                else
-                {
-                    _ = JsonConvert.DeserializeObject<SemesterItem>(thisSemesterCache!) ?? new SemesterItem();
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Redis操作失败，将跳过缓存操作");
-            }
+            await _examService.GetThisSemester(cookie).ConfigureAwait(false);
         }
 
         return list;

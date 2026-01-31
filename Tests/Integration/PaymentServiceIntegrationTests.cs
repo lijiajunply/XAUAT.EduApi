@@ -4,7 +4,6 @@ using Microsoft.Extensions.Logging;
 using StackExchange.Redis;
 using XAUAT.EduApi.Services;
 using EduApi.Data;
-using EduApi.Data.Models;
 using Moq.Protected;
 
 namespace XAUAT.EduApi.Tests.Integration;

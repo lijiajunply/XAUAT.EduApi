@@ -1,8 +1,8 @@
 using EduApi.Data.Models;
 using Microsoft.AspNetCore.Mvc;
-using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using StackExchange.Redis;
+using XAUAT.EduApi.Extensions;
 using XAUAT.EduApi.Services;
 
 namespace XAUAT.EduApi.Controllers;
@@ -19,7 +19,8 @@ public class BusController : ControllerBase
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly IDatabase? _redis;
     private readonly bool _redisAvailable;
-    
+    private readonly ILogger<BusController>? _logger;
+
     /// <summary>
     /// BusController构造函数
     /// </summary>
@@ -29,24 +30,10 @@ public class BusController : ControllerBase
     public BusController(IHttpClientFactory httpClientFactory, IConnectionMultiplexer? muxer, ILogger<BusController>? logger = null)
     {
         _httpClientFactory = httpClientFactory;
-        _redisAvailable = muxer != null;
-        if (_redisAvailable && muxer != null)
-        {
-            try
-            {
-                _redis = muxer.GetDatabase();
-                logger?.LogInformation("Redis连接成功");
-            }
-            catch (Exception ex)
-            {
-                logger?.LogError(ex, "Redis连接失败");
-                _redisAvailable = false;
-            }
-        }
-        else
-        {
-            logger?.LogWarning("Redis未配置");
-        }
+        _logger = logger;
+
+        // 使用扩展方法初始化Redis连接
+        _redis = muxer.SafeGetDatabase(logger, out _redisAvailable);
     }
 
     /// <summary>
@@ -60,7 +47,7 @@ public class BusController : ControllerBase
     /// <remarks>
     /// 示例请求：
     /// GET /Bus
-    /// 
+    ///
     /// 获取指定日期的校车时刻表：
     /// GET /Bus/2024-12-01
     /// </remarks>
@@ -84,7 +71,7 @@ public class BusController : ControllerBase
     /// <remarks>
     /// 示例请求：
     /// GET /Bus/NewData
-    /// 
+    ///
     /// 获取指定日期和校区的校车时刻表：
     /// GET /Bus/NewData/2024-12-01?loc=雁塔
     /// </remarks>
@@ -99,16 +86,13 @@ public class BusController : ControllerBase
         client.Timeout = new TimeSpan(0, 0, 0, 1, 0);
         time ??= DateTime.Today.ToString("yyyy-MM-dd");
 
-        var key = "bus_new_data:" + time;
+        var cacheKey = CacheKeys.BusNewData(time);
 
         // 尝试从Redis获取数据
-        if (_redisAvailable && _redis != null)
+        var cachedBus = await _redis.GetCacheAsync<BusModel>(_redisAvailable, cacheKey, _logger);
+        if (cachedBus != null)
         {
-            var bus = await _redis.StringGetAsync(key);
-            if (bus.HasValue)
-            {
-                return Ok(JsonConvert.DeserializeObject<BusModel>(bus.ToString()));
-            }
+            return Ok(cachedBus);
         }
 
         var response =
@@ -151,9 +135,10 @@ public class BusController : ControllerBase
 
         busModel.Total = busModel.Records.Count;
 
-        if (busModel.Total != 0 && _redisAvailable && _redis != null)
-            await _redis.StringSetAsync(key, JsonConvert.SerializeObject(busModel),
-                expiry: new TimeSpan(0, 12, 0, 0));
+        if (busModel.Total != 0)
+        {
+            await _redis.SetCacheAsync(_redisAvailable, cacheKey, busModel, TimeSpan.FromHours(12), _logger);
+        }
 
         return Ok(busModel);
     }
@@ -174,14 +159,13 @@ public class BusController : ControllerBase
         client.SetRealisticHeaders();
         time ??= DateTime.Today.ToString("yyyy-MM-dd");
 
+        var cacheKey = CacheKeys.Bus(time);
+
         // 尝试从Redis获取数据
-        if (_redisAvailable && _redis != null)
+        var cachedBus = await _redis.GetCacheAsync<BusModel>(_redisAvailable, cacheKey, _logger);
+        if (cachedBus != null)
         {
-            var bus = await _redis.StringGetAsync("bus:" + time);
-            if (bus.HasValue)
-            {
-                return JsonConvert.DeserializeObject<BusModel>(bus.ToString()) ?? new BusModel();
-            }
+            return cachedBus;
         }
 
         var response =
@@ -206,9 +190,10 @@ public class BusController : ControllerBase
             });
         }
 
-        if (busModel.Total != 0 && _redisAvailable && _redis != null)
-            await _redis.StringSetAsync("bus:" + time, JsonConvert.SerializeObject(busModel),
-                expiry: new TimeSpan(0, 12, 0, 0));
+        if (busModel.Total != 0)
+        {
+            await _redis.SetCacheAsync(_redisAvailable, cacheKey, busModel, TimeSpan.FromHours(12), _logger);
+        }
 
         return busModel;
     }

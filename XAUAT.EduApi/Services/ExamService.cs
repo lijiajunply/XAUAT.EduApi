@@ -3,6 +3,7 @@ using EduApi.Data.Models;
 using Newtonsoft.Json;
 using Polly;
 using StackExchange.Redis;
+using XAUAT.EduApi.Extensions;
 
 namespace XAUAT.EduApi.Services;
 
@@ -29,24 +30,8 @@ public class ExamService : IExamService
         _logger = logger;
         _info = info;
 
-        _redisAvailable = muxer != null;
-        if (_redisAvailable && muxer != null)
-        {
-            try
-            {
-                _redis = muxer.GetDatabase();
-                _logger.LogInformation("Redis连接成功");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Redis连接失败");
-                _redisAvailable = false;
-            }
-        }
-        else
-        {
-            _logger.LogWarning("Redis未配置，将使用数据库作为缓存");
-        }
+        // 使用扩展方法初始化Redis连接
+        _redis = muxer.SafeGetDatabase(_logger, out _redisAvailable);
     }
 
     public async Task<ExamResponse> GetExamArrangementsAsync(string cookie, string? id)
@@ -76,28 +61,11 @@ public class ExamService : IExamService
     {
         _logger.LogInformation("开始抓取学期数据");
 
-        // 尝试从Redis获取缓存，设置1小时过期时间
-        if (_redisAvailable && _redis != null)
+        // 尝试从Redis获取缓存
+        var cachedSemester = await _redis.GetCacheAsync<SemesterItem>(_redisAvailable, CacheKeys.ThisSemester, _logger);
+        if (cachedSemester != null && !string.IsNullOrEmpty(cachedSemester.Value))
         {
-            try
-            {
-                var thisSemester = await _redis.StringGetAsync("thisSemester");
-
-                if (thisSemester is { HasValue: true, IsNullOrEmpty: false })
-                {
-                    var item = JsonConvert.DeserializeObject<SemesterItem>(thisSemester.ToString()) ??
-                               new SemesterItem();
-                    if (!string.IsNullOrEmpty(item.Value))
-                    {
-                        _logger.LogInformation("已提取到缓存信息");
-                        return item;
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Redis操作失败，将直接请求数据");
-            }
+            return cachedSemester;
         }
 
         var retryPolicy = Policy
@@ -108,10 +76,10 @@ public class ExamService : IExamService
         return await retryPolicy.ExecuteAsync(async () =>
         {
             using var client = _httpClientFactory.CreateClient();
-
             client.SetRealisticHeaders();
-            client.Timeout = TimeSpan.FromSeconds(5); // 修改为5秒超时
+            client.Timeout = TimeSpan.FromSeconds(5);
             client.DefaultRequestHeaders.Add("Cookie", cookie);
+
             var html = await client.GetStringAsync("https://swjw.xauat.edu.cn/student/for-std/course-table");
 
             // 检查是否重定向到登录页面
@@ -122,18 +90,8 @@ public class ExamService : IExamService
 
             var data = html.ParseNow(_info);
 
-            // 缓存到Redis，设置1小时过期时间
-            if (!_redisAvailable || _redis == null) return data;
-            try
-            {
-                await _redis.StringSetAsync("thisSemester", JsonConvert.SerializeObject(data),
-                    expiry: TimeSpan.FromHours(1));
-                _logger.LogInformation("学期数据已缓存到Redis");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Redis缓存写入失败");
-            }
+            // 缓存到Redis
+            await _redis.SetCacheAsync(_redisAvailable, CacheKeys.ThisSemester, data, TimeSpan.FromHours(1), _logger);
 
             return data;
         });
@@ -149,23 +107,15 @@ public class ExamService : IExamService
     {
         try
         {
-            var cacheKey = $"exam_arrangement_{id}";
+            var cacheKey = CacheKeys.ExamArrangement(id);
 
-            // 尝试从Redis获取缓存，设置1小时过期时间
-            if (_redisAvailable && _redis != null && !string.IsNullOrEmpty(id))
+            // 尝试从Redis获取缓存
+            if (!string.IsNullOrEmpty(id))
             {
-                try
+                var cachedExam = await _redis.GetCacheAsync<ExamResponse>(_redisAvailable, cacheKey, _logger);
+                if (cachedExam is { CanClick: true })
                 {
-                    var redisResult = await _redis.StringGetAsync(cacheKey);
-                    if (redisResult.HasValue)
-                    {
-                        var a = JsonConvert.DeserializeObject<ExamResponse>(redisResult.ToString());
-                        if (a is { CanClick: true }) return a;
-                    }
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Redis操作失败，将直接请求数据");
+                    return cachedExam;
                 }
             }
 
@@ -175,12 +125,11 @@ public class ExamService : IExamService
                 url += $"info/{id}?";
             }
 
-            var request = new HttpRequestMessage(HttpMethod.Get, url);
-            request.Headers.Add("Cookie", cookie);
+            var request = new HttpRequestMessage(HttpMethod.Get, url).WithCookie(cookie);
 
-            using var httpClient = _httpClientFactory.CreateClient(); // 使用注入的HttpClientFactory
+            using var httpClient = _httpClientFactory.CreateClient();
             httpClient.SetRealisticHeaders();
-            httpClient.Timeout = TimeSpan.FromSeconds(5); // 修改为5秒超时
+            httpClient.Timeout = TimeSpan.FromSeconds(5);
 
             // 设置 CancellationToken
             var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
@@ -250,27 +199,12 @@ public class ExamService : IExamService
 
             if (string.IsNullOrEmpty(id)) return result;
 
-            // 缓存到Redis，设置1小时过期时间
-            if (_redisAvailable && _redis != null)
-            {
-                try
-                {
-                    await _redis.StringSetAsync(cacheKey, JsonConvert.SerializeObject(result),
-                        expiry: TimeSpan.FromHours(1));
-                    _logger.LogInformation("考试安排数据已缓存到Redis");
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Redis缓存写入失败");
-                }
-            }
+            // 缓存到Redis
+            await _redis.SetCacheAsync(_redisAvailable, cacheKey, result, TimeSpan.FromHours(1), _logger);
 
             return result;
 
-            HttpRequestMessage CreateRequest() => new(HttpMethod.Get, url)
-            {
-                Headers = { { "Cookie", cookie } }
-            };
+            HttpRequestMessage CreateRequest() => new HttpRequestMessage(HttpMethod.Get, url).WithCookie(cookie);
         }
         catch (Exception ex)
         {
