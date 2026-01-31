@@ -38,27 +38,39 @@ public class InfoController(IHttpClientFactory httpClientFactory, ILogger<Course
     [ProducesResponseType(typeof(string), StatusCodes.Status502BadGateway)]
     public async Task<IActionResult> GetCompletion()
     {
-        logger.LogInformation("开始抓取学业进度");
-        var cookie = Request.Headers.Cookie.ToString();
-        if (string.IsNullOrEmpty(cookie))
+        try
         {
-            cookie = Request.Headers["xauat"].ToString(); // 从请求中获取 cookie
+            logger.LogInformation("开始抓取学业进度");
+            var cookie = Request.Headers.Cookie.ToString();
+            if (string.IsNullOrEmpty(cookie))
+            {
+                cookie = Request.Headers["xauat"].ToString(); // 从请求中获取 cookie
+            }
+
+            using var client = httpClientFactory.CreateClient();
+            client.SetRealisticHeaders();
+            client.Timeout = TimeSpan.FromSeconds(6); // 添加超时控制
+            client.DefaultRequestHeaders.Add("Cookie", cookie);
+            var response =
+                await client.GetAsync("https://swjw.xauat.edu.cn/student/ws/student/home-page/programCompletionPreview");
+            var content = await response.Content.ReadAsStringAsync();
+
+            if (content.Contains("登入页面"))
+            {
+                throw new Exceptions.UnAuthenticationError();
+            }
+
+            return Content(content);
         }
-
-        using var client = httpClientFactory.CreateClient();
-        client.SetRealisticHeaders();
-        client.Timeout = TimeSpan.FromSeconds(6); // 添加超时控制
-        client.DefaultRequestHeaders.Add("Cookie", cookie);
-        var response =
-            await client.GetAsync("https://swjw.xauat.edu.cn/student/ws/student/home-page/programCompletionPreview");
-        var content = await response.Content.ReadAsStringAsync();
-
-        if (content.Contains("登入页面"))
+        catch (Exceptions.UnAuthenticationError)
         {
-            throw new Exceptions.UnAuthenticationError();
+            return Unauthorized("认证失败，请重新登录");
         }
-
-        return Content(content);
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "获取学业进度时出错");
+            return StatusCode(500, "获取学业进度失败");
+        }
     }
 
     /// <summary>

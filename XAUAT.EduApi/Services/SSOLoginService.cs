@@ -1,6 +1,7 @@
 using System.Net;
 using Newtonsoft.Json.Linq;
 using Polly;
+using XAUAT.EduApi.Exceptions;
 using XAUAT.EduApi.Interfaces;
 
 namespace XAUAT.EduApi.Services;
@@ -37,7 +38,7 @@ public class SSOLoginService(
             if (!json["success"]!.ToObject<bool>())
             {
                 logger.LogWarning("用户 {Username} 登录失败，教务系统返回失败", username);
-                throw new Exception("Login failed");
+                throw new LoginFailedException();
             }
 
             var cookies = json["cookies"]!.ToObject<string>() ?? "";
@@ -46,7 +47,7 @@ public class SSOLoginService(
             if (string.IsNullOrEmpty(studentId) || studentId == "/student/login")
             {
                 logger.LogWarning("用户 {Username} 登录失败，Cookie 解析失败", username);
-                return new { Success = false, StudentId = "", Cookie = "" };
+                throw new LoginFailedException();
             }
 
             

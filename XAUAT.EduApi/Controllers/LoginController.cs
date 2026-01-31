@@ -1,5 +1,6 @@
 using EduApi.Data.Models;
 using Microsoft.AspNetCore.Mvc;
+using XAUAT.EduApi.Exceptions;
 using XAUAT.EduApi.Interfaces;
 
 namespace XAUAT.EduApi.Controllers;
@@ -23,6 +24,7 @@ public class LoginController(ILoginService loginService, ILogger<LoginController
     /// <returns>登录结果，包含学生ID和Cookie</returns>
     /// <response code="200">登录成功，返回学生ID和Cookie</response>
     /// <response code="400">参数错误，用户名或密码不能为空</response>
+    /// <response code="401">登录失败，用户名或密码错误</response>
     /// <response code="500">服务器内部错误，教务处系统访问失败</response>
     /// <remarks>
     /// 示例请求：
@@ -35,6 +37,7 @@ public class LoginController(ILoginService loginService, ILogger<LoginController
     [HttpPost]
     [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(string), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(string), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(string), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> Login([FromBody] LoginRequest request)
     {
@@ -47,6 +50,10 @@ public class LoginController(ILoginService loginService, ILogger<LoginController
 
             var result = await loginService.LoginAsync(request.Username, request.Password);
             return Ok(result);
+        }
+        catch (LoginFailedException)
+        {
+            return Unauthorized("用户名或密码错误");
         }
         catch (Exception ex)
         {
