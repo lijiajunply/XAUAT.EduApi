@@ -13,7 +13,7 @@ public interface IPaymentService
     Task<PaymentData> GetTurnoverAsync(string cardNum);
 }
 
-public class PaymentService(IConnectionMultiplexer muxer, IHttpClientFactory httpClientFactory) : IPaymentService
+public class PaymentService(IConnectionMultiplexer muxer, IHttpClientFactory httpClientFactory, ILogger<PaymentService> logger) : IPaymentService
 {
     private readonly IDatabase _redis = muxer.GetDatabase();
 
@@ -190,7 +190,7 @@ public class PaymentService(IConnectionMultiplexer muxer, IHttpClientFactory htt
                 return a;
             }
 
-            Console.WriteLine($"Error: {response.StatusCode}");
+            logger.LogWarning("获取支付列表失败，状态码: {StatusCode}", response.StatusCode);
 
             return [];
         }

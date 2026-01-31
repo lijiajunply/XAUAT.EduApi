@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using StackExchange.Redis;
 
 namespace XAUAT.EduApi.Extensions;
@@ -8,48 +9,46 @@ namespace XAUAT.EduApi.Extensions;
 /// </summary>
 public static class RedisExtensions
 {
+    /// <summary>
+    /// 安全获取Redis数据库
+    /// </summary>
     /// <param name="muxer">Redis连接多路复用器</param>
-    extension(IConnectionMultiplexer? muxer)
+    /// <param name="logger">日志记录器</param>
+    /// <param name="redisAvailable">Redis是否可用</param>
+    /// <returns>Redis数据库实例，或null如果连接失败</returns>
+    public static IDatabase? SafeGetDatabase(this IConnectionMultiplexer? muxer, ILogger? logger, out bool redisAvailable)
     {
-        /// <summary>
-        /// 安全获取Redis数据库
-        /// </summary>
-        /// <param name="logger">日志记录器</param>
-        /// <param name="redisAvailable">Redis是否可用</param>
-        /// <returns>Redis数据库实例，或null如果连接失败</returns>
-        public IDatabase? SafeGetDatabase(ILogger? logger, out bool redisAvailable)
+        redisAvailable = false;
+        if (muxer == null)
         {
+            logger?.LogWarning("Redis连接多路复用器为空");
+            return null;
+        }
+
+        try
+        {
+            var database = muxer.GetDatabase();
+            redisAvailable = true;
+            logger?.LogInformation("Redis连接成功");
+            return database;
+        }
+        catch (Exception ex)
+        {
+            logger?.LogError(ex, "Redis连接失败");
             redisAvailable = false;
-            if (muxer == null)
-            {
-                logger?.LogWarning("Redis连接多路复用器为空");
-                return null;
-            }
-
-            try
-            {
-                var database = muxer.GetDatabase();
-                redisAvailable = true;
-                logger?.LogInformation("Redis连接成功");
-                return database;
-            }
-            catch (Exception ex)
-            {
-                logger?.LogError(ex, "Redis连接失败");
-                redisAvailable = false;
-                return null;
-            }
+            return null;
         }
+    }
 
-        /// <summary>
-        /// 安全获取Redis数据库
-        /// </summary>
-        /// <param name="redisAvailable">Redis是否可用</param>
-        /// <returns>Redis数据库实例，或null如果连接失败</returns>
-        public IDatabase? SafeGetDatabase(out bool redisAvailable)
-        {
-            return muxer.SafeGetDatabase(null, out redisAvailable);
-        }
+    /// <summary>
+    /// 安全获取Redis数据库
+    /// </summary>
+    /// <param name="muxer">Redis连接多路复用器</param>
+    /// <param name="redisAvailable">Redis是否可用</param>
+    /// <returns>Redis数据库实例，或null如果连接失败</returns>
+    public static IDatabase? SafeGetDatabase(this IConnectionMultiplexer? muxer, out bool redisAvailable)
+    {
+        return muxer.SafeGetDatabase(null, out redisAvailable);
     }
 
     /// <summary>
@@ -58,7 +57,8 @@ public static class RedisExtensions
     /// <param name="database">Redis数据库实例</param>
     /// <param name="redisAvailable">Redis是否可用</param>
     /// <param name="action">要执行的Redis操作</param>
-    public static void SafeExecute(this IDatabase? database, bool redisAvailable, Action<IDatabase> action)
+    /// <param name="logger">日志记录器（可选）</param>
+    public static void SafeExecute(this IDatabase? database, bool redisAvailable, Action<IDatabase> action, ILogger? logger = null)
     {
         if (redisAvailable && database != null)
         {
@@ -69,7 +69,7 @@ public static class RedisExtensions
             catch (Exception ex)
             {
                 // 记录Redis操作异常，但不影响主流程
-                Console.WriteLine($"Redis操作异常: {ex.Message}");
+                logger?.LogWarning(ex, "Redis操作异常: {Message}", ex.Message);
             }
         }
     }
@@ -80,10 +80,11 @@ public static class RedisExtensions
     /// <param name="database">Redis数据库实例</param>
     /// <param name="redisAvailable">Redis是否可用</param>
     /// <param name="func">要执行的异步Redis操作</param>
+    /// <param name="logger">日志记录器（可选）</param>
     /// <typeparam name="T">操作结果类型</typeparam>
     /// <returns>操作结果，或默认值如果操作失败</returns>
     public static async Task<T?> SafeExecuteAsync<T>(this IDatabase? database, bool redisAvailable,
-        Func<IDatabase, Task<T>> func)
+        Func<IDatabase, Task<T>> func, ILogger? logger = null)
     {
         if (redisAvailable && database != null)
         {
@@ -94,7 +95,7 @@ public static class RedisExtensions
             catch (Exception ex)
             {
                 // 记录Redis操作异常，但不影响主流程
-                Console.WriteLine($"Redis操作异常: {ex.Message}");
+                logger?.LogWarning(ex, "Redis操作异常: {Message}", ex.Message);
             }
         }
 

@@ -78,6 +78,7 @@ public class FullStudentFlowIntegrationTests : IDisposable
         // 创建日志模拟
         var courseLogger = new Mock<ILogger<CourseService>>().Object;
         var scoreLogger = new Mock<ILogger<ScoreService>>().Object;
+        var paymentLogger = new Mock<ILogger<PaymentService>>().Object;
 
         // 创建成绩仓库和服务
         _scoreRepository = new ScoreRepository(_dbContext);
@@ -98,7 +99,8 @@ public class FullStudentFlowIntegrationTests : IDisposable
         // 创建支付服务
         _paymentService = new PaymentService(
             _redisConnectionMock.Object,
-            _httpClientFactoryMock.Object);
+            _httpClientFactoryMock.Object,
+            paymentLogger);
 
         // 创建信息服务
         _infoService = new InfoService();
