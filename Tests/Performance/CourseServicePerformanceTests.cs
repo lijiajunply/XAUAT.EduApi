@@ -48,21 +48,24 @@ public class CourseServicePerformanceTests
         // 创建CacheService模拟
         _cacheServiceMock = new Mock<ICacheService>();
         _cacheServiceMock.Setup(x => x.GetOrCreateAsync(
-            It.IsAny<string>(),
-            It.IsAny<Func<Task<List<CourseActivity>>>>(),
-            It.IsAny<TimeSpan?>(),
-            It.IsAny<CacheLevel>(),
-            It.IsAny<int>(),
-            It.IsAny<CancellationToken>()))
-            .Returns<string, Func<Task<List<CourseActivity>>>, TimeSpan?, CacheLevel, int, CancellationToken>(
-                async (key, factory, expiration, level, priority, token) => await factory());
+                It.IsAny<string>(),
+                It.IsAny<Func<Task<List<CourseActivity>>>>(),
+                It.IsAny<TimeSpan?>(),
+                It.IsAny<CacheLevel>(),
+                It.IsAny<int>(),
+                It.IsAny<CancellationToken>()))
+            .Returns<string, Func<Task<List<CourseActivity>>>, TimeSpan?, CacheLevel, int, CancellationToken>(async (
+                key, factory, expiration, level, priority, token) => await factory());
+
+        var infoService = new InfoService();
 
         // 创建课程服务
         _courseService = new CourseService(
             _httpClientFactoryMock.Object,
             _loggerMock.Object,
             _examServiceMock.Object,
-            _cacheServiceMock.Object);
+            _cacheServiceMock.Object,
+            infoService);
     }
 
     /// <summary>
@@ -191,7 +194,7 @@ public class CourseServicePerformanceTests
                 }
             }));
         }
-        
+
         await Task.WhenAll(tasks);
     }
 }

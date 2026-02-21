@@ -29,7 +29,7 @@ public class CourseAndScoreIntegrationTests : IDisposable
     {
         // 为每个测试创建唯一的数据库名称，确保测试隔离
         var uniqueDatabaseName = "TestDatabase_CourseScore_" + Guid.NewGuid();
-        
+
         // 使用内存数据库进行集成测试
         _dbContextOptions = new DbContextOptionsBuilder<EduContext>()
             .UseInMemoryDatabase(databaseName: uniqueDatabaseName)
@@ -53,6 +53,8 @@ public class CourseAndScoreIntegrationTests : IDisposable
         // 创建课程服务
         var courseLogger = new Mock<ILogger<CourseService>>().Object;
         
+        var infoService = new InfoService();
+
         // 设置HttpClientFactory返回一个有效的HttpClient实例
         var httpClientFactoryMock = new Mock<IHttpClientFactory>();
         httpClientFactoryMock.Setup(x => x.CreateClient(It.IsAny<string>()))
@@ -61,20 +63,21 @@ public class CourseAndScoreIntegrationTests : IDisposable
         // 创建CacheService模拟
         var cacheServiceMock = new Mock<ICacheService>();
         cacheServiceMock.Setup(x => x.GetOrCreateAsync(
-            It.IsAny<string>(),
-            It.IsAny<Func<Task<List<CourseActivity>>>>(),
-            It.IsAny<TimeSpan?>(),
-            It.IsAny<CacheLevel>(),
-            It.IsAny<int>(),
-            It.IsAny<CancellationToken>()))
-            .Returns<string, Func<Task<List<CourseActivity>>>, TimeSpan?, CacheLevel, int, CancellationToken>(
-                async (key, factory, expiration, level, priority, token) => await factory());
-        
+                It.IsAny<string>(),
+                It.IsAny<Func<Task<List<CourseActivity>>>>(),
+                It.IsAny<TimeSpan?>(),
+                It.IsAny<CacheLevel>(),
+                It.IsAny<int>(),
+                It.IsAny<CancellationToken>()))
+            .Returns<string, Func<Task<List<CourseActivity>>>, TimeSpan?, CacheLevel, int, CancellationToken>(async (
+                key, factory, expiration, level, priority, token) => await factory());
+
         _courseService = new CourseService(
             httpClientFactoryMock.Object,
             courseLogger,
             _examServiceMock.Object,
-            cacheServiceMock.Object);
+            cacheServiceMock.Object, 
+            infoService);
 
         // 创建成绩仓库和服务
         var scoreLogger = new Mock<ILogger<ScoreService>>().Object;

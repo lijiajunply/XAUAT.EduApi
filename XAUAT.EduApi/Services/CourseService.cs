@@ -14,16 +14,22 @@ public class CourseService(
     IHttpClientFactory httpClientFactory,
     ILogger<CourseService> logger,
     IExamService examService,
-    ICacheService cacheService)
+    ICacheService cacheService,
+    IInfoService infoService)
     : ICourseService
 {
     public async Task<List<CourseActivity>> GetCoursesAsync(string studentId, string cookie)
     {
-        // 使用缓存，Key 包含 studentId，过期时间设为1天
-        return await cacheService.GetOrCreateAsync(
-            CacheKeys.Courses(studentId),
-            async () => await FetchCoursesFromRemoteAsync(studentId, cookie),
-            TimeSpan.FromDays(1));
+        if (infoService.IsInSchool())
+        {
+            // 使用缓存，Key 包含 studentId，过期时间设为1天
+            return await cacheService.GetOrCreateAsync(
+                CacheKeys.Courses(studentId),
+                async () => await FetchCoursesFromRemoteAsync(studentId, cookie),
+                TimeSpan.FromDays(1));
+        }
+
+        return await FetchCoursesFromRemoteAsync(studentId, cookie);
     }
 
     private async Task<List<CourseActivity>> FetchCoursesFromRemoteAsync(string studentId, string cookie)
@@ -73,7 +79,8 @@ public class CourseService(
     /// <summary>
     /// 获取单个学生的课程数据
     /// </summary>
-    private async Task<List<CourseActivity>> FetchCourseForStudent(HttpClient client, string semesterValue, string studentId, string cookie)
+    private async Task<List<CourseActivity>> FetchCourseForStudent(HttpClient client, string semesterValue,
+        string studentId, string cookie)
     {
         // 为每个请求创建新的 HttpClient 以避免并发问题
         using var newClient = httpClientFactory.CreateClient();
@@ -97,11 +104,8 @@ public class CourseService(
 
         var jsonResponse = JsonConvert.DeserializeObject<CourseResponse>(jsonString);
 
-        if (jsonResponse?.StudentTableVm == null)
-        {
-            throw new InvalidOperationException("未找到课程数据");
-        }
-
-        return jsonResponse.StudentTableVm.Activities;
+        return jsonResponse?.StudentTableVm == null
+            ? throw new InvalidOperationException("未找到课程数据")
+            : jsonResponse.StudentTableVm.Activities;
     }
 }

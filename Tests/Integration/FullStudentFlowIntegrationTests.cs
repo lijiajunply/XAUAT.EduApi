@@ -35,7 +35,7 @@ public class FullStudentFlowIntegrationTests : IDisposable
     {
         // 为每个测试创建唯一的数据库名称，确保测试隔离
         var uniqueDatabaseName = "TestDatabase_FullStudentFlow_" + Guid.NewGuid();
-        
+
         // 使用内存数据库进行集成测试
         _dbContextOptions = new DbContextOptionsBuilder<EduContext>()
             .UseInMemoryDatabase(databaseName: uniqueDatabaseName)
@@ -66,14 +66,14 @@ public class FullStudentFlowIntegrationTests : IDisposable
         // 创建CacheService模拟
         _cacheServiceMock = new Mock<ICacheService>();
         _cacheServiceMock.Setup(x => x.GetOrCreateAsync(
-            It.IsAny<string>(),
-            It.IsAny<Func<Task<List<CourseActivity>>>>(),
-            It.IsAny<TimeSpan?>(),
-            It.IsAny<CacheLevel>(),
-            It.IsAny<int>(),
-            It.IsAny<CancellationToken>()))
-            .Returns<string, Func<Task<List<CourseActivity>>>, TimeSpan?, CacheLevel, int, CancellationToken>(
-                async (key, factory, expiration, level, priority, token) => await factory());
+                It.IsAny<string>(),
+                It.IsAny<Func<Task<List<CourseActivity>>>>(),
+                It.IsAny<TimeSpan?>(),
+                It.IsAny<CacheLevel>(),
+                It.IsAny<int>(),
+                It.IsAny<CancellationToken>()))
+            .Returns<string, Func<Task<List<CourseActivity>>>, TimeSpan?, CacheLevel, int, CancellationToken>(async (
+                key, factory, expiration, level, priority, token) => await factory());
 
         // 创建日志模拟
         var courseLogger = new Mock<ILogger<CourseService>>().Object;
@@ -89,21 +89,21 @@ public class FullStudentFlowIntegrationTests : IDisposable
             _redisConnectionMock.Object,
             _scoreRepository);
 
+        // 创建信息服务
+        _infoService = new InfoService();
+
         // 创建课程服务
         _courseService = new CourseService(
             _httpClientFactoryMock.Object,
             courseLogger,
             _examServiceMock.Object,
-            _cacheServiceMock.Object);
+            _cacheServiceMock.Object, _infoService);
 
         // 创建支付服务
         _paymentService = new PaymentService(
             _redisConnectionMock.Object,
             _httpClientFactoryMock.Object,
             paymentLogger);
-
-        // 创建信息服务
-        _infoService = new InfoService();
     }
 
     /// <summary>
@@ -206,11 +206,11 @@ public class FullStudentFlowIntegrationTests : IDisposable
         Assert.NotNull(scoresResult);
 
         // 验证支付服务在Redis失败时能正确处理异常
-        await Assert.ThrowsAsync<PaymentServiceException>(() => 
+        await Assert.ThrowsAsync<PaymentServiceException>(() =>
             _paymentService.Login(cardNum));
 
         // 验证课程服务在HttpClient调用失败时能正确处理异常
-        await Assert.ThrowsAnyAsync<Exception>(() => 
+        await Assert.ThrowsAnyAsync<Exception>(() =>
             _courseService.GetCoursesAsync(studentId, cookie));
 
         // 验证信息服务不受其他服务异常影响
@@ -227,20 +227,20 @@ public class FullStudentFlowIntegrationTests : IDisposable
         // Arrange
         const string expectedStartTime = "2025-01-01";
         const string expectedEndTime = "2025-12-31";
-        
+
         // 设置环境变量
         Environment.SetEnvironmentVariable("START", expectedStartTime, EnvironmentVariableTarget.Process);
         Environment.SetEnvironmentVariable("END", expectedEndTime, EnvironmentVariableTarget.Process);
-        
+
         // Act
         var result = _infoService.GetTime();
         var isInSchool = _infoService.IsInSchool();
-        
+
         // Assert
         Assert.Equal(expectedStartTime, result.StartTime);
         Assert.Equal(expectedEndTime, result.EndTime);
         Assert.IsType<bool>(isInSchool);
-        
+
         // 清理环境变量
         Environment.SetEnvironmentVariable("START", null, EnvironmentVariableTarget.Process);
         Environment.SetEnvironmentVariable("END", null, EnvironmentVariableTarget.Process);
