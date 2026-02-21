@@ -56,7 +56,7 @@ public class CourseService(
         // 合并结果
         var courses = allResults.SelectMany(r => r).ToList();
 
-        if (courses == null! || courses.Count == 0)
+        if (courses == null!)
         {
             throw new InvalidOperationException("未找到课程数据");
         }
