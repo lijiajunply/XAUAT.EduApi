@@ -46,7 +46,7 @@ public class ProgramController(
         try
         {
             var cookie = Request.Headers.Cookie.ToString();
-            if (string.IsNullOrEmpty(cookie))
+            if (string.IsNullOrEmpty(cookie) || cookie.StartsWith("Rider"))
             {
                 cookie = Request.Headers["xauat"].ToString(); // 从请求中获取 cookie
             }
@@ -98,7 +98,7 @@ public class ProgramController(
         try
         {
             var cookie = Request.Headers.Cookie.ToString();
-            if (string.IsNullOrEmpty(cookie))
+            if (string.IsNullOrEmpty(cookie) || cookie.StartsWith("Rider"))
             {
                 cookie = Request.Headers["xauat"].ToString(); // 从请求中获取 cookie
             }

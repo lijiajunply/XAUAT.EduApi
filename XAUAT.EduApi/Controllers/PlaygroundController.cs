@@ -14,7 +14,7 @@ public class PlaygroundController(IHttpClientFactory httpClientFactory) : Contro
     public async Task<IActionResult> Get()
     {
         var cookie = Request.Headers.Cookie.ToString();
-        if (string.IsNullOrEmpty(cookie))
+        if (string.IsNullOrEmpty(cookie) || cookie.StartsWith("Rider"))
         {
             cookie = Request.Headers["xauat"].ToString(); // 从请求中获取 cookie
         }

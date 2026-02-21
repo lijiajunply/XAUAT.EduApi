@@ -42,7 +42,7 @@ public class InfoController(IHttpClientFactory httpClientFactory, ILogger<Course
         {
             logger.LogInformation("开始抓取学业进度");
             var cookie = Request.Headers.Cookie.ToString();
-            if (string.IsNullOrEmpty(cookie))
+            if (string.IsNullOrEmpty(cookie) || cookie.StartsWith("Rider"))
             {
                 cookie = Request.Headers["xauat"].ToString(); // 从请求中获取 cookie
             }
