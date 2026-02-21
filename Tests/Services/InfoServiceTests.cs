@@ -75,7 +75,7 @@ public class InfoServiceTests
         Environment.SetEnvironmentVariable("END", endTime, EnvironmentVariableTarget.Process);
         
         // Act
-        var result = _infoService.IsInSchool();
+        var result = _infoService.IsGreatThanStart();
         
         // Assert
         Assert.True(result);
@@ -100,7 +100,7 @@ public class InfoServiceTests
         Environment.SetEnvironmentVariable("END", endTime, EnvironmentVariableTarget.Process);
         
         // Act
-        var result = _infoService.IsInSchool();
+        var result = _infoService.IsGreatThanStart();
         
         // Assert
         Assert.False(result);
@@ -149,7 +149,7 @@ public class InfoServiceTests
         Environment.SetEnvironmentVariable("END", invalidDate, EnvironmentVariableTarget.Process);
         
         // Act & Assert
-        Assert.Throws<FormatException>(() => _infoService.IsInSchool());
+        Assert.Throws<FormatException>(() => _infoService.IsGreatThanStart());
         
         // 清理环境变量
         Environment.SetEnvironmentVariable("START", null, EnvironmentVariableTarget.Process);
@@ -172,7 +172,7 @@ public class InfoServiceTests
         Environment.SetEnvironmentVariable("END", endTime, EnvironmentVariableTarget.Process);
         
         // Act
-        var result = _infoService.IsInSchool();
+        var result = _infoService.IsGreatThanStart();
         
         // Assert
         Assert.True(result);
@@ -198,7 +198,7 @@ public class InfoServiceTests
         Environment.SetEnvironmentVariable("END", endTime, EnvironmentVariableTarget.Process);
         
         // Act
-        var result = _infoService.IsInSchool();
+        var result = _infoService.IsGreatThanStart();
         
         // Assert
         Assert.True(result);
@@ -323,7 +323,7 @@ public class InfoServiceTests
         Environment.SetEnvironmentVariable("END", endTime, EnvironmentVariableTarget.Process);
         
         // Act
-        var result = _infoService.IsInSchool();
+        var result = _infoService.IsGreatThanStart();
         
         // Assert
         Assert.False(result);

@@ -20,7 +20,7 @@ public class CourseService(
 {
     public async Task<List<CourseActivity>> GetCoursesAsync(string studentId, string cookie)
     {
-        if (infoService.IsInSchool())
+        if (infoService.IsGreatThanStart(2))
         {
             // 使用缓存，Key 包含 studentId，过期时间设为1天
             return await cacheService.GetOrCreateAsync(

@@ -3,7 +3,11 @@
 public interface IInfoService
 {
     TimeModel GetTime();
+    bool IsGreatThanStart();
+    bool IsGreatThanStart(int time);
+    bool IsLessThanEnd();
     bool IsInSchool();
+    bool IsLessThanEnd(int time);
 }
 
 [Serializable]
@@ -19,12 +23,36 @@ public class InfoService : IInfoService
     {
         var start = Environment.GetEnvironmentVariable("START", EnvironmentVariableTarget.Process);
         var end = Environment.GetEnvironmentVariable("END", EnvironmentVariableTarget.Process);
-        return new TimeModel() { StartTime = start ?? "2025-08-31", EndTime = end ?? "2026-01-24" };
+        return new TimeModel() { StartTime = start ?? "2026-03-01", EndTime = end ?? "2026-07-18" };
+    }
+
+    public bool IsGreatThanStart()
+    {
+        var time = GetTime();
+        return DateTime.Now >= DateTime.Parse(time.StartTime);
+    }
+
+    public bool IsGreatThanStart(int time)
+    {
+        var timeModel = GetTime();
+        return DateTime.Now >= DateTime.Parse(timeModel.StartTime).AddDays(time * 7);
     }
 
     public bool IsInSchool()
     {
         var time = GetTime();
-        return DateTime.Now >= DateTime.Parse(time.StartTime);
+        return DateTime.Now >= DateTime.Parse(time.StartTime) && DateTime.Now <= DateTime.Parse(time.EndTime);
+    }
+
+    public bool IsLessThanEnd()
+    {
+        var time = GetTime();
+        return DateTime.Now <= DateTime.Parse(time.EndTime);
+    }
+
+    public bool IsLessThanEnd(int time)
+    {
+        var timeModel = GetTime();
+        return DateTime.Now <= DateTime.Parse(timeModel.EndTime).AddDays(-time * 7);
     }
 }

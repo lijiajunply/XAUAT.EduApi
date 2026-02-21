@@ -235,7 +235,7 @@ public static class SemesterModelStatic
         // 使用正则表达式匹配所有semester选项
         var regexString = "<option value=\"(.*)\">(.*)</option>";
 
-        if (service.IsInSchool())
+        if (service.IsLessThanEnd())
         {
             regexString = "<option selected=\"selected\" value=\"(.*)\">(.*)</option>";
         }

@@ -86,7 +86,7 @@ public class ExamServiceTests
         _redisDatabaseMock.Setup(m => m.StringGetAsync(It.IsAny<RedisKey>(), It.IsAny<CommandFlags>()))
             .ReturnsAsync(RedisValue.Null);
 
-        _infoServiceMock.Setup(m => m.IsInSchool()).Returns(true);
+        _infoServiceMock.Setup(m => m.IsGreatThanStart()).Returns(true);
 
         var htmlContent = @"
             <html>

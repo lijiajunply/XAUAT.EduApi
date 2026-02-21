@@ -159,7 +159,7 @@ public class FullStudentFlowIntegrationTests : IDisposable
 
         // Act - 获取时间信息
         var timeInfo = _infoService.GetTime();
-        var isInSchool = _infoService.IsInSchool();
+        var isInSchool = _infoService.IsGreatThanStart();
 
         // Act - 获取成绩数据
         var scoresResult = await _scoreService.GetScoresAsync(studentId, semester, cookie);
@@ -234,7 +234,7 @@ public class FullStudentFlowIntegrationTests : IDisposable
 
         // Act
         var result = _infoService.GetTime();
-        var isInSchool = _infoService.IsInSchool();
+        var isInSchool = _infoService.IsGreatThanStart();
 
         // Assert
         Assert.Equal(expectedStartTime, result.StartTime);
