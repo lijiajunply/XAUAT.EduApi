@@ -81,7 +81,7 @@ public class CourseAndScoreIntegrationTests : IDisposable
 
         // 创建成绩仓库和服务
         var scoreLogger = new Mock<ILogger<ScoreService>>().Object;
-        _scoreRepository = new ScoreRepository(_dbContext);
+        _scoreRepository = new ScoreRepository(new TestDbContextFactory(_dbContextOptions));
         _scoreService = new ScoreService(
             httpClientFactory,
             scoreLogger,

@@ -81,7 +81,7 @@ public class FullStudentFlowIntegrationTests : IDisposable
         var paymentLogger = new Mock<ILogger<PaymentService>>().Object;
 
         // 创建成绩仓库和服务
-        _scoreRepository = new ScoreRepository(_dbContext);
+        _scoreRepository = new ScoreRepository(new TestDbContextFactory(_dbContextOptions));
         _scoreService = new ScoreService(
             _httpClientFactoryMock.Object,
             scoreLogger,
