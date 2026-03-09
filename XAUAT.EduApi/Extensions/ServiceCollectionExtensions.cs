@@ -152,8 +152,6 @@ public static class ServiceCollectionExtensions
             return services;
         }
 
-
-
         /// <summary>
         /// 注册服务发现服务
         /// </summary>
@@ -165,8 +163,6 @@ public static class ServiceCollectionExtensions
 
             return services;
         }
-
-
 
         /// <summary>
         /// 注册所有服务

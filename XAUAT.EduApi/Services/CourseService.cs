@@ -1,6 +1,7 @@
 using EduApi.Data.Models;
 using Newtonsoft.Json;
 using XAUAT.EduApi.Caching;
+using XAUAT.EduApi.Extensions;
 
 namespace XAUAT.EduApi.Services;
 
@@ -13,16 +14,22 @@ public class CourseService(
     IHttpClientFactory httpClientFactory,
     ILogger<CourseService> logger,
     IExamService examService,
-    ICacheService cacheService)
+    ICacheService cacheService,
+    IInfoService infoService)
     : ICourseService
 {
     public async Task<List<CourseActivity>> GetCoursesAsync(string studentId, string cookie)
     {
-        // 使用缓存，Key 包含 studentId，过期时间设为1天
-        return await cacheService.GetOrCreateAsync(
-            $"courses:{studentId}",
-            async () => await FetchCoursesFromRemoteAsync(studentId, cookie),
-            TimeSpan.FromDays(1));
+        if (infoService.IsGreatThanStart(2))
+        {
+            // 使用缓存，Key 包含 studentId，过期时间设为1天
+            return await cacheService.GetOrCreateAsync(
+                CacheKeys.Courses(studentId),
+                async () => await FetchCoursesFromRemoteAsync(studentId, cookie),
+                TimeSpan.FromDays(1));
+        }
+
+        return await FetchCoursesFromRemoteAsync(studentId, cookie);
     }
 
     private async Task<List<CourseActivity>> FetchCoursesFromRemoteAsync(string studentId, string cookie)
@@ -35,11 +42,11 @@ public class CourseService(
         }
 
         var split = studentId.Split(',');
-        var courses = new List<CourseActivity>();
 
         using var client = httpClientFactory.CreateClient();
         client.SetRealisticHeaders();
         client.DefaultRequestHeaders.Add("Cookie", cookie);
+        client.Timeout = HttpTimeouts.EduSystem;
 
         var semester = await examService.GetThisSemester(cookie);
 
@@ -48,32 +55,14 @@ public class CourseService(
             throw new InvalidOperationException("无法获取当前学期信息");
         }
 
-        foreach (var a in split)
-        {
-            var response = await client.GetAsync(
-                $"https://swjw.xauat.edu.cn/student/for-std/course-table/semester/{semester.Value}/print-data/{a}");
+        // 使用 Task.WhenAll 并行获取所有学生的课程，解决 N+1 问题
+        var tasks = split.Select(a => FetchCourseForStudent(client, semester.Value, a, cookie)).ToArray();
+        var allResults = await Task.WhenAll(tasks).ConfigureAwait(false);
 
-            if (!response.IsSuccessStatusCode)
-            {
-                throw new HttpRequestException($"获取课程数据失败，状态码: {response.StatusCode}");
-            }
+        // 合并结果
+        var courses = allResults.SelectMany(r => r).ToList();
 
-            var jsonString = await response.Content.ReadAsStringAsync();
-            if (jsonString.Contains("登入页面"))
-            {
-                throw new Exceptions.UnAuthenticationError();
-            }
-            var jsonResponse = JsonConvert.DeserializeObject<CourseResponse>(jsonString);
-
-            if (jsonResponse?.StudentTableVm == null)
-            {
-                throw new InvalidOperationException("未找到课程数据");
-            }
-
-            courses.AddRange(jsonResponse.StudentTableVm.Activities);
-        }
-
-        if (courses == null! || courses.Count == 0)
+        if (courses == null!)
         {
             throw new InvalidOperationException("未找到课程数据");
         }
@@ -85,5 +74,38 @@ public class CourseService(
         }
 
         return courses;
+    }
+
+    /// <summary>
+    /// 获取单个学生的课程数据
+    /// </summary>
+    private async Task<List<CourseActivity>> FetchCourseForStudent(HttpClient client, string semesterValue,
+        string studentId, string cookie)
+    {
+        // 为每个请求创建新的 HttpClient 以避免并发问题
+        using var newClient = httpClientFactory.CreateClient();
+        newClient.SetRealisticHeaders();
+        newClient.DefaultRequestHeaders.Add("Cookie", cookie);
+        newClient.Timeout = HttpTimeouts.EduSystem;
+
+        var response = await newClient.GetAsync(
+            $"https://swjw.xauat.edu.cn/student/for-std/course-table/semester/{semesterValue}/print-data/{studentId}");
+
+        if (!response.IsSuccessStatusCode)
+        {
+            throw new HttpRequestException($"获取课程数据失败，状态码: {response.StatusCode}");
+        }
+
+        var jsonString = await response.Content.ReadAsStringAsync();
+        if (jsonString.Contains("登入页面"))
+        {
+            throw new Exceptions.UnAuthenticationError();
+        }
+
+        var jsonResponse = JsonConvert.DeserializeObject<CourseResponse>(jsonString);
+
+        return jsonResponse?.StudentTableVm == null
+            ? throw new InvalidOperationException("未找到课程数据")
+            : jsonResponse.StudentTableVm.Activities;
     }
 }

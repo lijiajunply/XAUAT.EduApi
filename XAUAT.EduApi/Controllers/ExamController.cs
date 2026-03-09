@@ -23,6 +23,7 @@ public class ExamController(
     /// <param name="studentId">学生ID，多个ID用逗号分隔</param>
     /// <returns>考试安排列表</returns>
     /// <response code="200">成功获取考试安排</response>
+    /// <response code="401">认证失败，需要重新登录</response>
     /// <response code="500">服务器内部错误，获取考试安排失败</response>
     /// <remarks>
     /// 示例请求：
@@ -33,19 +34,24 @@ public class ExamController(
     /// </remarks>
     [HttpGet]
     [ProducesResponseType(typeof(ExamResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(string), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(string), StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<ExamResponse>> GetExamArrangements(string? studentId)
     {
         try
         {
             var cookie = Request.Headers.Cookie.ToString();
-            if (string.IsNullOrEmpty(cookie))
+            if (string.IsNullOrEmpty(cookie) || cookie.StartsWith("Rider"))
             {
                 cookie = Request.Headers["xauat"].ToString(); // 从请求中获取 cookie
             }
 
             var result = await examService.GetExamArrangementsAsync(cookie, studentId);
             return Ok(result);
+        }
+        catch (Exceptions.UnAuthenticationError)
+        {
+            return Unauthorized("认证失败，请重新登录");
         }
         catch (Exception ex)
         {

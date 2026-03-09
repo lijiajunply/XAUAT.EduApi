@@ -1,7 +1,7 @@
 using System.Text;
-using Newtonsoft.Json;
 using System.Text.Json.Serialization;
 using StackExchange.Redis;
+using XAUAT.EduApi.Extensions;
 using JsonSerializer = System.Text.Json.JsonSerializer;
 using Polly;
 
@@ -14,19 +14,32 @@ public interface IProgramService
     public Task<Dictionary<string, List<PlanCourse>>> GetAllTrainPrograms(string cookie, string id);
 }
 
-public class ProgramService(IHttpClientFactory httpClientFactory, IConnectionMultiplexer muxer) : IProgramService
+public class ProgramService : IProgramService
 {
     private const string BaseUrl = "https://swjw.xauat.edu.cn";
-    private readonly IDatabase _redis = muxer.GetDatabase();
+    private readonly IDatabase? _redis;
+    private readonly bool _redisAvailable;
+    private readonly IHttpClientFactory _httpClientFactory;
+    private readonly ILogger<ProgramService>? _logger;
+
+    public ProgramService(IHttpClientFactory httpClientFactory, IConnectionMultiplexer? muxer, ILogger<ProgramService>? logger = null)
+    {
+        _httpClientFactory = httpClientFactory;
+        _logger = logger;
+
+        // 使用扩展方法初始化Redis连接
+        _redis = muxer.SafeGetDatabase(logger, out _redisAvailable);
+    }
 
     public async Task<List<PlanCourse>> GetAllTrainProgram(string cookie, string id)
     {
-        var key = $"train-program-{id}";
-        var trainProgramValue = await _redis.StringGetAsync(key);
+        var cacheKey = CacheKeys.TrainProgram(id);
 
-        if (trainProgramValue.HasValue)
+        // 尝试从Redis获取缓存
+        var cachedProgram = await _redis.GetCacheAsync<List<PlanCourse>>(_redisAvailable, cacheKey, _logger);
+        if (cachedProgram is { Count: > 0 })
         {
-            return JsonConvert.DeserializeObject<List<PlanCourse>>(trainProgramValue.ToString()) ?? [];
+            return cachedProgram;
         }
 
         var retryPolicy = Policy
@@ -36,21 +49,20 @@ public class ProgramService(IHttpClientFactory httpClientFactory, IConnectionMul
 
         return await retryPolicy.ExecuteAsync(async () =>
         {
-            var request =
-                new HttpRequestMessage(HttpMethod.Get, $"{BaseUrl}/student/for-std/program/root-module-json/{id}");
-            request.Headers.Add("Cookie", cookie);
+            var request = new HttpRequestMessage(HttpMethod.Get, $"{BaseUrl}/student/for-std/program/root-module-json/{id}")
+                .WithCookie(cookie);
 
-            using var httpClient = httpClientFactory.CreateClient(); // 使用命名客户端
-            httpClient.Timeout = TimeSpan.FromSeconds(5); // 5秒超时
+            using var httpClient = _httpClientFactory.CreateClient();
+            httpClient.Timeout = TimeSpan.FromSeconds(5);
 
             var response = await httpClient.SendAsync(request);
             if (!response.IsSuccessStatusCode) return [];
             var content = await response.Content.ReadAsStringAsync();
 
-        if (content.Contains("登入页面"))
-        {
-            throw new Exceptions.UnAuthenticationError();
-        }
+            if (content.Contains("登入页面"))
+            {
+                throw new Exceptions.UnAuthenticationError();
+            }
 
             var result = JsonSerializer.Deserialize<ProgramModel>(content) ?? new ProgramModel();
 
@@ -58,7 +70,7 @@ public class ProgramService(IHttpClientFactory httpClientFactory, IConnectionMul
 
             if (list.Count != 0)
             {
-                _redis.StringSet(key, JsonSerializer.Serialize(list), new TimeSpan(1, 0, 0, 0));
+                await _redis.SetCacheAsync(_redisAvailable, cacheKey, list, TimeSpan.FromDays(1), _logger);
             }
 
             return list;

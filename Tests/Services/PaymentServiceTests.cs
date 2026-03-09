@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using StackExchange.Redis;
 using Moq;
 using Moq.Protected;
@@ -13,6 +14,7 @@ public class PaymentServiceTests
     private readonly Mock<IConnectionMultiplexer> _connectionMultiplexerMock;
     private readonly Mock<IDatabase> _redisDatabaseMock;
     private readonly Mock<IHttpClientFactory> _httpClientFactoryMock;
+    private readonly Mock<ILogger<PaymentService>> _loggerMock;
     private readonly PaymentService _paymentService;
 
     /// <summary>
@@ -23,6 +25,7 @@ public class PaymentServiceTests
         _connectionMultiplexerMock = new Mock<IConnectionMultiplexer>();
         _redisDatabaseMock = new Mock<IDatabase>();
         _httpClientFactoryMock = new Mock<IHttpClientFactory>();
+        _loggerMock = new Mock<ILogger<PaymentService>>();
 
         // 设置Redis连接返回模拟的数据库
         _connectionMultiplexerMock.Setup(x => x.GetDatabase(It.IsAny<int>(), It.IsAny<object>()))
@@ -30,7 +33,8 @@ public class PaymentServiceTests
 
         _paymentService = new PaymentService(
             _connectionMultiplexerMock.Object,
-            _httpClientFactoryMock.Object);
+            _httpClientFactoryMock.Object,
+            _loggerMock.Object);
     }
 
     /// <summary>

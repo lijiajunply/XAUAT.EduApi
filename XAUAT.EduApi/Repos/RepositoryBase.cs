@@ -4,41 +4,47 @@ using Microsoft.EntityFrameworkCore;
 
 namespace XAUAT.EduApi.Repos;
 
-public abstract class RepositoryBase<T>(EduContext context) : IRepository<T>
+public abstract class RepositoryBase<T>(IDbContextFactory<EduContext> contextFactory) : IRepository<T>
     where T : class
 {
-    protected readonly EduContext Context = context;
+    protected EduContext CreateContext() => contextFactory.CreateDbContext();
 
     public async Task<T?> GetByIdAsync(string id)
     {
-        return await Context.Set<T>().FindAsync(id);
+        await using var context = CreateContext();
+        return await context.Set<T>().FindAsync(id);
     }
 
     public async Task<IEnumerable<T>> GetAllAsync()
     {
-        return await Context.Set<T>().AsNoTracking().ToListAsync();
+        await using var context = CreateContext();
+        return await context.Set<T>().AsNoTracking().ToListAsync();
     }
 
     public async Task<IEnumerable<T>> FindAsync(Expression<Func<T, bool>> predicate)
     {
-        return await Context.Set<T>().AsNoTracking().Where(predicate).ToListAsync();
+        await using var context = CreateContext();
+        return await context.Set<T>().AsNoTracking().Where(predicate).ToListAsync();
     }
 
     public async Task AddAsync(T entity)
     {
-        await Context.Set<T>().AddAsync(entity);
-        await Context.SaveChangesAsync();
+        await using var context = CreateContext();
+        await context.Set<T>().AddAsync(entity);
+        await context.SaveChangesAsync();
     }
 
     public async Task UpdateAsync(T entity)
     {
-        Context.Set<T>().Update(entity);
-        await Context.SaveChangesAsync();
+        await using var context = CreateContext();
+        context.Set<T>().Update(entity);
+        await context.SaveChangesAsync();
     }
 
     public async Task DeleteAsync(T entity)
     {
-        Context.Set<T>().Remove(entity);
-        await Context.SaveChangesAsync();
+        await using var context = CreateContext();
+        context.Set<T>().Remove(entity);
+        await context.SaveChangesAsync();
     }
 }

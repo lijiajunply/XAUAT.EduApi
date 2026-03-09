@@ -50,7 +50,8 @@ public class ScoreServiceIntegrationTests : IDisposable
         var redisConnection = new Mock<IConnectionMultiplexer>().Object;
         
         // 创建仓库和服务
-        _scoreRepository = new ScoreRepository(_dbContext);
+        var dbContextFactory = new TestDbContextFactory(_dbContextOptions);
+        _scoreRepository = new ScoreRepository(dbContextFactory);
         _scoreService = new ScoreService(
             httpClientFactory,
             logger,
@@ -150,4 +151,9 @@ public class ScoreServiceIntegrationTests : IDisposable
     {
         _dbContext.Dispose();
     }
+}
+
+internal class TestDbContextFactory(DbContextOptions<EduContext> options) : IDbContextFactory<EduContext>
+{
+    public EduContext CreateDbContext() => new EduContext(options);
 }

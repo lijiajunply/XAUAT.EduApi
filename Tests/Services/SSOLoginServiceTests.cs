@@ -3,6 +3,7 @@ using Moq.Protected;
 using Newtonsoft.Json;
 using System.Net;
 using Microsoft.Extensions.Logging;
+using XAUAT.EduApi.Exceptions;
 using XAUAT.EduApi.Interfaces;
 using XAUAT.EduApi.Services;
 
@@ -99,7 +100,7 @@ public class SSOLoginServiceTests
         _mockHttpClientFactory.Setup(_ => _.CreateClient(It.IsAny<string>())).Returns(client);
 
         // Act & Assert
-        await Assert.ThrowsAsync<Exception>(() => _service.LoginAsync(username, password));
+        await Assert.ThrowsAsync<LoginFailedException>(() => _service.LoginAsync(username, password));
     }
 
     [Fact]

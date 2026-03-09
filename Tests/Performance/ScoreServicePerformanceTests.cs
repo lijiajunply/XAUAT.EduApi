@@ -84,7 +84,7 @@ public class ScoreServicePerformanceTests
         _dbContext.SaveChanges();
 
         // 创建仓库和服务
-        _scoreRepository = new ScoreRepository(_dbContext);
+        _scoreRepository = new ScoreRepository(new TestDbContextFactory(_dbContextOptions));
         _scoreService = new ScoreService(
             _httpClientFactoryMock.Object,
             new Mock<ILogger<ScoreService>>().Object,
@@ -175,4 +175,9 @@ public class ScoreServicePerformanceTests
         // 测试查询性能
         await _scoreService.GetScoresAsync(StudentId, Semester, Cookie);
     }
+}
+
+internal class TestDbContextFactory(DbContextOptions<EduContext> options) : IDbContextFactory<EduContext>
+{
+    public EduContext CreateDbContext() => new EduContext(options);
 }

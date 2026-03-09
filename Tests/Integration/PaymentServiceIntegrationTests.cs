@@ -4,7 +4,6 @@ using Microsoft.Extensions.Logging;
 using StackExchange.Redis;
 using XAUAT.EduApi.Services;
 using EduApi.Data;
-using EduApi.Data.Models;
 using Moq.Protected;
 
 namespace XAUAT.EduApi.Tests.Integration;
@@ -20,6 +19,7 @@ public class PaymentServiceIntegrationTests : IDisposable
     private readonly Mock<IConnectionMultiplexer> _redisConnectionMock;
     private readonly Mock<IDatabase> _redisDatabaseMock;
     private readonly Mock<IHttpClientFactory> _httpClientFactoryMock;
+    private readonly Mock<ILogger<PaymentService>> _loggerMock;
 
     /// <summary>
     /// 构造函数，初始化测试依赖
@@ -48,10 +48,14 @@ public class PaymentServiceIntegrationTests : IDisposable
         // 创建HttpClientFactory模拟
         _httpClientFactoryMock = new Mock<IHttpClientFactory>();
 
+        // 创建Logger模拟
+        _loggerMock = new Mock<ILogger<PaymentService>>();
+
         // 模拟支付服务
         _paymentService = new PaymentService(
             _redisConnectionMock.Object,
-            _httpClientFactoryMock.Object);
+            _httpClientFactoryMock.Object,
+            _loggerMock.Object);
     }
 
     /// <summary>

@@ -30,25 +30,27 @@ public class CourseServiceTests
 
         // Mock CacheService.GetOrCreateAsync to simply execute the factory
         _cacheServiceMock.Setup(x => x.GetOrCreateAsync(
-            It.IsAny<string>(),
-            It.IsAny<Func<Task<List<CourseActivity>>>>(),
-            It.IsAny<TimeSpan?>(),
-            It.IsAny<CacheLevel>(),
-            It.IsAny<int>(),
-            It.IsAny<CancellationToken>()))
-            .Returns<string, Func<Task<List<CourseActivity>>>, TimeSpan?, CacheLevel, int, CancellationToken>(
-                async (key, factory, expiration, level, priority, token) => await factory());
+                It.IsAny<string>(),
+                It.IsAny<Func<Task<List<CourseActivity>>>>(),
+                It.IsAny<TimeSpan?>(),
+                It.IsAny<CacheLevel>(),
+                It.IsAny<int>(),
+                It.IsAny<CancellationToken>()))
+            .Returns<string, Func<Task<List<CourseActivity>>>, TimeSpan?, CacheLevel, int, CancellationToken>(async (
+                key, factory, expiration, level, priority, token) => await factory());
 
         // 设置HttpClientFactory返回一个有效的HttpClient实例
         var httpClient = new HttpClient();
         _httpClientFactoryMock.Setup(x => x.CreateClient(It.IsAny<string>()))
             .Returns(httpClient);
 
+        var infoService = new InfoService();
         _courseService = new CourseService(
             _httpClientFactoryMock.Object,
             _loggerMock.Object,
             _examServiceMock.Object,
-            _cacheServiceMock.Object);
+            _cacheServiceMock.Object,
+            infoService);
     }
 
     /// <summary>
@@ -62,7 +64,7 @@ public class CourseServiceTests
         var cookie = "test-cookie";
 
         // Act & Assert
-        await Assert.ThrowsAsync<Exception>(() => 
+        await Assert.ThrowsAsync<Exception>(() =>
             _courseService.GetCoursesAsync(studentId, cookie));
     }
 
@@ -77,7 +79,7 @@ public class CourseServiceTests
         var cookie = string.Empty;
 
         // Act & Assert
-        await Assert.ThrowsAsync<Exception>(() => 
+        await Assert.ThrowsAsync<Exception>(() =>
             _courseService.GetCoursesAsync(studentId, cookie));
     }
 
@@ -96,7 +98,7 @@ public class CourseServiceTests
             .ReturnsAsync(new SemesterItem { Value = string.Empty, Text = string.Empty });
 
         // Act & Assert
-        await Assert.ThrowsAsync<InvalidOperationException>(() => 
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
             _courseService.GetCoursesAsync(studentId, cookie));
     }
 
@@ -111,7 +113,7 @@ public class CourseServiceTests
         var cookie = "test-cookie";
 
         // Act & Assert
-        await Assert.ThrowsAsync<Exception>(() => 
+        await Assert.ThrowsAsync<Exception>(() =>
             _courseService.GetCoursesAsync(studentId, cookie));
     }
 
@@ -126,7 +128,7 @@ public class CourseServiceTests
         string? cookie = null;
 
         // Act & Assert
-        await Assert.ThrowsAsync<Exception>(() => 
+        await Assert.ThrowsAsync<Exception>(() =>
             _courseService.GetCoursesAsync(studentId, cookie));
     }
 
@@ -282,7 +284,7 @@ public class CourseServiceTests
             .Returns(httpClient);
 
         // Act & Assert
-        await Assert.ThrowsAsync<HttpRequestException>(() => 
+        await Assert.ThrowsAsync<HttpRequestException>(() =>
             _courseService.GetCoursesAsync(studentId, cookie));
     }
 
@@ -319,7 +321,7 @@ public class CourseServiceTests
             .Returns(httpClient);
 
         // Act & Assert
-        await Assert.ThrowsAsync<Newtonsoft.Json.JsonReaderException>(() => 
+        await Assert.ThrowsAsync<Newtonsoft.Json.JsonReaderException>(() =>
             _courseService.GetCoursesAsync(studentId, cookie));
     }
 
@@ -361,7 +363,7 @@ public class CourseServiceTests
             .Returns(httpClient);
 
         // Act & Assert
-        await Assert.ThrowsAsync<InvalidOperationException>(() => 
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
             _courseService.GetCoursesAsync(studentId, cookie));
     }
 }

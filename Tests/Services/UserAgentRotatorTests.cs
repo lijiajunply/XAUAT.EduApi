@@ -1,6 +1,4 @@
-using System.Net.Http;
 using XAUAT.EduApi.Services;
-using Xunit;
 
 namespace XAUAT.EduApi.Tests.Services;
 
