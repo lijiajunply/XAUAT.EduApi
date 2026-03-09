@@ -19,8 +19,7 @@ public partial class CookieCodeService(IHttpClientFactory httpClientFactory) : I
             var request = new HttpRequestMessage(HttpMethod.Get, "https://swjw.xauat.edu.cn/student/for-std/precaution");
             request.Headers.Add("Cookie", cookies);
 
-            using var httpClient = httpClientFactory.CreateClient();
-            httpClient.Timeout = TimeSpan.FromSeconds(5); // 5秒超时
+            using var httpClient = httpClientFactory.CreateClient("DefaultClient");
             var response = await httpClient.SendAsync(request);
 
             if (!response.IsSuccessStatusCode)
