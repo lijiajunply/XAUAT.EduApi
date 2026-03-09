@@ -96,7 +96,6 @@ public class BusController : ControllerBase
         // 使用专门配置的HttpClient（跳过SSL验证）
         using var client = _httpClientFactory.CreateClient("BusClient");
         client.SetRealisticHeaders();
-        client.Timeout = new TimeSpan(0, 0, 0, 1, 0);
         time ??= DateTime.Today.ToString("yyyy-MM-dd");
 
         var key = "bus_new_data:" + time;

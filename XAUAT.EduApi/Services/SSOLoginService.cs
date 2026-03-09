@@ -21,7 +21,7 @@ public class SSOLoginService(
         return await retryPolicy.ExecuteAsync(async () =>
         {
             using var httpClient = httpClientFactory.CreateClient();
-            httpClient.Timeout = TimeSpan.FromSeconds(5); // 5秒超时
+            httpClient.Timeout = TimeSpan.FromSeconds(15); // 5秒超时
 
             var response = await httpClient.GetAsync($"https://schedule.xauat.site/login/{username}/{password}");
             var content = await response.Content.ReadAsStringAsync();

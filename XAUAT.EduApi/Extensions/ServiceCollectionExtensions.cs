@@ -120,7 +120,7 @@ public static class ServiceCollectionExtensions
             services.AddHttpClient("BusClient")
                 .ConfigureHttpClient(client =>
                 {
-                    client.Timeout = TimeSpan.FromSeconds(10); // 设置超时时间为10秒
+                    client.Timeout = TimeSpan.FromSeconds(15); // 设置超时时间为10秒
                 })
                 .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler()
                 {
