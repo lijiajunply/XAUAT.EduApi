@@ -54,7 +54,7 @@ public class BusController : ControllerBase
     [HttpGet("{time?}")]
     [ProducesResponseType(typeof(BusModel), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(string), StatusCodes.Status500InternalServerError)]
-    public async Task<IActionResult> GetBus(string? time)
+    public async Task<ActionResult<BusModel>> GetBus(string? time)
     {
         return Ok(await GetBusFromOldData(time));
     }
@@ -78,7 +78,7 @@ public class BusController : ControllerBase
     [HttpGet("NewData/{time?}")]
     [ProducesResponseType(typeof(BusModel), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(string), StatusCodes.Status500InternalServerError)]
-    public async Task<IActionResult> GetBusFromNewData(string? time, string loc = "ALL")
+    public async Task<ActionResult<BusModel>> GetBusFromNewData(string? time, string loc = "ALL")
     {
         // 使用专门配置的HttpClient（跳过SSL验证）
         using var client = _httpClientFactory.CreateClient("BusClient");
@@ -151,7 +151,7 @@ public class BusController : ControllerBase
     /// <returns>校车时刻表数据，包含所有线路的发车时间、站点等信息</returns>
     [HttpGet("OldData/{time?}")]
     [ProducesResponseType(typeof(BusModel), StatusCodes.Status200OK)]
-    public async Task<BusModel> GetBusFromOldData(string? time, bool isShow = false)
+    public async Task<ActionResult<BusModel>> GetBusFromOldData(string? time, bool isShow = false)
     {
         // 使用专门配置的HttpClient（跳过SSL验证）
         using var client = _httpClientFactory.CreateClient("BusClient");
