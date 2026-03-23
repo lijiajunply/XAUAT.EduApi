@@ -1,4 +1,5 @@
 using System.Net;
+using EduApi.Data.Models;
 using Newtonsoft.Json.Linq;
 using Polly;
 using XAUAT.EduApi.Exceptions;
@@ -12,7 +13,7 @@ public class SSOLoginService(
     ICookieCodeService cookieCode,
     ILogger<SSOLoginService> logger) : ILoginService
 {
-    public async Task<object> LoginAsync(string username, string password)
+    public async Task<LoginResponse> LoginAsync(string username, string password)
     {
         var retryPolicy = Policy
             .Handle<HttpRequestException>()
@@ -52,7 +53,12 @@ public class SSOLoginService(
 
             
             logger.LogInformation("用户 {Username} 登录成功", username);
-            return new { Success = true, StudentId = studentId, Cookie = cookies };
+            return new LoginResponse
+            {
+                Success = true,
+                StudentId = studentId,
+                Cookie = cookies
+            };
         });
     }
 }

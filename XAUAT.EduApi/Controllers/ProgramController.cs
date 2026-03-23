@@ -1,3 +1,4 @@
+using EduApi.Data.Models;
 using Microsoft.AspNetCore.Mvc;
 using XAUAT.EduApi.Services;
 
@@ -38,10 +39,10 @@ public class ProgramController(
     /// xauat: YOUR_AUTH_COOKIE
     /// </remarks>
     [HttpGet]
-    [ProducesResponseType(typeof(List<object>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(List<PlanCourse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(string), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(string), StatusCodes.Status500InternalServerError)]
-    public async Task<IActionResult> GetAllTrainProgram(string id, string? name)
+    public async Task<ActionResult<List<PlanCourse>>> GetAllTrainProgram(string id, string? name)
     {
         try
         {
@@ -90,10 +91,10 @@ public class ProgramController(
     /// xauat: YOUR_AUTH_COOKIE
     /// </remarks>
     [HttpGet("GetDic")]
-    [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Dictionary<string, List<PlanCourse>>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(string), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(string), StatusCodes.Status500InternalServerError)]
-    public async Task<IActionResult> GetAllTrainPrograms(string id)
+    public async Task<ActionResult<Dictionary<string, List<PlanCourse>>>> GetAllTrainPrograms(string id)
     {
         try
         {

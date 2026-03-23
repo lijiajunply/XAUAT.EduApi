@@ -29,7 +29,8 @@ namespace XAUAT.EduApi.Controllers
         /// </remarks>
         [HttpGet("Semester")]
         [ProducesResponseType(typeof(SemesterResult), StatusCodes.Status200OK)]
-        [ProducesResponseType(typeof(object), StatusCodes.Status500InternalServerError)]
+        [ProducesResponseType(typeof(string), StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status500InternalServerError)]
         public async Task<ActionResult<SemesterResult>> ParseSemester(string? studentId)
         {
             try
@@ -51,7 +52,7 @@ namespace XAUAT.EduApi.Controllers
             catch (Exception ex)
             {
                 logger.LogError(ex, "解析学期数据时出错");
-                return StatusCode(500, new { error = ex.Message });
+                return StatusCode(500, new ErrorResponse { error = ex.Message });
             }
         }
 
@@ -68,7 +69,8 @@ namespace XAUAT.EduApi.Controllers
         /// </remarks>
         [HttpGet("ThisSemester")]
         [ProducesResponseType(typeof(SemesterItem), StatusCodes.Status200OK)]
-        [ProducesResponseType(typeof(object), StatusCodes.Status500InternalServerError)]
+        [ProducesResponseType(typeof(string), StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status500InternalServerError)]
         public async Task<ActionResult<SemesterItem>> GetThisSemester()
         {
             try
@@ -88,7 +90,7 @@ namespace XAUAT.EduApi.Controllers
             catch (Exception ex)
             {
                 logger.LogError(ex, "获取当前学期时出错");
-                return StatusCode(500, new { error = ex.Message });
+                return StatusCode(500, new ErrorResponse { error = ex.Message });
             }
         }
 
@@ -108,8 +110,9 @@ namespace XAUAT.EduApi.Controllers
         /// </remarks>
         [HttpGet]
         [ProducesResponseType(typeof(List<ScoreResponse>), StatusCodes.Status200OK)]
-        [ProducesResponseType(typeof(object), StatusCodes.Status400BadRequest)]
-        [ProducesResponseType(typeof(object), StatusCodes.Status500InternalServerError)]
+        [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(string), StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status500InternalServerError)]
         public async Task<ActionResult<List<ScoreResponse>>> GetScore(string studentId, string semester)
         {
             try
@@ -127,7 +130,7 @@ namespace XAUAT.EduApi.Controllers
             catch (ArgumentNullException ex)
             {
                 logger.LogWarning(ex, "参数错误");
-                return BadRequest(new { error = ex.Message });
+                return BadRequest(new ErrorResponse { error = ex.Message });
             }
             catch (Exceptions.UnAuthenticationError)
             {
@@ -136,7 +139,7 @@ namespace XAUAT.EduApi.Controllers
             catch (Exception ex)
             {
                 logger.LogError(ex, "获取成绩时出错");
-                return StatusCode(500, new { error = ex.Message });
+                return StatusCode(500, new ErrorResponse { error = ex.Message });
             }
         }
     }

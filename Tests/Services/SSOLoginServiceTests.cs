@@ -63,11 +63,9 @@ public class SSOLoginServiceTests
 
         // Assert
         Assert.NotNull(result);
-        var propertyInfo = result.GetType().GetProperty("Success");
-        Assert.True((bool)propertyInfo!.GetValue(result)!);
-        
-        var studentIdProp = result.GetType().GetProperty("StudentId");
-        Assert.Equal(studentId, studentIdProp!.GetValue(result));
+        Assert.True(result.Success);
+        Assert.Equal(studentId, result.StudentId);
+        Assert.Equal(cookies, result.Cookie);
     }
 
     [Fact]

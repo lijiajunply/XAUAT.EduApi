@@ -84,8 +84,8 @@ public class InfoController(IHttpClientFactory httpClientFactory, ILogger<Course
     /// GET /Info/Time
     /// </remarks>
     [HttpGet("Time")]
-    [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
-    public ActionResult GetTime()
+    [ProducesResponseType(typeof(TimeModel), StatusCodes.Status200OK)]
+    public ActionResult<TimeModel> GetTime()
     {
         return Ok(info.GetTime());
     }

@@ -11,7 +11,8 @@ namespace XAUAT.EduApi.Controllers;
 public class PlaygroundController(IHttpClientFactory httpClientFactory) : ControllerBase
 {
     [HttpGet]
-    public async Task<IActionResult> Get()
+    [ProducesResponseType(typeof(JObject), StatusCodes.Status200OK)]
+    public async Task<ActionResult<JObject>> Get()
     {
         var cookie = Request.Headers.Cookie.ToString();
         if (string.IsNullOrEmpty(cookie) || cookie.StartsWith("Rider"))

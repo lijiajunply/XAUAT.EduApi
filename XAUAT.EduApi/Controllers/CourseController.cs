@@ -1,3 +1,4 @@
+using EduApi.Data.Models;
 using Microsoft.AspNetCore.Mvc;
 using XAUAT.EduApi.Services;
 
@@ -30,12 +31,13 @@ public class CourseController(ILogger<CourseController> logger, ICourseService c
     /// GET /Course?studentId=123456
     /// </remarks>
     [HttpGet]
-    [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(object), StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(typeof(object), StatusCodes.Status404NotFound)]
-    [ProducesResponseType(typeof(object), StatusCodes.Status500InternalServerError)]
-    [ProducesResponseType(typeof(object), StatusCodes.Status502BadGateway)]
-    public async Task<IActionResult> GetCourse(string studentId)
+    [ProducesResponseType(typeof(CourseResultResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(CourseErrorResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(CourseErrorResponse), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(CourseErrorResponse), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(CourseErrorResponse), StatusCodes.Status500InternalServerError)]
+    [ProducesResponseType(typeof(CourseErrorResponse), StatusCodes.Status502BadGateway)]
+    public async Task<ActionResult<CourseResultResponse>> GetCourse(string studentId)
     {
         try
         {
@@ -49,7 +51,7 @@ public class CourseController(ILogger<CourseController> logger, ICourseService c
             var courses = await courseService.GetCoursesAsync(studentId, cookie);
 
             // 返回处理后的课程数据
-            return Ok(new
+            return Ok(new CourseResultResponse
             {
                 Success = true,
                 Data = courses,
@@ -58,27 +60,27 @@ public class CourseController(ILogger<CourseController> logger, ICourseService c
         }
         catch (Exceptions.UnAuthenticationError)
         {
-            return Unauthorized(new { Success = false, Message = "认证失败，请重新登录" });
+            return Unauthorized(new CourseErrorResponse { Success = false, Message = "认证失败，请重新登录" });
         }
         catch (ArgumentNullException ex)
         {
             logger.LogWarning(ex, "参数错误");
-            return BadRequest(new { Success = false, ex.Message });
+            return BadRequest(new CourseErrorResponse { Success = false, Message = ex.Message });
         }
         catch (HttpRequestException ex)
         {
             logger.LogError(ex, "HTTP请求错误");
-            return StatusCode(502, new { Success = false, ex.Message });
+            return StatusCode(502, new CourseErrorResponse { Success = false, Message = ex.Message });
         }
         catch (InvalidOperationException ex)
         {
             logger.LogWarning(ex, "操作无效");
-            return NotFound(new { Success = false, ex.Message });
+            return NotFound(new CourseErrorResponse { Success = false, Message = ex.Message });
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "获取课程时发生错误");
-            return StatusCode(500, new { Success = false, Message = "服务器内部错误" });
+            return StatusCode(500, new CourseErrorResponse { Success = false, Message = "服务器内部错误" });
         }
     }
 }

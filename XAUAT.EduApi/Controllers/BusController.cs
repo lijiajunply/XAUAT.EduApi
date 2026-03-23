@@ -56,7 +56,7 @@ public class BusController : ControllerBase
     [ProducesResponseType(typeof(string), StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<BusModel>> GetBus(string? time)
     {
-        return Ok(await GetBusFromOldData(time));
+        return await GetBusFromOldData(time);
     }
 
     /// <summary>
@@ -107,7 +107,7 @@ public class BusController : ControllerBase
 
         if (i?.Count == 0)
         {
-            return Ok(await GetBusFromOldData(time, isShow: true));
+            return await GetBusFromOldData(time, isShow: true);
         }
 
         foreach (var j in json["data"]!["dfBusPlans"]!)

@@ -1,3 +1,4 @@
+using EduApi.Data.Models;
 using Microsoft.AspNetCore.Mvc;
 using XAUAT.EduApi.Services;
 
@@ -28,10 +29,10 @@ public class PaymentController(IPaymentService paymentService, ILogger<PaymentCo
     /// GET /Payment/123456789
     /// </remarks>
     [HttpGet("{id}")]
-    [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(object), StatusCodes.Status500InternalServerError)]
-    [ProducesResponseType(typeof(object), StatusCodes.Status503ServiceUnavailable)]
-    public async Task<IActionResult> Login(string id)
+    [ProducesResponseType(typeof(string), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ErrorWithMessageResponse), StatusCodes.Status500InternalServerError)]
+    [ProducesResponseType(typeof(ErrorWithMessageResponse), StatusCodes.Status503ServiceUnavailable)]
+    public async Task<ActionResult<string>> Login(string id)
     {
         try
         {
@@ -43,12 +44,12 @@ public class PaymentController(IPaymentService paymentService, ILogger<PaymentCo
         catch (PaymentServiceException ex)
         {
             logger.LogError(ex, "Payment service error during login for card {id}", id);
-            return StatusCode(503, new { error = "服务暂时不可用", message = ex.Message });
+            return StatusCode(503, new ErrorWithMessageResponse { error = "服务暂时不可用", message = ex.Message });
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Unexpected error during login for card {id}", id);
-            return StatusCode(500, new { error = "服务器内部错误", message = "登录过程中发生未知错误" });
+            return StatusCode(500, new ErrorWithMessageResponse { error = "服务器内部错误", message = "登录过程中发生未知错误" });
         }
     }
 
@@ -66,10 +67,10 @@ public class PaymentController(IPaymentService paymentService, ILogger<PaymentCo
     /// GET /Payment/123456789/turnover
     /// </remarks>
     [HttpGet("{id}/turnover")]
-    [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(object), StatusCodes.Status500InternalServerError)]
-    [ProducesResponseType(typeof(object), StatusCodes.Status503ServiceUnavailable)]
-    public async Task<IActionResult> GetTurnover(string id)
+    [ProducesResponseType(typeof(PaymentData), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ErrorWithMessageResponse), StatusCodes.Status500InternalServerError)]
+    [ProducesResponseType(typeof(ErrorWithMessageResponse), StatusCodes.Status503ServiceUnavailable)]
+    public async Task<ActionResult<PaymentData>> GetTurnover(string id)
     {
         try
         {
@@ -81,12 +82,12 @@ public class PaymentController(IPaymentService paymentService, ILogger<PaymentCo
         catch (PaymentServiceException ex)
         {
             logger.LogError(ex, "Payment service error during fetching turnover for card {id}", id);
-            return StatusCode(503, new { error = "服务暂时不可用", message = ex.Message });
+            return StatusCode(503, new ErrorWithMessageResponse { error = "服务暂时不可用", message = ex.Message });
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Unexpected error during fetching turnover for card {id}", id);
-            return StatusCode(500, new { error = "服务器内部错误", message = "获取消费记录过程中发生未知错误" });
+            return StatusCode(500, new ErrorWithMessageResponse { error = "服务器内部错误", message = "获取消费记录过程中发生未知错误" });
         }
     }
 }
