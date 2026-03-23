@@ -34,7 +34,7 @@ public class InfoController(IHttpClientFactory httpClientFactory, ILogger<Course
     /// xauat: YOUR_AUTH_COOKIE
     /// </remarks>
     [HttpGet("Completion")]
-    [ProducesResponseType(typeof(CreditInfo), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(CreditInfo[]), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(string), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(string), StatusCodes.Status500InternalServerError)]
     [ProducesResponseType(typeof(string), StatusCodes.Status502BadGateway)]
@@ -44,7 +44,7 @@ public class InfoController(IHttpClientFactory httpClientFactory, ILogger<Course
         {
             logger.LogInformation("开始抓取学业进度");
             var cookie = Request.Headers.Cookie.ToString();
-            if (string.IsNullOrEmpty(cookie) || cookie.StartsWith("Rider"))
+            if (string.IsNullOrEmpty(cookie) || cookie.StartsWith("Rider") || !cookie.StartsWith("__pstsid__"))
             {
                 cookie = Request.Headers["xauat"].ToString(); // 从请求中获取 cookie
             }
@@ -62,7 +62,7 @@ public class InfoController(IHttpClientFactory httpClientFactory, ILogger<Course
                 throw new Exceptions.UnAuthenticationError();
             }
 
-            var data = JsonConvert.DeserializeObject<StudyModule>(content);
+            var data = JsonConvert.DeserializeObject<StudyModule[]>(content) ?? [];
 
             return Ok(data);
         }
