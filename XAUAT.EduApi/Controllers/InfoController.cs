@@ -1,4 +1,6 @@
+using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Mvc;
+using Newtonsoft.Json;
 using XAUAT.EduApi.Services;
 
 namespace XAUAT.EduApi.Controllers;
@@ -32,7 +34,7 @@ public class InfoController(IHttpClientFactory httpClientFactory, ILogger<Course
     /// xauat: YOUR_AUTH_COOKIE
     /// </remarks>
     [HttpGet("Completion")]
-    [ProducesResponseType(typeof(string), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(CreditInfo), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(string), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(string), StatusCodes.Status500InternalServerError)]
     [ProducesResponseType(typeof(string), StatusCodes.Status502BadGateway)]
@@ -60,7 +62,9 @@ public class InfoController(IHttpClientFactory httpClientFactory, ILogger<Course
                 throw new Exceptions.UnAuthenticationError();
             }
 
-            return Content(content);
+            var data = JsonConvert.DeserializeObject<StudyModule>(content);
+
+            return Ok(data);
         }
         catch (Exceptions.UnAuthenticationError)
         {
@@ -89,4 +93,46 @@ public class InfoController(IHttpClientFactory httpClientFactory, ILogger<Course
     {
         return Ok(info.GetTime());
     }
+}
+
+public class CreditInfo
+{
+    /// <summary>
+    /// 学分项名称
+    /// </summary>
+    [JsonPropertyName("name")]
+    public string Name { get; set; } = "";
+
+    /// <summary>
+    /// 实际学分
+    /// </summary>
+    [JsonPropertyName("actual")]
+    public double Actual { get; set; }
+
+    /// <summary>
+    /// 满学分
+    /// </summary>
+    [JsonPropertyName("full")]
+    public double Full { get; set; }
+}
+
+public class StudyModule
+{
+    /// <summary>
+    /// 类型（如：主修）
+    /// </summary>
+    [JsonPropertyName("type")]
+    public string Type { get; set; }= "";
+
+    /// <summary>
+    /// 总学分信息
+    /// </summary>
+    [JsonPropertyName("total")]
+    public CreditInfo Total { get; set; } = new();
+
+    /// <summary>
+    /// 各教学模块学分明细
+    /// </summary>
+    [JsonPropertyName("other")]
+    public List<CreditInfo> Other { get; set; } = [];
 }
