@@ -52,7 +52,6 @@ builder.Services.AddAllServices(serviceConfig);
 var app = builder.Build();
 
 
-
 // 注册当前服务实例到服务注册中心
 var serviceRegistry = app.Services.GetRequiredService<IServiceRegistry>();
 var configuration = app.Configuration;
@@ -150,16 +149,13 @@ AppDomain.CurrentDomain.ProcessExit += async (_, _) =>
 {
     // 注销服务实例
     await serviceRegistry.DeregisterAsync(serviceName, instanceId);
-
-
-
     // 确保所有日志都被正确写入
     Log.CloseAndFlush();
 };
 
 // 注册应用程序取消事件
 var cts = new CancellationTokenSource();
-app.Lifetime.ApplicationStopping.Register(() => { cts.Cancel(); });
+app.Lifetime.ApplicationStopping.Register(cts.Cancel);
 
 app.Run();
 

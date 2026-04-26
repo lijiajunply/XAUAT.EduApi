@@ -14,25 +14,17 @@ public interface IPaymentService
     Task<PaymentData> GetTurnoverAsync(string cardNum);
 }
 
-public class PaymentService : IPaymentService
+public class PaymentService(
+    ICacheService cacheService,
+    IHttpClientFactory httpClientFactory,
+    ILogger<PaymentService> logger)
+    : IPaymentService
 {
-    private readonly ICacheService _cacheService;
-    private readonly IHttpClientFactory _httpClientFactory;
-    private readonly ILogger<PaymentService> _logger;
-
-    public PaymentService(ICacheService cacheService, IHttpClientFactory httpClientFactory,
-        ILogger<PaymentService> logger)
-    {
-        _httpClientFactory = httpClientFactory;
-        _logger = logger;
-        _cacheService = cacheService;
-    }
-
     public async Task<string> Login(string cardNum)
     {
         try
         {
-            return await _cacheService.GetOrCreateAsync(
+            return await cacheService.GetOrCreateAsync(
                 CacheKeys.PaymentToken(cardNum),
                 async () =>
                 {
@@ -55,7 +47,7 @@ public class PaymentService : IPaymentService
                         Authorization = "Basic bW9iaWxlX3NlcnZpY2VfcGxhdGZvcm06bW9iaWxlX3NlcnZpY2VfcGxhdGZvcm1fc2VjcmV0"
                     };
 
-                    using var client = _httpClientFactory.CreateClient();
+                    using var client = httpClientFactory.CreateClient();
                     client.Timeout = HttpTimeouts.Slow;
 
                     var keyboardResponse =
@@ -132,7 +124,7 @@ public class PaymentService : IPaymentService
 
     private async Task<List<PaymentModel>> GetPayments(string token, string cardNum)
     {
-        return await _cacheService.GetOrCreateAsync(
+        return await cacheService.GetOrCreateAsync(
             CacheKeys.PaymentList(cardNum),
             async () =>
             {
@@ -154,7 +146,7 @@ public class PaymentService : IPaymentService
                 var query = string.Join("&", paramsDict.Select(kvp => $"{kvp.Key}={Uri.EscapeDataString(kvp.Value)}"));
                 uriBuilder.Query = query;
 
-                using var client = _httpClientFactory.CreateClient();
+                using var client = httpClientFactory.CreateClient();
                 client.Timeout = HttpTimeouts.EduSystem;
                 foreach (var header in headers)
                 {
@@ -174,7 +166,7 @@ public class PaymentService : IPaymentService
                     return records?.Select(PaymentModel.FromJson).ToList() ?? [];
                 }
 
-                _logger.LogWarning("获取支付列表失败，状态码: {StatusCode}", response.StatusCode);
+                logger.LogWarning("获取支付列表失败，状态码: {StatusCode}", response.StatusCode);
                 return [];
             },
             TimeSpan.FromMinutes(20));
@@ -182,7 +174,7 @@ public class PaymentService : IPaymentService
 
     private async Task<double> GetBalanceAsync(string token, string cardNum)
     {
-        return await _cacheService.GetOrCreateAsync(
+        return await cacheService.GetOrCreateAsync(
             CacheKeys.ElectronicAccount(cardNum),
             async () =>
             {
@@ -194,7 +186,7 @@ public class PaymentService : IPaymentService
                     { "synjones-auth", token }
                 };
 
-                using var client = _httpClientFactory.CreateClient();
+                using var client = httpClientFactory.CreateClient();
                 client.Timeout = HttpTimeouts.EduSystem;
                 foreach (var header in headers)
                 {

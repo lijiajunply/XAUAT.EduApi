@@ -14,20 +14,14 @@ public interface IProgramService
     public Task<Dictionary<string, List<PlanCourse>>> GetAllTrainPrograms(string cookie, string id);
 }
 
-public class ProgramService : IProgramService
+public class ProgramService(
+    IHttpClientFactory httpClientFactory,
+    ICacheService cacheService,
+    ILogger<ProgramService>? logger = null)
+    : IProgramService
 {
     private const string BaseUrl = "https://swjw.xauat.edu.cn";
-    private readonly ICacheService _cacheService;
-    private readonly IHttpClientFactory _httpClientFactory;
-    private readonly ILogger<ProgramService>? _logger;
-
-    public ProgramService(IHttpClientFactory httpClientFactory, ICacheService cacheService,
-        ILogger<ProgramService>? logger = null)
-    {
-        _httpClientFactory = httpClientFactory;
-        _logger = logger;
-        _cacheService = cacheService;
-    }
+    private readonly ILogger<ProgramService>? _logger = logger;
 
     public async Task<List<PlanCourse>> GetAllTrainProgram(string cookie, string id)
     {
@@ -40,7 +34,7 @@ public class ProgramService : IProgramService
 
     private async Task<List<PlanCourse>> GetAllTrainProgramByOneId(string cookie, string id)
     {
-        return await _cacheService.GetOrCreateAsync(
+        return await cacheService.GetOrCreateAsync(
             CacheKeys.TrainProgram(id),
             async () =>
             {
@@ -55,7 +49,7 @@ public class ProgramService : IProgramService
                         new HttpRequestMessage(HttpMethod.Get, $"{BaseUrl}/student/for-std/program/root-module-json/{id}")
                             .WithCookie(cookie);
 
-                    using var httpClient = _httpClientFactory.CreateClient();
+                    using var httpClient = httpClientFactory.CreateClient();
                     httpClient.Timeout = TimeSpan.FromSeconds(5);
 
                     var response = await httpClient.SendAsync(request);
