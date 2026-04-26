@@ -1,7 +1,6 @@
 using Moq;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using StackExchange.Redis;
 using XAUAT.EduApi.Services;
 using XAUAT.EduApi.Repos;
 using EduApi.Data;
@@ -42,8 +41,21 @@ public class CourseAndScoreIntegrationTests : IDisposable
         _dbContext.Database.EnsureCreated();
 
         // 创建公共依赖项
-        var httpClientFactory = new Mock<IHttpClientFactory>().Object;
-        var redisConnection = new Mock<IConnectionMultiplexer>().Object;
+        var httpClientFactoryMock2 = new Mock<IHttpClientFactory>();
+        httpClientFactoryMock2.Setup(x => x.CreateClient(It.IsAny<string>())).Returns(new HttpClient());
+        var httpClientFactory = httpClientFactoryMock2.Object;
+        var cacheServiceForScore = new Mock<ICacheService>();
+        // 设置透传用于ScoreService
+        cacheServiceForScore
+            .Setup(m => m.GetOrCreateAsync(
+                It.IsAny<string>(),
+                It.IsAny<Func<Task<List<ScoreResponse>>>>(),
+                It.IsAny<TimeSpan?>(),
+                It.IsAny<CacheLevel>(),
+                It.IsAny<int>(),
+                It.IsAny<CancellationToken>()))
+            .Returns(async (string key, Func<Task<List<ScoreResponse>>> factory, TimeSpan? exp, CacheLevel level, int priority, CancellationToken ct) =>
+                await factory());
 
         // 创建ExamService模拟
         _examServiceMock = new Mock<IExamService>();
@@ -86,7 +98,7 @@ public class CourseAndScoreIntegrationTests : IDisposable
             httpClientFactory,
             scoreLogger,
             _examServiceMock.Object,
-            redisConnection,
+            cacheServiceForScore.Object,
             _scoreRepository);
     }
 
@@ -99,7 +111,7 @@ public class CourseAndScoreIntegrationTests : IDisposable
         // Arrange
         var studentId = "123456";
         var cookie = "test-cookie";
-        var semester = "2025-2026-1";
+        var semester = "2024-2025-1"; // 非当前学期，走数据库查询路径
 
         // 添加测试成绩数据到数据库
         var testScores = new List<ScoreResponse>
@@ -144,7 +156,7 @@ public class CourseAndScoreIntegrationTests : IDisposable
     public async Task TestMultipleStudentsScoreFlow()
     {
         // Arrange
-        var semester = "2025-2026-1";
+        var semester = "2024-2025-1"; // 非当前学期，走数据库查询路径
         var cookie = "test-cookie";
 
         // 添加多个学生的测试成绩数据

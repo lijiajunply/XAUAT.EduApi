@@ -1,6 +1,6 @@
 using System.Text;
 using System.Text.Json.Serialization;
-using StackExchange.Redis;
+using XAUAT.EduApi.Caching;
 using XAUAT.EduApi.Extensions;
 using JsonSerializer = System.Text.Json.JsonSerializer;
 using Polly;
@@ -17,19 +17,16 @@ public interface IProgramService
 public class ProgramService : IProgramService
 {
     private const string BaseUrl = "https://swjw.xauat.edu.cn";
-    private readonly IDatabase? _redis;
-    private readonly bool _redisAvailable;
+    private readonly ICacheService _cacheService;
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILogger<ProgramService>? _logger;
 
-    public ProgramService(IHttpClientFactory httpClientFactory, IConnectionMultiplexer? muxer,
+    public ProgramService(IHttpClientFactory httpClientFactory, ICacheService cacheService,
         ILogger<ProgramService>? logger = null)
     {
         _httpClientFactory = httpClientFactory;
         _logger = logger;
-
-        // 使用扩展方法初始化Redis连接
-        _redis = muxer.SafeGetDatabase(logger, out _redisAvailable);
+        _cacheService = cacheService;
     }
 
     public async Task<List<PlanCourse>> GetAllTrainProgram(string cookie, string id)
@@ -43,49 +40,39 @@ public class ProgramService : IProgramService
 
     private async Task<List<PlanCourse>> GetAllTrainProgramByOneId(string cookie, string id)
     {
-        var cacheKey = CacheKeys.TrainProgram(id);
-
-        // 尝试从Redis获取缓存
-        var cachedProgram = await _redis.GetCacheAsync<List<PlanCourse>>(_redisAvailable, cacheKey, _logger);
-        if (cachedProgram is { Count: > 0 })
-        {
-            return cachedProgram;
-        }
-
-        var retryPolicy = Policy
-            .Handle<HttpRequestException>()
-            .Or<TaskCanceledException>()
-            .WaitAndRetryAsync(3, retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)));
-
-        return await retryPolicy.ExecuteAsync(async () =>
-        {
-            var request =
-                new HttpRequestMessage(HttpMethod.Get, $"{BaseUrl}/student/for-std/program/root-module-json/{id}")
-                    .WithCookie(cookie);
-
-            using var httpClient = _httpClientFactory.CreateClient();
-            httpClient.Timeout = TimeSpan.FromSeconds(5);
-
-            var response = await httpClient.SendAsync(request);
-            if (!response.IsSuccessStatusCode) return [];
-            var content = await response.Content.ReadAsStringAsync();
-
-            if (content.Contains("登入页面"))
+        return await _cacheService.GetOrCreateAsync(
+            CacheKeys.TrainProgram(id),
+            async () =>
             {
-                throw new Exceptions.UnAuthenticationError();
-            }
+                var retryPolicy = Policy
+                    .Handle<HttpRequestException>()
+                    .Or<TaskCanceledException>()
+                    .WaitAndRetryAsync(3, retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)));
 
-            var result = JsonSerializer.Deserialize<ProgramModel>(content) ?? new ProgramModel();
+                return await retryPolicy.ExecuteAsync(async () =>
+                {
+                    var request =
+                        new HttpRequestMessage(HttpMethod.Get, $"{BaseUrl}/student/for-std/program/root-module-json/{id}")
+                            .WithCookie(cookie);
 
-            var list = GetPlanCourses(result);
+                    using var httpClient = _httpClientFactory.CreateClient();
+                    httpClient.Timeout = TimeSpan.FromSeconds(5);
 
-            if (list.Count != 0)
-            {
-                await _redis.SetCacheAsync(_redisAvailable, cacheKey, list, TimeSpan.FromDays(1), _logger);
-            }
+                    var response = await httpClient.SendAsync(request);
+                    if (!response.IsSuccessStatusCode) return [];
+                    var content = await response.Content.ReadAsStringAsync();
 
-            return list;
-        });
+                    if (content.Contains("登入页面"))
+                    {
+                        throw new Exceptions.UnAuthenticationError();
+                    }
+
+                    var result = JsonSerializer.Deserialize<ProgramModel>(content) ?? new ProgramModel();
+
+                    return GetPlanCourses(result);
+                });
+            },
+            TimeSpan.FromDays(1));
     }
 
     private static List<PlanCourse> GetPlanCourses(ProgramModel result)

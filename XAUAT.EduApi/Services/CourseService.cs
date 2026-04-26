@@ -43,11 +43,6 @@ public class CourseService(
 
         var split = studentId.Split(',');
 
-        using var client = httpClientFactory.CreateClient();
-        client.SetRealisticHeaders();
-        client.DefaultRequestHeaders.Add("Cookie", cookie);
-        client.Timeout = HttpTimeouts.EduSystem;
-
         var semester = await examService.GetThisSemester(cookie);
 
         if (string.IsNullOrEmpty(semester.Value))
@@ -62,7 +57,7 @@ public class CourseService(
         // 合并结果
         var courses = allResults.SelectMany(r => r).ToList();
 
-        if (courses == null!)
+        if (courses.Count == 0)
         {
             throw new InvalidOperationException("未找到课程数据");
         }

@@ -1,7 +1,7 @@
 using EduApi.Data.Models;
 using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json.Linq;
-using StackExchange.Redis;
+using XAUAT.EduApi.Caching;
 using XAUAT.EduApi.Extensions;
 using XAUAT.EduApi.Services;
 
@@ -17,23 +17,17 @@ namespace XAUAT.EduApi.Controllers;
 public class BusController : ControllerBase
 {
     private readonly IHttpClientFactory _httpClientFactory;
-    private readonly IDatabase? _redis;
-    private readonly bool _redisAvailable;
-    private readonly ILogger<BusController>? _logger;
+    private readonly ICacheService _cacheService;
 
     /// <summary>
     /// BusController构造函数
     /// </summary>
     /// <param name="httpClientFactory">HttpClient工厂，用于创建HTTP客户端</param>
-    /// <param name="muxer">Redis连接多路复用器，用于缓存数据</param>
-    /// <param name="logger">日志记录器，用于记录日志信息</param>
-    public BusController(IHttpClientFactory httpClientFactory, IConnectionMultiplexer? muxer, ILogger<BusController>? logger = null)
+    /// <param name="cacheService">缓存服务</param>
+    public BusController(IHttpClientFactory httpClientFactory, ICacheService cacheService)
     {
         _httpClientFactory = httpClientFactory;
-        _logger = logger;
-
-        // 使用扩展方法初始化Redis连接
-        _redis = muxer.SafeGetDatabase(logger, out _redisAvailable);
+        _cacheService = cacheService;
     }
 
     /// <summary>
@@ -80,63 +74,61 @@ public class BusController : ControllerBase
     [ProducesResponseType(typeof(string), StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<BusModel>> GetBusFromNewData(string? time, string loc = "ALL")
     {
-        // 使用专门配置的HttpClient（跳过SSL验证）
-        using var client = _httpClientFactory.CreateClient("BusClient");
-        client.SetRealisticHeaders();
         time ??= DateTime.Today.ToString("yyyy-MM-dd");
 
-        var cacheKey = CacheKeys.BusNewData(time);
+        var busModel = await _cacheService.GetOrCreateAsync(
+            CacheKeys.BusNewData(time),
+            async () =>
+            {
+                using var client = _httpClientFactory.CreateClient("BusClient");
+                client.SetRealisticHeaders();
 
-        // 尝试从Redis获取数据
-        var cachedBus = await _redis.GetCacheAsync<BusModel>(_redisAvailable, cacheKey, _logger);
-        if (cachedBus != null)
-        {
-            return Ok(cachedBus);
-        }
+                var response =
+                    await client.PostAsJsonAsync(
+                        "https://bcdd.xauat.edu.cn/api/openapi/getDayBusPlans", new { type = loc, nowDay = time });
+                response.EnsureSuccessStatusCode();
 
-        var response =
-            await client.PostAsJsonAsync(
-                "https://bcdd.xauat.edu.cn/api/openapi/getDayBusPlans", new { type = loc, nowDay = time });
-        response.EnsureSuccessStatusCode();
+                var content = await response.Content.ReadAsStringAsync();
+                var result = new BusModel();
+                var json = JObject.Parse(content);
 
-        var content = await response.Content.ReadAsStringAsync();
-        var busModel = new BusModel();
-        var json = JObject.Parse(content);
+                var i = json["data"]!["dfBusPlans"] as JArray;
 
-        var i = json["data"]!["dfBusPlans"] as JArray;
+                if (i == null || i.Count == 0)
+                {
+                    return result;
+                }
 
-        if (i?.Count == 0)
+                foreach (var j in json["data"]!["dfBusPlans"]!)
+                {
+                    if (j["frcamp"] != null && !string.IsNullOrEmpty(j["frcamp"]!.ToString())) continue;
+                    var departure = j["fscamp"] + "校区";
+                    var arrival = j["fecamp"] + "校区";
+                    var timestamp = long.Parse(j["fstime"]!.ToString()) * 10000;
+
+                    var tricks1970 = new DateTime(1970, 1, 1, 8, 0, 0).Ticks;
+                    var timeTricks = tricks1970 + timestamp;
+
+                    var runTime = new DateTime(timeTricks);
+                    result.Records.Add(new BusItem()
+                    {
+                        LineName = $"{departure}→{arrival}",
+                        Description = j["fbusNo"]!.ToString(),
+                        DepartureStation = departure,
+                        ArrivalStation = arrival,
+                        RunTime = runTime.ToString("T"),
+                        ArrivalStationTime = "01:30",
+                    });
+                }
+
+                result.Total = result.Records.Count;
+                return result;
+            },
+            TimeSpan.FromHours(12));
+
+        if (busModel.Total == 0)
         {
             return await GetBusFromOldData(time, isShow: true);
-        }
-
-        foreach (var j in json["data"]!["dfBusPlans"]!)
-        {
-            if (j["frcamp"] != null && !string.IsNullOrEmpty(j["frcamp"]!.ToString())) continue;
-            var departure = j["fscamp"] + "校区";
-            var arrival = j["fecamp"] + "校区";
-            var timestamp = long.Parse(j["fstime"]!.ToString()) * 10000;
-
-            var tricks1970 = new DateTime(1970, 1, 1, 8, 0, 0).Ticks; //1970年1月1日刻度
-            var timeTricks = tricks1970 + timestamp; //日志日期刻度
-
-            var runTime = new DateTime(timeTricks);
-            busModel.Records.Add(new BusItem()
-            {
-                LineName = $"{departure}→{arrival}",
-                Description = j["fbusNo"]!.ToString(),
-                DepartureStation = departure,
-                ArrivalStation = arrival,
-                RunTime = runTime.ToString("T"),
-                ArrivalStationTime = "01:30",
-            });
-        }
-
-        busModel.Total = busModel.Records.Count;
-
-        if (busModel.Total != 0)
-        {
-            await _redis.SetCacheAsync(_redisAvailable, cacheKey, busModel, TimeSpan.FromHours(12), _logger);
         }
 
         return Ok(busModel);
@@ -153,47 +145,39 @@ public class BusController : ControllerBase
     [ProducesResponseType(typeof(BusModel), StatusCodes.Status200OK)]
     public async Task<ActionResult<BusModel>> GetBusFromOldData(string? time, bool isShow = false)
     {
-        // 使用专门配置的HttpClient（跳过SSL验证）
-        using var client = _httpClientFactory.CreateClient("BusClient");
-        client.SetRealisticHeaders();
         time ??= DateTime.Today.ToString("yyyy-MM-dd");
 
-        var cacheKey = CacheKeys.Bus(time);
-
-        // 尝试从Redis获取数据
-        var cachedBus = await _redis.GetCacheAsync<BusModel>(_redisAvailable, cacheKey, _logger);
-        if (cachedBus != null)
-        {
-            return cachedBus;
-        }
-
-        var response =
-            await client.GetAsync(
-                $"https://school-bus.xauat.edu.cn/api/school/bus/user/runPlanPage?current=1&size=30&keyWord=&lineId=&date={time}");
-        response.EnsureSuccessStatusCode();
-        var content = await response.Content.ReadAsStringAsync();
-        var busModel = new BusModel();
-        var json = JObject.Parse(content);
-        busModel.Total = json["data"]!["total"]!.ToObject<int>();
-        foreach (var j in json["data"]!["records"]!)
-        {
-            if (j["wayStation"] != null && !string.IsNullOrEmpty(j["wayStation"]!.ToString())) continue;
-            busModel.Records.Add(new BusItem()
+        return await _cacheService.GetOrCreateAsync(
+            CacheKeys.Bus(time),
+            async () =>
             {
-                LineName = j["lineName"]!.ToString(),
-                Description = j["descr"]! + (isShow ? " (调用的为旧平台数据)" : ""),
-                DepartureStation = j["departureStation"]!.ToString(),
-                ArrivalStation = j["arrivalStation"]!.ToString(),
-                RunTime = j["runTime"]!.ToString(),
-                ArrivalStationTime = j["arrivalStationTime"]!.ToString()
-            });
-        }
+                using var client = _httpClientFactory.CreateClient("BusClient");
+                client.SetRealisticHeaders();
 
-        if (busModel.Total != 0)
-        {
-            await _redis.SetCacheAsync(_redisAvailable, cacheKey, busModel, TimeSpan.FromHours(12), _logger);
-        }
+                var response =
+                    await client.GetAsync(
+                        $"https://school-bus.xauat.edu.cn/api/school/bus/user/runPlanPage?current=1&size=30&keyWord=&lineId=&date={time}");
+                response.EnsureSuccessStatusCode();
+                var content = await response.Content.ReadAsStringAsync();
+                var busModel = new BusModel();
+                var json = JObject.Parse(content);
+                busModel.Total = json["data"]!["total"]!.ToObject<int>();
+                foreach (var j in json["data"]!["records"]!)
+                {
+                    if (j["wayStation"] != null && !string.IsNullOrEmpty(j["wayStation"]!.ToString())) continue;
+                    busModel.Records.Add(new BusItem()
+                    {
+                        LineName = j["lineName"]!.ToString(),
+                        Description = j["descr"]! + (isShow ? " (调用的为旧平台数据)" : ""),
+                        DepartureStation = j["departureStation"]!.ToString(),
+                        ArrivalStation = j["arrivalStation"]!.ToString(),
+                        RunTime = j["runTime"]!.ToString(),
+                        ArrivalStationTime = j["arrivalStationTime"]!.ToString()
+                    });
+                }
 
-        return busModel;
+                return busModel;
+            },
+            TimeSpan.FromHours(12));
     }
 }

@@ -518,18 +518,14 @@ public class CacheServiceTests : IDisposable
         var factoryCallCount = 0;
 
         // Act & Assert
-        var result = await _cacheService.GetOrCreateAsync(key, async () =>
-        {
-            factoryCallCount++;
-            if (factoryCallCount == 1)
+        var exception = await Assert.ThrowsAsync<Exception>(() =>
+            _cacheService.GetOrCreateAsync<string>(key, async () =>
             {
+                factoryCallCount++;
                 throw new Exception("Factory error");
-            }
-            return await Task.FromResult("value");
-        }, level: CacheLevel.Local);
+            }, level: CacheLevel.Local));
 
-        // 由于异常处理，应该再次调用工厂方法
-        Assert.Equal("value", result);
+        Assert.Equal("Factory error", exception.Message);
     }
 
     #endregion

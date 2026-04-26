@@ -26,6 +26,9 @@ public class CacheService : ICacheService, IDisposable
     // 缓存策略映射
     private readonly ConcurrentDictionary<string, CacheStrategyType> _cacheStrategies;
 
+    // 防缓存击穿：每个Key一个信号量，确保只有一个线程回源抓取
+    private readonly ConcurrentDictionary<string, SemaphoreSlim> _keyLocks = new();
+
     // 监控服务（可选）
     private readonly IMonitoringService? _monitoringService;
 
@@ -133,27 +136,44 @@ public class CacheService : ICacheService, IDisposable
 
         try
         {
-            // 1. 尝试从缓存获取
+            // 1. 快速路径：先从缓存获取
             var cachedValue = await GetAsync<T>(key, cancellationToken);
             if (cachedValue != null)
             {
                 return cachedValue;
             }
 
-            // 2. 缓存未命中，调用工厂方法创建值
-            _logger.LogTrace("Cache miss, calling factory: {Key}", key);
-            var newValue = await factory();
+            // 2. 获取或创建该Key的信号量，防止缓存击穿
+            var slim = _keyLocks.GetOrAdd(key, _ => new SemaphoreSlim(1, 1));
+            await slim.WaitAsync(cancellationToken);
+            try
+            {
+                // 3. 双重检查：获取锁后再次检查缓存
+                cachedValue = await GetAsync<T>(key, cancellationToken);
+                if (cachedValue != null)
+                {
+                    return cachedValue;
+                }
 
-            // 3. 将新值存入缓存
-            await SetAsync(key, newValue, expiration, level, businessPriority, cancellationToken);
+                // 4. 缓存未命中，调用工厂方法（每个Key只有一个线程能到达这里）
+                _logger.LogTrace("Cache miss, calling factory: {Key}", key);
+                var newValue = await factory();
 
-            return newValue;
+                // 5. 将新值存入缓存
+                await SetAsync(key, newValue, expiration, level, businessPriority, cancellationToken);
+
+                return newValue;
+            }
+            finally
+            {
+                slim.Release();
+            }
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error in GetOrCreateAsync: {Key}", key);
-            // 即使缓存操作失败，也返回工厂方法的结果
-            return await factory();
+            // 缓存操作失败时降级：直接调用工厂方法获取数据（不重试已失败的工厂）
+            throw;
         }
         finally
         {

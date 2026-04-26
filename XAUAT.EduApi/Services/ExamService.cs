@@ -2,7 +2,7 @@ using System.Text.RegularExpressions;
 using EduApi.Data.Models;
 using Newtonsoft.Json;
 using Polly;
-using StackExchange.Redis;
+using XAUAT.EduApi.Caching;
 using XAUAT.EduApi.Extensions;
 
 namespace XAUAT.EduApi.Services;
@@ -14,31 +14,20 @@ public interface IExamService
     Task<SemesterItem> GetThisSemester(string cookie);
 }
 
-public class ExamService : IExamService
+public class ExamService(
+    IHttpClientFactory httpClientFactory,
+    ILogger<ExamService> logger,
+    IInfoService info,
+    ICacheService cacheService)
+    : IExamService
 {
     private const string BaseUrl = "https://swjw.xauat.edu.cn";
-    private readonly IDatabase? _redis;
-    private readonly bool _redisAvailable;
-    private readonly IHttpClientFactory _httpClientFactory;
-    private readonly ILogger<ExamService> _logger;
-    private readonly IInfoService _info;
-
-    public ExamService(IHttpClientFactory httpClientFactory, ILogger<ExamService> logger, IInfoService info,
-        IConnectionMultiplexer? muxer)
-    {
-        _httpClientFactory = httpClientFactory;
-        _logger = logger;
-        _info = info;
-
-        // 使用扩展方法初始化Redis连接
-        _redis = muxer.SafeGetDatabase(_logger, out _redisAvailable);
-    }
 
     public async Task<ExamResponse> GetExamArrangementsAsync(string cookie, string? id)
     {
         if (string.IsNullOrEmpty(id) || !id.Contains(','))
         {
-            return await GetExamArrangementAsync(cookie);
+            return await GetExamArrangementAsync(cookie, id);
         }
 
         var split = id.Split(',');
@@ -64,42 +53,35 @@ public class ExamService : IExamService
     /// <returns></returns>
     public async Task<SemesterItem> GetThisSemester(string cookie)
     {
-        _logger.LogInformation("开始抓取学期数据");
+        logger.LogInformation("开始抓取学期数据");
 
-        // 尝试从Redis获取缓存
-        var cachedSemester = await _redis.GetCacheAsync<SemesterItem>(_redisAvailable, CacheKeys.ThisSemester, _logger);
-        if (cachedSemester != null && !string.IsNullOrEmpty(cachedSemester.Value))
-        {
-            return cachedSemester;
-        }
-
-        var retryPolicy = Policy
-            .Handle<HttpRequestException>()
-            .Or<TaskCanceledException>()
-            .WaitAndRetryAsync(3, retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)));
-
-        return await retryPolicy.ExecuteAsync(async () =>
-        {
-            using var client = _httpClientFactory.CreateClient();
-            client.SetRealisticHeaders();
-            client.Timeout = HttpTimeouts.EduSystem;
-            client.DefaultRequestHeaders.Add("Cookie", cookie);
-
-            var html = await client.GetStringAsync("https://swjw.xauat.edu.cn/student/for-std/course-table");
-
-            // 检查是否重定向到登录页面
-            if (html.Contains("登入页面"))
+        return await cacheService.GetOrCreateAsync(
+            CacheKeys.ThisSemester,
+            async () =>
             {
-                throw new Exceptions.UnAuthenticationError();
-            }
+                var retryPolicy = Policy
+                    .Handle<HttpRequestException>()
+                    .Or<TaskCanceledException>()
+                    .WaitAndRetryAsync(3, retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)));
 
-            var data = html.ParseNow(_info);
+                return await retryPolicy.ExecuteAsync(async () =>
+                {
+                    using var client = httpClientFactory.CreateClient();
+                    client.SetRealisticHeaders();
+                    client.Timeout = HttpTimeouts.EduSystem;
+                    client.DefaultRequestHeaders.Add("Cookie", cookie);
 
-            // 缓存到Redis
-            await _redis.SetCacheAsync(_redisAvailable, CacheKeys.ThisSemester, data, TimeSpan.FromHours(1), _logger);
+                    var html = await client.GetStringAsync("https://swjw.xauat.edu.cn/student/for-std/course-table");
 
-            return data;
-        });
+                    if (html.Contains("登入页面"))
+                    {
+                        throw new Exceptions.UnAuthenticationError();
+                    }
+
+                    return html.ParseNow(info);
+                });
+            },
+            TimeSpan.FromHours(1));
     }
 
     /// <summary>
@@ -110,34 +92,34 @@ public class ExamService : IExamService
     /// <returns></returns>
     private async Task<ExamResponse> GetExamArrangementAsync(string cookie, string? id = null)
     {
+        // 无id时不使用缓存
+        if (string.IsNullOrEmpty(id))
+        {
+            return await FetchExamArrangementAsync(cookie, null);
+        }
+
+        return await cacheService.GetOrCreateAsync(
+            CacheKeys.ExamArrangement(id),
+            async () => await FetchExamArrangementAsync(cookie, id),
+            TimeSpan.FromHours(1));
+    }
+
+    private async Task<ExamResponse> FetchExamArrangementAsync(string cookie, string? id)
+    {
         try
         {
-            var cacheKey = CacheKeys.ExamArrangement(id);
-
-            // 尝试从Redis获取缓存
-            if (!string.IsNullOrEmpty(id))
-            {
-                var cachedExam = await _redis.GetCacheAsync<ExamResponse>(_redisAvailable, cacheKey, _logger);
-                if (cachedExam is { CanClick: true })
-                {
-                    return cachedExam;
-                }
-            }
-
             var url = $"{BaseUrl}/student/for-std/exam-arrange/";
             if (!string.IsNullOrEmpty(id))
             {
                 url += $"info/{id}?";
             }
 
-            using var httpClient = _httpClientFactory.CreateClient();
+            using var httpClient = httpClientFactory.CreateClient();
             httpClient.SetRealisticHeaders();
             httpClient.Timeout = HttpTimeouts.EduSystem;
 
-            // 设置 CancellationToken
             using var cts = new CancellationTokenSource(HttpTimeouts.EduSystem);
 
-            // 添加重试逻辑
             var retryPolicy = Policy
                 .Handle<HttpRequestException>()
                 .Or<TaskCanceledException>()
@@ -146,23 +128,21 @@ public class ExamService : IExamService
 
             var response = await retryPolicy.ExecuteAsync(async ct =>
             {
-                var requestPolicy = CreateRequest(); // 每次重试都新建请求
+                var requestPolicy = new HttpRequestMessage(HttpMethod.Get, url).WithCookie(cookie);
                 return await httpClient.SendAsync(requestPolicy, ct);
             }, cts.Token);
 
             var content = await response.Content.ReadAsStringAsync(cts.Token);
 
-            // 检查是否重定向到登录页面
             if (content.Contains("登入页面"))
             {
                 throw new Exceptions.UnAuthenticationError();
             }
 
-            // 解析数据
             var match = Regex.Match(content, @"var studentExamInfoVms = (.*?)\];", RegexOptions.Singleline);
             if (!match.Success)
             {
-                _logger.LogWarning("Failed to match exam data pattern");
+                logger.LogWarning("Failed to match exam data pattern");
                 return new ExamResponse
                 {
                     Exams = [],
@@ -172,14 +152,13 @@ public class ExamService : IExamService
             }
 
             var jsonData = match.Groups[1].Value + "]";
-            // 替换单引号为双引号
             jsonData = jsonData.Replace("'", "\"");
             jsonData = Regex.Replace(jsonData, @"\\x[0-9A-Fa-f]{2}", "");
 
             var examData = JsonConvert.DeserializeObject<List<ExamDataRaw>>(jsonData);
             if (examData == null)
             {
-                _logger.LogWarning("Failed to deserialize exam data");
+                logger.LogWarning("Failed to deserialize exam data");
                 return new ExamResponse
                 {
                     Exams = [],
@@ -188,7 +167,7 @@ public class ExamService : IExamService
                 };
             }
 
-            var result = new ExamResponse
+            return new ExamResponse
             {
                 Exams = examData.Select(d => new ExamInfo
                 {
@@ -199,19 +178,10 @@ public class ExamService : IExamService
                 }).ToList(),
                 CanClick = examData.Count != 0
             };
-
-            if (string.IsNullOrEmpty(id)) return result;
-
-            // 缓存到Redis
-            await _redis.SetCacheAsync(_redisAvailable, cacheKey, result, TimeSpan.FromHours(1), _logger);
-
-            return result;
-
-            HttpRequestMessage CreateRequest() => new HttpRequestMessage(HttpMethod.Get, url).WithCookie(cookie);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error getting exam arrangements");
+            logger.LogError(ex, "Error getting exam arrangements");
             return new ExamResponse
             {
                 Exams = [],

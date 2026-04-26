@@ -1,11 +1,12 @@
 using Moq;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using StackExchange.Redis;
 using XAUAT.EduApi.Services;
 using XAUAT.EduApi.Repos;
+using XAUAT.EduApi.Caching;
 using EduApi.Data;
 using EduApi.Data.Models;
+using Moq.Protected;
 
 namespace XAUAT.EduApi.Tests.Integration;
 
@@ -35,11 +36,17 @@ public class ScoreServiceIntegrationTests : IDisposable
         // 初始化数据库
         _dbContext.Database.EnsureCreated();
         
-        // 创建依赖项
+        // 创建依赖项 - 使用HttpMessageHandler模拟HTTP响应
         var httpClientFactoryMock = new Mock<IHttpClientFactory>();
-        // 创建一个 HttpClient，设置一个无效的 BaseAddress，这样请求会失败，从而触发错误处理逻辑，返回空列表
-        var httpClient = new HttpClient { BaseAddress = new Uri("http://localhost:9999/") };
-        httpClientFactoryMock.Setup(m => m.CreateClient(It.IsAny<string>())).Returns(httpClient);
+        var handlerMock = new Mock<HttpMessageHandler>();
+        handlerMock.Protected()
+            .Setup<Task<HttpResponseMessage>>("SendAsync", ItExpr.IsAny<HttpRequestMessage>(), ItExpr.IsAny<CancellationToken>())
+            .ReturnsAsync(new HttpResponseMessage
+            {
+                StatusCode = System.Net.HttpStatusCode.NotFound
+            });
+        httpClientFactoryMock.Setup(m => m.CreateClient(It.IsAny<string>()))
+            .Returns(() => new HttpClient(handlerMock.Object, disposeHandler: false));
         var httpClientFactory = httpClientFactoryMock.Object;
         var logger = new Mock<ILogger<ScoreService>>().Object;
         var examServiceMock = new Mock<IExamService>();
@@ -47,8 +54,19 @@ public class ScoreServiceIntegrationTests : IDisposable
         examServiceMock.Setup(m => m.GetThisSemester(It.IsAny<string>()))
             .ReturnsAsync(new SemesterItem { Value = "2025-2026-1", Text = "2025-2026学年第一学期" });
         var examService = examServiceMock.Object;
-        var redisConnection = new Mock<IConnectionMultiplexer>().Object;
-        
+        var cacheServiceMock = new Mock<ICacheService>();
+        // 设置GetOrCreateAsync透传，确保工厂方法能正常执行
+        cacheServiceMock
+            .Setup(m => m.GetOrCreateAsync(
+                It.IsAny<string>(),
+                It.IsAny<Func<Task<List<ScoreResponse>>>>(),
+                It.IsAny<TimeSpan?>(),
+                It.IsAny<CacheLevel>(),
+                It.IsAny<int>(),
+                It.IsAny<CancellationToken>()))
+            .Returns(async (string key, Func<Task<List<ScoreResponse>>> factory, TimeSpan? exp, CacheLevel level, int priority, CancellationToken ct) =>
+                await factory());
+
         // 创建仓库和服务
         var dbContextFactory = new TestDbContextFactory(_dbContextOptions);
         _scoreRepository = new ScoreRepository(dbContextFactory);
@@ -56,7 +74,7 @@ public class ScoreServiceIntegrationTests : IDisposable
             httpClientFactory,
             logger,
             examService,
-            redisConnection,
+            cacheServiceMock.Object,
             _scoreRepository);
     }
     

@@ -9,6 +9,7 @@ using System.Net;
 using EduApi.Data;
 using EduApi.Data.Models;
 using XAUAT.EduApi.Caching;
+using XAUAT.EduApi.Extensions;
 using XAUAT.EduApi.Repos;
 using XAUAT.EduApi.Services;
 
@@ -31,8 +32,13 @@ public class EndToEndIntegrationTests : IDisposable
         var services = new ServiceCollection();
 
         // 配置内存数据库
-        services.AddDbContext<EduContext>(options =>
-            options.UseInMemoryDatabase(databaseName: $"EndToEndTestDb_{Guid.NewGuid()}"));
+        var dbName = $"EndToEndTestDb_{Guid.NewGuid()}";
+        var dbOptions = new DbContextOptionsBuilder<EduContext>()
+            .UseInMemoryDatabase(databaseName: dbName)
+            .Options;
+        services.AddSingleton(dbOptions);
+        services.AddDbContext<EduContext>(options => options.UseInMemoryDatabase(dbName));
+        services.AddSingleton<IDbContextFactory<EduContext>>(sp => new TestDbContextFactory(dbOptions));
 
         // 配置Redis Mock
         _redisMock = new Mock<IConnectionMultiplexer>();
@@ -86,6 +92,7 @@ public class EndToEndIntegrationTests : IDisposable
     {
         // Arrange
         var scoreService = _serviceProvider.GetRequiredService<IScoreService>();
+        var cacheService = _serviceProvider.GetRequiredService<ICacheService>();
         var studentId = "2021001";
         var semester = "301";
         var cookie = "test-cookie";
@@ -94,10 +101,12 @@ public class EndToEndIntegrationTests : IDisposable
         {
             new() { Name = "高等数学", Grade = "90", Credit = "4", Gpa = "4.0" }
         };
-        var cachedJson = Newtonsoft.Json.JsonConvert.SerializeObject(cachedScores);
 
-        _redisDatabaseMock.Setup(x => x.StringGetAsync(It.IsAny<RedisKey>(), It.IsAny<CommandFlags>()))
-            .ReturnsAsync(new RedisValue(cachedJson));
+        // 使用CacheService预填充缓存，确保数据格式正确
+        await cacheService.SetAsync(
+            CacheKeys.Scores(studentId, semester),
+            cachedScores,
+            level: CacheLevel.Local);
 
         // Act
         var result = await scoreService.GetScoresAsync(studentId, semester, cookie);
@@ -113,19 +122,14 @@ public class EndToEndIntegrationTests : IDisposable
     {
         // Arrange
         var scoreService = _serviceProvider.GetRequiredService<IScoreService>();
+        var cacheService = _serviceProvider.GetRequiredService<ICacheService>();
         var studentId = "2021001";
         var semester = "200"; // 非当前学期
         var cookie = "test-cookie";
 
-        // 设置Redis返回空
-        _redisDatabaseMock.Setup(x => x.StringGetAsync(It.IsAny<RedisKey>(), It.IsAny<CommandFlags>()))
-            .ReturnsAsync(RedisValue.Null);
-
-        // 设置当前学期
+        // 设置当前学期缓存
         var currentSemester = new SemesterItem { Value = "301", Text = "2025-2026-1" };
-        var semesterJson = Newtonsoft.Json.JsonConvert.SerializeObject(currentSemester);
-        _redisDatabaseMock.Setup(x => x.StringGetAsync("eduapi:thisSemester", It.IsAny<CommandFlags>()))
-            .ReturnsAsync(new RedisValue(semesterJson));
+        await cacheService.SetAsync(CacheKeys.ThisSemester, currentSemester, level: CacheLevel.Local);
 
         // 添加测试数据到数据库
         _dbContext.Scores.Add(new ScoreResponse
@@ -228,6 +232,7 @@ public class EndToEndIntegrationTests : IDisposable
     {
         // Arrange
         var examService = _serviceProvider.GetRequiredService<IExamService>();
+        var cacheService = _serviceProvider.GetRequiredService<ICacheService>();
         var cookie = "test-cookie";
         var id = "2021001";
 
@@ -239,10 +244,12 @@ public class EndToEndIntegrationTests : IDisposable
             },
             CanClick = true
         };
-        var cachedJson = Newtonsoft.Json.JsonConvert.SerializeObject(cachedExam);
 
-        _redisDatabaseMock.Setup(x => x.StringGetAsync(It.IsAny<RedisKey>(), It.IsAny<CommandFlags>()))
-            .ReturnsAsync(new RedisValue(cachedJson));
+        // 使用CacheService预填充缓存，确保数据格式正确
+        await cacheService.SetAsync(
+            CacheKeys.ExamArrangement(id),
+            cachedExam,
+            level: CacheLevel.Local);
 
         // Act
         var result = await examService.GetExamArrangementsAsync(cookie, id);
@@ -273,8 +280,8 @@ public class EndToEndIntegrationTests : IDisposable
                 Content = new StringContent("<html>var studentExamInfoVms = [];</html>")
             });
 
-        var httpClient = new HttpClient(handlerMock.Object);
-        _httpClientFactoryMock.Setup(m => m.CreateClient(It.IsAny<string>())).Returns(httpClient);
+        _httpClientFactoryMock.Setup(m => m.CreateClient(It.IsAny<string>()))
+            .Returns(() => new HttpClient(handlerMock.Object, disposeHandler: false));
 
         // Act
         var result = await examService.GetExamArrangementsAsync(cookie, id);
@@ -294,22 +301,18 @@ public class EndToEndIntegrationTests : IDisposable
         var cacheService = _serviceProvider.GetRequiredService<ICacheService>();
         var studentId = "2021001";
 
-        // 模拟学生数据缓存
-        var studentData = new
-        {
-            Id = studentId,
-            Name = "张三",
-            Major = "计算机科学与技术"
-        };
+        // 模拟学生数据缓存 - 使用字符串类型保证Set和Get使用相同的泛型参数
+        var studentData = "张三,计算机科学与技术";
 
         // Act - 缓存学生数据
         await cacheService.SetAsync($"student:{studentId}", studentData, level: CacheLevel.Local);
 
         // Act - 获取学生数据
-        var cachedData = await cacheService.GetAsync<object>($"student:{studentId}");
+        var cachedData = await cacheService.GetAsync<string>($"student:{studentId}");
 
         // Assert
         Assert.NotNull(cachedData);
+        Assert.Equal(studentData, cachedData);
     }
 
     [Fact]
@@ -339,9 +342,10 @@ public class EndToEndIntegrationTests : IDisposable
         // Assert
         Assert.Equal(2, completedTasks);
 
-        // 验证数据已被缓存
-        var semester = await cacheService.GetAsync<SemesterItem>("warmup:semester");
-        Assert.NotNull(semester);
+        // 验证数据已被缓存 - warmup使用object类型存储，需用相同类型获取
+        var semesterObj = await cacheService.GetAsync<object>("warmup:semester");
+        Assert.NotNull(semesterObj);
+        var semester = Assert.IsType<SemesterItem>(semesterObj);
         Assert.Equal("301", semester.Value);
     }
 
@@ -373,19 +377,14 @@ public class EndToEndIntegrationTests : IDisposable
     {
         // Arrange
         var scoreService = _serviceProvider.GetRequiredService<IScoreService>();
+        var cacheService = _serviceProvider.GetRequiredService<ICacheService>();
         var studentId = "invalid-student";
         var semester = "301";
         var cookie = "test-cookie";
 
-        // 设置Redis返回空
-        _redisDatabaseMock.Setup(x => x.StringGetAsync(It.IsAny<RedisKey>(), It.IsAny<CommandFlags>()))
-            .ReturnsAsync(RedisValue.Null);
-
-        // 设置当前学期
+        // 设置当前学期缓存
         var currentSemester = new SemesterItem { Value = "301", Text = "2025-2026-1" };
-        var semesterJson = Newtonsoft.Json.JsonConvert.SerializeObject(currentSemester);
-        _redisDatabaseMock.Setup(x => x.StringGetAsync("eduapi:thisSemester", It.IsAny<CommandFlags>()))
-            .ReturnsAsync(new RedisValue(semesterJson));
+        await cacheService.SetAsync(CacheKeys.ThisSemester, currentSemester, level: CacheLevel.Local);
 
         // 模拟HTTP请求失败
         var handlerMock = new Mock<HttpMessageHandler>();
@@ -396,8 +395,8 @@ public class EndToEndIntegrationTests : IDisposable
                 StatusCode = HttpStatusCode.NotFound
             });
 
-        var httpClient = new HttpClient(handlerMock.Object);
-        _httpClientFactoryMock.Setup(m => m.CreateClient(It.IsAny<string>())).Returns(httpClient);
+        _httpClientFactoryMock.Setup(m => m.CreateClient(It.IsAny<string>()))
+            .Returns(() => new HttpClient(handlerMock.Object, disposeHandler: false));
 
         // Act
         var result = await scoreService.GetScoresAsync(studentId, semester, cookie);

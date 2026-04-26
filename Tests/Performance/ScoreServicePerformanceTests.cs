@@ -2,9 +2,9 @@ using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
 using Moq;
 using Microsoft.Extensions.Logging;
-using StackExchange.Redis;
 using XAUAT.EduApi.Services;
 using XAUAT.EduApi.Repos;
+using XAUAT.EduApi.Caching;
 using EduApi.Data;
 using EduApi.Data.Models;
 using Microsoft.EntityFrameworkCore;
@@ -56,11 +56,18 @@ public class ScoreServicePerformanceTests
         _examServiceMock.Setup(m => m.GetThisSemester(It.IsAny<string>()))
             .ReturnsAsync(new SemesterItem { Value = Semester, Text = "2025-2026学年第一学期" });
 
-        // 创建Redis模拟
-        var redisConnectionMock = new Mock<IConnectionMultiplexer>();
-        var redisDatabaseMock = new Mock<IDatabase>();
-        redisConnectionMock.Setup(x => x.GetDatabase(It.IsAny<int>(), It.IsAny<object>()))
-            .Returns(redisDatabaseMock.Object);
+        // 创建CacheService模拟 - 默认透传
+        var cacheServiceMock = new Mock<ICacheService>();
+        cacheServiceMock
+            .Setup(m => m.GetOrCreateAsync(
+                It.IsAny<string>(),
+                It.IsAny<Func<Task<List<ScoreResponse>>>>(),
+                It.IsAny<TimeSpan?>(),
+                It.IsAny<CacheLevel>(),
+                It.IsAny<int>(),
+                It.IsAny<CancellationToken>()))
+            .Returns(async (string key, Func<Task<List<ScoreResponse>>> factory, TimeSpan? exp, CacheLevel level, int priority, CancellationToken ct) =>
+                await factory());
 
         // 添加测试数据
         var testScores = new List<ScoreResponse>();
@@ -89,7 +96,7 @@ public class ScoreServicePerformanceTests
             _httpClientFactoryMock.Object,
             new Mock<ILogger<ScoreService>>().Object,
             _examServiceMock.Object,
-            redisConnectionMock.Object,
+            cacheServiceMock.Object,
             _scoreRepository);
     }
 

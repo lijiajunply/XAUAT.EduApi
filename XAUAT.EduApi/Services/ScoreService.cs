@@ -2,7 +2,7 @@ using System.Text.RegularExpressions;
 using EduApi.Data.Models;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using StackExchange.Redis;
+using XAUAT.EduApi.Caching;
 using XAUAT.EduApi.Extensions;
 using XAUAT.EduApi.Repos;
 
@@ -15,60 +15,37 @@ public interface IScoreService
     Task<SemesterItem> GetThisSemesterAsync(string cookie);
 }
 
-public class ScoreService : IScoreService
+public class ScoreService(
+    IHttpClientFactory httpClientFactory,
+    ILogger<ScoreService> logger,
+    IExamService examService,
+    ICacheService cacheService,
+    IScoreRepository scoreRepository)
+    : IScoreService
 {
-    private readonly IDatabase? _redis;
-    private readonly bool _redisAvailable;
-    private readonly IHttpClientFactory _httpClientFactory;
-    private readonly ILogger<ScoreService> _logger;
-    private readonly IExamService _examService;
-    private readonly IScoreRepository _scoreRepository;
-
-    public ScoreService(IHttpClientFactory httpClientFactory, ILogger<ScoreService> logger, IExamService examService,
-        IConnectionMultiplexer? muxer, IScoreRepository scoreRepository)
-    {
-        _httpClientFactory = httpClientFactory;
-        _logger = logger;
-        _examService = examService;
-        _scoreRepository = scoreRepository;
-
-        // 使用扩展方法初始化Redis连接
-        _redis = muxer.SafeGetDatabase(_logger, out _redisAvailable);
-    }
-
     public async Task<List<ScoreResponse>> GetScoresAsync(string studentId, string semester, string cookie)
     {
-        _logger.LogInformation("开始获取考试分数");
+        logger.LogInformation("开始获取考试分数");
 
         if (string.IsNullOrEmpty(studentId) || string.IsNullOrEmpty(cookie))
         {
             throw new ArgumentNullException(nameof(studentId));
         }
 
-        // 尝试从Redis获取缓存
-        var cacheKey = CacheKeys.Scores(studentId, semester);
-        var cachedScores = await _redis.GetCacheAsync<List<ScoreResponse>>(_redisAvailable, cacheKey, _logger);
-        if (cachedScores is { Count: > 0 })
-        {
-            return cachedScores;
-        }
+        return await cacheService.GetOrCreateAsync(
+            CacheKeys.Scores(studentId, semester),
+            async () =>
+            {
+                var split = studentId.Split(',');
 
-        var split = studentId.Split(',');
+                // 使用 Task.WhenAll 并行获取所有学生的成绩，解决 N+1 问题
+                var tasks = split.Select((s, index) => GetScoreResponseWithIndex(s, semester, cookie, index)).ToArray();
+                var allResults = await Task.WhenAll(tasks).ConfigureAwait(false);
 
-        // 使用 Task.WhenAll 并行获取所有学生的成绩，解决 N+1 问题
-        var tasks = split.Select((s, index) => GetScoreResponseWithIndex(s, semester, cookie, index)).ToArray();
-        var allResults = await Task.WhenAll(tasks).ConfigureAwait(false);
-
-        // 合并结果
-        var result = allResults.SelectMany(r => r).ToList();
-
-        // 将结果缓存到Redis
-        if (result.Count > 0)
-        {
-            await _redis.SetCacheAsync(_redisAvailable, cacheKey, result, TimeSpan.FromHours(1), _logger);
-        }
-
-        return result;
+                // 合并结果
+                return allResults.SelectMany(r => r).ToList();
+            },
+            TimeSpan.FromHours(1));
     }
 
     /// <summary>
@@ -93,52 +70,46 @@ public class ScoreService : IScoreService
 
     public async Task<SemesterResult> ParseSemesterAsync(string? studentId, string cookie)
     {
-        _logger.LogInformation("开始解析学期数据");
+        logger.LogInformation("开始解析学期数据");
 
-        // 尝试从Redis获取缓存
-        var cacheKey = CacheKeys.SemesterResult(studentId);
-        var cachedResult = await _redis.GetCacheAsync<SemesterResult>(_redisAvailable, cacheKey, _logger);
-        if (cachedResult != null)
-        {
-            return cachedResult;
-        }
+        return await cacheService.GetOrCreateAsync(
+            CacheKeys.SemesterResult(studentId),
+            async () =>
+            {
+                using var client = httpClientFactory.CreateClient();
+                client.ConfigureForEduSystem(cookie, HttpTimeouts.EduSystem);
 
-        using var client = _httpClientFactory.CreateClient();
-        client.ConfigureForEduSystem(cookie, HttpTimeouts.EduSystem);
+                var url = "https://swjw.xauat.edu.cn/student/for-std/grade/sheet";
+                if (!string.IsNullOrEmpty(studentId))
+                {
+                    var split = studentId.Split(',');
+                    var firstId = split.FirstOrDefault();
+                    url += $"/semester-index/{firstId}";
+                }
 
-        var url = "https://swjw.xauat.edu.cn/student/for-std/grade/sheet";
-        if (!string.IsNullOrEmpty(studentId))
-        {
-            var split = studentId.Split(',');
-            studentId = split.FirstOrDefault();
-            url += $"/semester-index/{studentId}";
-        }
+                var html = await client.GetStringAsync(url).ConfigureAwait(false);
 
-        var html = await client.GetStringAsync(url).ConfigureAwait(false);
+                if (html.Contains("登入页面"))
+                {
+                    throw new Exceptions.UnAuthenticationError();
+                }
 
-        if (html.Contains("登入页面"))
-        {
-            throw new Exceptions.UnAuthenticationError();
-        }
-
-        var result = new SemesterResult();
-        result.Parse(html);
-
-        // 将结果缓存到Redis
-        await _redis.SetCacheAsync(_redisAvailable, cacheKey, result, TimeSpan.FromHours(1), _logger);
-
-        return result;
+                var result = new SemesterResult();
+                result.Parse(html);
+                return result;
+            },
+            TimeSpan.FromHours(1));
     }
 
     public async Task<SemesterItem> GetThisSemesterAsync(string cookie)
     {
-        return await _examService.GetThisSemester(cookie);
+        return await examService.GetThisSemester(cookie);
     }
 
     private async Task<IEnumerable<ScoreResponse>> GetScoreResponse(string studentId, string semester, string cookie)
     {
         // 判断是否为当前学期
-        var thisSemester = await _examService.GetThisSemester(cookie).ConfigureAwait(false);
+        var thisSemester = await examService.GetThisSemester(cookie).ConfigureAwait(false);
         var isCurrentSemester = thisSemester != null! && thisSemester.Value == semester;
 
         if (!isCurrentSemester && thisSemester != null)
@@ -152,7 +123,7 @@ public class ScoreService : IScoreService
         if (!isCurrentSemester)
         {
             // 从数据库查询
-            var dbScores = await _scoreRepository.GetByUserIdAsync(studentId).ConfigureAwait(false);
+            var dbScores = await scoreRepository.GetByUserIdAsync(studentId).ConfigureAwait(false);
             dbScores = dbScores.Where(s => s.Semester == semester);
 
             // 如果数据库中有数据，直接返回
@@ -182,11 +153,11 @@ public class ScoreService : IScoreService
 
         try
         {
-            await _scoreRepository.AddRangeAsync(scoresToSave).ConfigureAwait(false);
+            await scoreRepository.AddRangeAsync(scoresToSave).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "保存成绩数据到数据库时出错");
+            logger.LogError(ex, "保存成绩数据到数据库时出错");
             // 即使保存失败也返回爬取的数据
         }
 
@@ -195,7 +166,7 @@ public class ScoreService : IScoreService
 
     private async Task<List<ScoreResponse>> CrawlScores(string studentId, string semester, string cookie)
     {
-        using var client = _httpClientFactory.CreateClient();
+        using var client = httpClientFactory.CreateClient();
         client.ConfigureForEduSystem(cookie, HttpTimeouts.EduSystem);
 
         var response = await client.GetAsync(
@@ -204,7 +175,7 @@ public class ScoreService : IScoreService
 
         if (!response.IsSuccessStatusCode)
         {
-            _logger.LogWarning("获取成绩数据失败，HTTP状态码: {StatusCode}", response.StatusCode);
+            logger.LogWarning("获取成绩数据失败，HTTP状态码: {StatusCode}", response.StatusCode);
             return [];
         }
 
@@ -213,7 +184,7 @@ public class ScoreService : IScoreService
         // 检查返回的内容是否为HTML（表示可能需要重新登录）
         if (content.StartsWith('<'))
         {
-            _logger.LogWarning("获取成绩数据失败，返回了HTML内容而非JSON，可能Cookie已过期");
+            logger.LogWarning("获取成绩数据失败，返回了HTML内容而非JSON，可能Cookie已过期");
             if (content.Contains("登入页面"))
             {
                 throw new Exceptions.UnAuthenticationError();
@@ -229,7 +200,7 @@ public class ScoreService : IScoreService
         }
         catch (JsonReaderException ex)
         {
-            _logger.LogError(ex, "解析成绩JSON数据失败，原始内容: {Content}", content);
+            logger.LogError(ex, "解析成绩JSON数据失败，原始内容: {Content}", content);
             return [];
         }
 
@@ -249,10 +220,10 @@ public class ScoreService : IScoreService
         if (list.Count == 0) return list;
 
         // 缓存当前学期信息
-        var thisSemesterCache = await _redis.GetStringCacheAsync(_redisAvailable, CacheKeys.ThisSemester, _logger);
+        var thisSemesterCache = await cacheService.GetAsync<string>(CacheKeys.ThisSemester);
         if (string.IsNullOrEmpty(thisSemesterCache))
         {
-            await _examService.GetThisSemester(cookie).ConfigureAwait(false);
+            await examService.GetThisSemester(cookie).ConfigureAwait(false);
         }
 
         return list;

@@ -1,9 +1,9 @@
 using Moq;
 using Moq.Protected;
 using Newtonsoft.Json;
-using StackExchange.Redis;
 using System.Net;
 using XAUAT.EduApi.Services;
+using XAUAT.EduApi.Caching;
 using JsonSerializer = System.Text.Json.JsonSerializer;
 
 namespace XAUAT.EduApi.Tests.Services;
@@ -11,19 +11,32 @@ namespace XAUAT.EduApi.Tests.Services;
 public class ProgramServiceTests
 {
     private readonly Mock<IHttpClientFactory> _mockHttpClientFactory;
-    private readonly Mock<IConnectionMultiplexer> _mockMuxer;
-    private readonly Mock<IDatabase> _mockDatabase;
+    private readonly Mock<ICacheService> _mockCacheService;
     private readonly ProgramService _service;
 
     public ProgramServiceTests()
     {
         _mockHttpClientFactory = new Mock<IHttpClientFactory>();
-        _mockMuxer = new Mock<IConnectionMultiplexer>();
-        _mockDatabase = new Mock<IDatabase>();
-        
-        _mockMuxer.Setup(x => x.GetDatabase(It.IsAny<int>(), It.IsAny<object>())).Returns(_mockDatabase.Object);
-        
-        _service = new ProgramService(_mockHttpClientFactory.Object, _mockMuxer.Object);
+        _mockCacheService = new Mock<ICacheService>();
+
+        // 默认配置GetOrCreateAsync：缓存未命中时调用工厂方法
+        SetupGetOrCreatePassThrough<List<PlanCourse>>();
+
+        _service = new ProgramService(_mockHttpClientFactory.Object, _mockCacheService.Object);
+    }
+
+    private void SetupGetOrCreatePassThrough<T>()
+    {
+        _mockCacheService
+            .Setup(m => m.GetOrCreateAsync(
+                It.IsAny<string>(),
+                It.IsAny<Func<Task<T>>>(),
+                It.IsAny<TimeSpan?>(),
+                It.IsAny<CacheLevel>(),
+                It.IsAny<int>(),
+                It.IsAny<CancellationToken>()))
+            .Returns(async (string key, Func<Task<T>> factory, TimeSpan? exp, CacheLevel level, int priority, CancellationToken ct) =>
+                await factory());
     }
 
     [Fact]
@@ -33,10 +46,16 @@ public class ProgramServiceTests
         var id = "123";
         var cookie = "cookie";
         var cachedData = new List<PlanCourse> { new PlanCourse { Name = "Test Course" } };
-        var cachedJson = JsonConvert.SerializeObject(cachedData);
 
-        _mockDatabase.Setup(x => x.StringGetAsync($"train-program-{id}", It.IsAny<CommandFlags>()))
-            .ReturnsAsync(cachedJson);
+        _mockCacheService
+            .Setup(m => m.GetOrCreateAsync(
+                It.IsAny<string>(),
+                It.IsAny<Func<Task<List<PlanCourse>>>>(),
+                It.IsAny<TimeSpan?>(),
+                It.IsAny<CacheLevel>(),
+                It.IsAny<int>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(cachedData);
 
         // Act
         var result = await _service.GetAllTrainProgram(cookie, id);
@@ -45,6 +64,9 @@ public class ProgramServiceTests
         Assert.Single(result);
         Assert.Equal("Test Course", result[0].Name);
         _mockHttpClientFactory.Verify(x => x.CreateClient(It.IsAny<string>()), Times.Never);
+
+        // Reset
+        SetupGetOrCreatePassThrough<List<PlanCourse>>();
     }
 
     [Fact]
@@ -53,9 +75,6 @@ public class ProgramServiceTests
         // Arrange
         var id = "123";
         var cookie = "cookie";
-        
-        _mockDatabase.Setup(x => x.StringGetAsync($"train-program-{id}", It.IsAny<CommandFlags>()))
-            .ReturnsAsync(RedisValue.Null);
 
         var apiResponse = new ProgramModel
         {
@@ -99,26 +118,14 @@ public class ProgramServiceTests
         // Assert
         Assert.Single(result);
         Assert.Equal("API Course", result[0].Name);
-        
-        // Verify cache set
-        _mockDatabase.Verify(x => x.StringSetAsync(
-            $"train-program-{id}", 
-            It.IsAny<RedisValue>(), 
-            It.IsAny<TimeSpan?>(), 
-            It.IsAny<bool>(), 
-            It.IsAny<When>(), 
-            It.IsAny<CommandFlags>()), Times.Once);
     }
-    
+
     [Fact]
     public async Task GetAllTrainProgram_ShouldThrowUnAuthenticationError_WhenSessionExpired()
     {
         // Arrange
         var id = "123";
         var cookie = "cookie";
-        
-        _mockDatabase.Setup(x => x.StringGetAsync($"train-program-{id}", It.IsAny<CommandFlags>()))
-            .ReturnsAsync(RedisValue.Null);
 
         var handlerMock = new Mock<HttpMessageHandler>();
         handlerMock
