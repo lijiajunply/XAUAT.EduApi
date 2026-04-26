@@ -393,6 +393,7 @@ public class CacheService : ICacheService, IDisposable
             {
                 var redisResult = await _redisCache.GetManyAsync<T>(remainingKeys, cancellationToken);
 
+                var syncTasks = new List<Task>();
                 foreach (var (key, value) in redisResult)
                 {
                     if (value != null)
@@ -401,9 +402,10 @@ public class CacheService : ICacheService, IDisposable
                         _monitoringService?.RecordCacheHit("RedisCache");
 
                         // 同步到本地缓存
-                        await SetLocalCacheAsync(key, value, null, 5, cancellationToken);
+                        syncTasks.Add(SetLocalCacheAsync(key, value, null, 5, cancellationToken));
                     }
                 }
+                await Task.WhenAll(syncTasks);
             }
 
             // 3. 记录未命中
@@ -664,15 +666,18 @@ public class CacheService : ICacheService, IDisposable
             // 按优先级排序
             var sortedTasks = _warmupTasks.OrderByDescending(t => t.Priority).ToList();
 
-            foreach (var task in sortedTasks)
+            // 使用并发执行预热任务，设置合理的并发度防止请求过载
+            await Parallel.ForEachAsync(sortedTasks, new ParallelOptions
             {
-                cancellationToken.ThrowIfCancellationRequested();
-
+                MaxDegreeOfParallelism = Environment.ProcessorCount * 2,
+                CancellationToken = cancellationToken
+            }, async (task, ct) =>
+            {
                 if (await ProcessWarmupItemAsync(task))
                 {
-                    completedTasks++;
+                    Interlocked.Increment(ref completedTasks);
                 }
-            }
+            });
 
             _logger.LogInformation("Cache warmup completed, success: {CompletedTasks}/{TotalTasks}, elapsed: {Elapsed}",
                 completedTasks, totalTasks, stopwatch.Elapsed);
@@ -724,15 +729,20 @@ public class CacheService : ICacheService, IDisposable
 
             _logger.LogInformation("Starting incremental cache warmup, tasks: {TaskCount}", filteredTasks.Count);
 
-            foreach (var task in filteredTasks.OrderByDescending(t => t.Priority))
-            {
-                cancellationToken.ThrowIfCancellationRequested();
+            var tasksToRun = filteredTasks.OrderByDescending(t => t.Priority).ToList();
 
+            // 使用并发执行预热任务
+            await Parallel.ForEachAsync(tasksToRun, new ParallelOptions
+            {
+                MaxDegreeOfParallelism = Environment.ProcessorCount * 2,
+                CancellationToken = cancellationToken
+            }, async (task, ct) =>
+            {
                 if (await ProcessWarmupItemAsync(task))
                 {
-                    completedTasks++;
+                    Interlocked.Increment(ref completedTasks);
                 }
-            }
+            });
 
             _logger.LogInformation("Incremental cache warmup completed, success: {CompletedTasks}/{TotalTasks}",
                 completedTasks, filteredTasks.Count);

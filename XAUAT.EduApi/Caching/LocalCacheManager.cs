@@ -12,7 +12,6 @@ internal class LocalCacheManager
     private readonly IMemoryCache _cache;
     private readonly CacheOptions _options;
     private readonly ConcurrentDictionary<string, CacheItemMetadata> _metadata;
-    private readonly ReaderWriterLockSlim _lock;
 
     // 统计信息
     private long _hitCount;
@@ -26,7 +25,6 @@ internal class LocalCacheManager
     public LocalCacheManager(CacheOptions options)
     {
         _options = options;
-        _lock = new ReaderWriterLockSlim();
 
         // 创建内存缓存配置
         var cacheOptions = new MemoryCacheOptions
@@ -48,33 +46,24 @@ internal class LocalCacheManager
     /// <returns>缓存项，如果不存在则返回null</returns>
     public T? Get<T>(string key)
     {
-        try
+        if (_cache.TryGetValue(key, out CacheItem<T>? cacheItem))
         {
-            _lock.EnterReadLock();
-
-            if (_cache.TryGetValue(key, out CacheItem<T>? cacheItem))
+            if (cacheItem is { IsExpired: false })
             {
-                if (cacheItem is { IsExpired: false })
-                {
-                    // 更新访问信息
-                    cacheItem.HitCount++;
-                    cacheItem.LastAccessTime = DateTime.Now;
+                // 更新访问信息 (这里存在极小的并发竞态条件，但对于统计信息可以接受)
+                cacheItem.HitCount++;
+                cacheItem.LastAccessTime = DateTime.Now;
 
-                    // 更新缓存项
-                    Set(key, cacheItem.Value, cacheItem.RemainingTime, cacheItem.BusinessPriority);
+                // 更新缓存项
+                Set(key, cacheItem.Value, cacheItem.RemainingTime, cacheItem.BusinessPriority);
 
-                    Interlocked.Increment(ref _hitCount);
-                    return cacheItem.Value;
-                }
+                Interlocked.Increment(ref _hitCount);
+                return cacheItem.Value;
             }
+        }
 
-            Interlocked.Increment(ref _missCount);
-            return default;
-        }
-        finally
-        {
-            _lock.ExitReadLock();
-        }
+        Interlocked.Increment(ref _missCount);
+        return default;
     }
 
     /// <summary>
@@ -88,71 +77,66 @@ internal class LocalCacheManager
     /// <returns>是否设置成功</returns>
     public bool Set<T>(string key, T? value, TimeSpan? expiration = null, int businessPriority = 5)
     {
-        try
+        if (value == null)
         {
-            _lock.EnterWriteLock();
+            return Remove(key);
+        }
 
-            if (value == null)
+        var actualExpiration = expiration ?? _options.DefaultExpiration;
+        var now = DateTime.Now;
+
+        var cacheItem = new CacheItem<T>
+        {
+            Key = key,
+            Value = value,
+            CreatedTime = now,
+            ExpirationTime = now.Add(actualExpiration),
+            HitCount = 0,
+            LastAccessTime = now,
+            Level = CacheLevel.Local,
+            BusinessPriority = businessPriority
+        };
+
+        // 创建缓存项选项
+        var cacheEntryOptions = new MemoryCacheEntryOptions
+        {
+            AbsoluteExpiration = cacheItem.ExpirationTime,
+            Size = 1, // 每个缓存项大小为1
+            Priority = businessPriority >= 8 ? CacheItemPriority.NeverRemove : CacheItemPriority.Normal
+        };
+
+        // 添加过期回调
+        cacheEntryOptions.RegisterPostEvictionCallback((cacheKey, cacheValue, reason, state) =>
+        {
+            if (reason != EvictionReason.Removed)
             {
-                return Remove(key);
-            }
-
-            var actualExpiration = expiration ?? _options.DefaultExpiration;
-            var now = DateTime.Now;
-
-            var cacheItem = new CacheItem<T>
-            {
-                Key = key,
-                Value = value,
-                CreatedTime = now,
-                ExpirationTime = now.Add(actualExpiration),
-                HitCount = 0,
-                LastAccessTime = now,
-                Level = CacheLevel.Local,
-                BusinessPriority = businessPriority
-            };
-
-            // 创建缓存项选项
-            var cacheEntryOptions = new MemoryCacheEntryOptions
-            {
-                AbsoluteExpiration = cacheItem.ExpirationTime,
-                Size = 1, // 每个缓存项大小为1
-                Priority = businessPriority >= 8 ? CacheItemPriority.NeverRemove : CacheItemPriority.Normal
-            };
-
-            // 添加过期回调
-            cacheEntryOptions.RegisterPostEvictionCallback((cacheKey, cacheValue, reason, state) =>
-            {
-                if (reason != EvictionReason.Removed)
+                if (cacheKey != null)
                 {
-                    _metadata.TryRemove(cacheKey.ToString(), out _);
-                    if (reason == EvictionReason.Expired)
-                    {
-                        Interlocked.Increment(ref _expiredItems);
-                    }
+                    _metadata.TryRemove(cacheKey.ToString()!, out _);
                 }
-            });
+                
+                if (reason == EvictionReason.Expired)
+                {
+                    Interlocked.Increment(ref _expiredItems);
+                }
+            }
+        });
 
-            // 设置缓存
-            _cache.Set(key, cacheItem, cacheEntryOptions);
+        // 设置缓存
+        _cache.Set(key, cacheItem, cacheEntryOptions);
 
-            // 更新元数据
-            _metadata[key] = new CacheItemMetadata
-            {
-                Key = key,
-                CreatedTime = now,
-                ExpirationTime = now.Add(actualExpiration),
-                BusinessPriority = businessPriority,
-                HitCount = 0,
-                LastAccessTime = now
-            };
-
-            return true;
-        }
-        finally
+        // 更新元数据
+        _metadata[key] = new CacheItemMetadata
         {
-            _lock.ExitWriteLock();
-        }
+            Key = key,
+            CreatedTime = now,
+            ExpirationTime = now.Add(actualExpiration),
+            BusinessPriority = businessPriority,
+            HitCount = 0,
+            LastAccessTime = now
+        };
+
+        return true;
     }
 
     /// <summary>
@@ -162,17 +146,8 @@ internal class LocalCacheManager
     /// <returns>是否移除成功</returns>
     public bool Remove(string key)
     {
-        try
-        {
-            _lock.EnterWriteLock();
-
-            _cache.Remove(key);
-            return _metadata.TryRemove(key, out _);
-        }
-        finally
-        {
-            _lock.ExitWriteLock();
-        }
+        _cache.Remove(key);
+        return _metadata.TryRemove(key, out _);
     }
 
     /// <summary>
@@ -182,28 +157,19 @@ internal class LocalCacheManager
     /// <returns>是否存在</returns>
     public bool Exists(string key)
     {
-        try
+        if (_cache.TryGetValue(key, out CacheItem<object>? cacheItem))
         {
-            _lock.EnterReadLock();
-
-            if (_cache.TryGetValue(key, out CacheItem<object>? cacheItem))
+            if (cacheItem is { IsExpired: false })
             {
-                if (cacheItem is { IsExpired: false })
-                {
-                    return true;
-                }
-
-                // 如果已过期，移除它
-                Remove(key);
-                Interlocked.Increment(ref _expiredItems);
+                return true;
             }
 
-            return false;
+            // 如果已过期，移除它
+            Remove(key);
+            Interlocked.Increment(ref _expiredItems);
         }
-        finally
-        {
-            _lock.ExitReadLock();
-        }
+
+        return false;
     }
 
     /// <summary>
@@ -211,22 +177,13 @@ internal class LocalCacheManager
     /// </summary>
     public void Clear()
     {
-        try
+        // 清除所有缓存项
+        foreach (var key in _metadata.Keys.ToList())
         {
-            _lock.EnterWriteLock();
-
-            // 清除所有缓存项
-            foreach (var key in _metadata.Keys.ToList())
-            {
-                _cache.Remove(key);
-            }
-
-            _metadata.Clear();
+            _cache.Remove(key);
         }
-        finally
-        {
-            _lock.ExitWriteLock();
-        }
+
+        _metadata.Clear();
     }
 
     /// <summary>
@@ -240,22 +197,13 @@ internal class LocalCacheManager
     {
         return new AsyncEnumerableWrapper<string>([MustDisposeResource]() =>
         {
-            try
+            var keys = _metadata.Keys.Where(key =>
             {
-                _lock.EnterReadLock();
+                cancellationToken.ThrowIfCancellationRequested();
+                return WildcardMatch(key, pattern);
+            });
 
-                var keys = _metadata.Keys.Where(key =>
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    return WildcardMatch(key, pattern);
-                });
-
-                return keys.GetEnumerator();
-            }
-            finally
-            {
-                _lock.ExitReadLock();
-            }
+            return keys.GetEnumerator();
         });
     }
 
@@ -265,29 +213,20 @@ internal class LocalCacheManager
     /// <returns>缓存统计信息</returns>
     public LocalCacheStatistics GetStatistics()
     {
-        try
-        {
-            _lock.EnterReadLock();
+        var totalItems = _metadata.Count;
+        var hitCount = Interlocked.Read(ref _hitCount);
+        var missCount = Interlocked.Read(ref _missCount);
+        var expiredItems = Interlocked.Read(ref _expiredItems);
 
-            var totalItems = _metadata.Count;
-            var hitCount = Interlocked.Read(ref _hitCount);
-            var missCount = Interlocked.Read(ref _missCount);
-            var expiredItems = Interlocked.Read(ref _expiredItems);
-
-            return new LocalCacheStatistics
-            {
-                TotalItems = totalItems,
-                HitCount = hitCount,
-                MissCount = missCount,
-                HitRate = totalItems > 0 ? (double)hitCount / (hitCount + missCount) : 0,
-                ExpiredItems = expiredItems,
-                MemorySize = totalItems * 1024 // 粗略估计
-            };
-        }
-        finally
+        return new LocalCacheStatistics
         {
-            _lock.ExitReadLock();
-        }
+            TotalItems = totalItems,
+            HitCount = hitCount,
+            MissCount = missCount,
+            HitRate = totalItems > 0 ? (double)hitCount / (hitCount + missCount) : 0,
+            ExpiredItems = expiredItems,
+            MemorySize = totalItems * 1024 // 粗略估计
+        };
     }
 
     /// <summary>

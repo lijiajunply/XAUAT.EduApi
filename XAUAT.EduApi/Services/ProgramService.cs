@@ -22,7 +22,8 @@ public class ProgramService : IProgramService
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILogger<ProgramService>? _logger;
 
-    public ProgramService(IHttpClientFactory httpClientFactory, IConnectionMultiplexer? muxer, ILogger<ProgramService>? logger = null)
+    public ProgramService(IHttpClientFactory httpClientFactory, IConnectionMultiplexer? muxer,
+        ILogger<ProgramService>? logger = null)
     {
         _httpClientFactory = httpClientFactory;
         _logger = logger;
@@ -32,6 +33,15 @@ public class ProgramService : IProgramService
     }
 
     public async Task<List<PlanCourse>> GetAllTrainProgram(string cookie, string id)
+    {
+        var ids = id.Split(",");
+        var tasks = ids.Select(item => GetAllTrainProgramByOneId(cookie, item));
+        var results = await Task.WhenAll(tasks);
+
+        return results.SelectMany(x => x).ToList();
+    }
+
+    private async Task<List<PlanCourse>> GetAllTrainProgramByOneId(string cookie, string id)
     {
         var cacheKey = CacheKeys.TrainProgram(id);
 
@@ -49,8 +59,9 @@ public class ProgramService : IProgramService
 
         return await retryPolicy.ExecuteAsync(async () =>
         {
-            var request = new HttpRequestMessage(HttpMethod.Get, $"{BaseUrl}/student/for-std/program/root-module-json/{id}")
-                .WithCookie(cookie);
+            var request =
+                new HttpRequestMessage(HttpMethod.Get, $"{BaseUrl}/student/for-std/program/root-module-json/{id}")
+                    .WithCookie(cookie);
 
             using var httpClient = _httpClientFactory.CreateClient();
             httpClient.Timeout = TimeSpan.FromSeconds(5);
