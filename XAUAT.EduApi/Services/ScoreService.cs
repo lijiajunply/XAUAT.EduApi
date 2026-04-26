@@ -4,6 +4,7 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using XAUAT.EduApi.Caching;
 using XAUAT.EduApi.Extensions;
+using XAUAT.EduApi.Queues;
 using XAUAT.EduApi.Repos;
 
 namespace XAUAT.EduApi.Services;
@@ -20,9 +21,13 @@ public class ScoreService(
     ILogger<ScoreService> logger,
     IExamService examService,
     ICacheService cacheService,
-    IScoreRepository scoreRepository)
+    IScoreRepository scoreRepository,
+    IScorePersistenceQueue? scorePersistenceQueue = null)
     : IScoreService
 {
+    private readonly IScorePersistenceQueue _scorePersistenceQueue =
+        scorePersistenceQueue ?? NullScorePersistenceQueue.Instance;
+
     public async Task<List<ScoreResponse>> GetScoresAsync(string studentId, string semester, string cookie)
     {
         logger.LogInformation("开始获取考试分数");
@@ -153,12 +158,14 @@ public class ScoreService(
 
         try
         {
-            await scoreRepository.AddRangeAsync(scoresToSave).ConfigureAwait(false);
+            await _scorePersistenceQueue
+                .QueueAsync(new ScoreCrawledEvent(scoresToSave))
+                .ConfigureAwait(false);
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "保存成绩数据到数据库时出错");
-            // 即使保存失败也返回爬取的数据
+            logger.LogError(ex, "发布成绩持久化事件时出错");
+            // 即使入队失败也返回爬取的数据
         }
 
         return crawledScores;

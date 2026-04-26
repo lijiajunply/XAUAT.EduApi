@@ -6,6 +6,7 @@ using XAUAT.EduApi.Caching;
 using XAUAT.EduApi.ServiceDiscovery;
 using XAUAT.EduApi.HealthChecks;
 using XAUAT.EduApi.Interfaces;
+using XAUAT.EduApi.Queues;
 using XAUAT.EduApi.Repos;
 using XAUAT.EduApi.Services;
 
@@ -95,6 +96,8 @@ public static class ServiceCollectionExtensions
             services.AddScoped<IScoreService, ScoreService>();
             services.AddScoped<IRedisService, RedisService>();
             services.AddScoped<ICookieCodeService, CookieCodeService>();
+            services.AddSingleton<IScorePersistenceQueue, ChannelScorePersistenceQueue>();
+            services.AddHostedService<ScorePersistenceBackgroundService>();
 
             // 添加监控服务
             services.AddSingleton<IMonitoringService, MonitoringService>();
