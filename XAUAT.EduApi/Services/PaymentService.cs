@@ -47,7 +47,7 @@ public class PaymentService(
                         Authorization = "Basic bW9iaWxlX3NlcnZpY2VfcGxhdGZvcm06bW9iaWxlX3NlcnZpY2VfcGxhdGZvcm1fc2VjcmV0"
                     };
 
-                    using var client = httpClientFactory.CreateClient();
+                    using var client = httpClientFactory.CreateClient("PaymentClient");
                     client.Timeout = HttpTimeouts.Slow;
 
                     var keyboardResponse =
@@ -146,7 +146,7 @@ public class PaymentService(
                 var query = string.Join("&", paramsDict.Select(kvp => $"{kvp.Key}={Uri.EscapeDataString(kvp.Value)}"));
                 uriBuilder.Query = query;
 
-                using var client = httpClientFactory.CreateClient();
+                using var client = httpClientFactory.CreateClient("PaymentClient");
                 client.Timeout = HttpTimeouts.EduSystem;
                 foreach (var header in headers)
                 {
@@ -186,7 +186,7 @@ public class PaymentService(
                     { "synjones-auth", token }
                 };
 
-                using var client = httpClientFactory.CreateClient();
+                using var client = httpClientFactory.CreateClient("PaymentClient");
                 client.Timeout = HttpTimeouts.EduSystem;
                 foreach (var header in headers)
                 {

@@ -134,6 +134,21 @@ public static class ServiceCollectionExtensions
                 })
                 .AddPolicyHandler(PollyExtensions.GetRetryPolicy()); // 添加重试策略
 
+            // 配置专门用于PaymentService的HttpClient（跳过SSL验证）
+            services.AddHttpClient("PaymentClient")
+                .ConfigureHttpClient(client =>
+                {
+                    client.Timeout = TimeSpan.FromSeconds(15); // 设置超时时间为15秒
+                })
+                .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler()
+                {
+                    ServerCertificateCustomValidationCallback = (_, _, _, _) => true,
+                    MaxConnectionsPerServer = 100, // 设置每个服务器的最大连接数
+                    AllowAutoRedirect = true, // 允许自动重定向
+                    UseCookies = true // 使用Cookie
+                })
+                .AddPolicyHandler(PollyExtensions.GetRetryPolicy()); // 添加重试策略
+
             // 配置专门用于外部API的HttpClient
             services.AddHttpClient("ExternalApiClient")
                 .ConfigureHttpClient(client => { client.Timeout = TimeSpan.FromSeconds(10); })
