@@ -1,6 +1,6 @@
 using System.Runtime.Serialization;
 
-namespace XAUAT.EduApi.Services;
+namespace XAUAT.EduApi.Exceptions;
 
 [Serializable]
 public class PaymentServiceException : Exception

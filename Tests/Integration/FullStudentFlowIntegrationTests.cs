@@ -6,6 +6,7 @@ using Moq;
 using XAUAT.EduApi.Repos;
 using XAUAT.EduApi.Services;
 using XAUAT.EduApi.Caching;
+using XAUAT.EduApi.Exceptions;
 
 namespace XAUAT.EduApi.Tests.Integration;
 

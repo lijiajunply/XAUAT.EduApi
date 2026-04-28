@@ -5,6 +5,7 @@ using Moq.Protected;
 using System.Net;
 using XAUAT.EduApi.Services;
 using XAUAT.EduApi.Caching;
+using XAUAT.EduApi.Exceptions;
 
 namespace XAUAT.EduApi.Tests.Services;
 

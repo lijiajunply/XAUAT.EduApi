@@ -1,8 +1,8 @@
 using System.Text.Json;
 using EduApi.Data.Models;
-using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using XAUAT.EduApi.Caching;
+using XAUAT.EduApi.Exceptions;
 using XAUAT.EduApi.Extensions;
 using JsonSerializer = System.Text.Json.JsonSerializer;
 
@@ -36,7 +36,7 @@ public class PaymentService(
                         grant_type = "password",
                         scope = "all",
                         loginFrom = "h5",
-                        logintype = "card",
+                        logintype = "snoNew",
                         device_token = "h5",
                         synAccessSource = "h5"
                     };
