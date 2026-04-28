@@ -158,7 +158,6 @@
    ```
 
 3. 验证服务是否启动成功：
-   - 访问 `http://localhost:8080/health`，返回健康检查结果
    - 访问 `http://localhost:8080/scalar/v1`，查看 API 文档
 
 ## 3. 测试环境部署
@@ -209,7 +208,6 @@
    ```
 
 3. 验证服务是否启动成功：
-   - 访问 `http://localhost:8080/health`
    - 访问 `http://localhost:8080/scalar/v1`
 
 ### 3.2 手动部署
@@ -346,10 +344,6 @@ server {
     
     location /metrics {
         proxy_pass http://xauat_eduapi/metrics;
-    }
-    
-    location /health {
-        proxy_pass http://xauat_eduapi/health;
     }
     
     location /scalar {

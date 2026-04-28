@@ -3,7 +3,6 @@ using Microsoft.EntityFrameworkCore;
 using Serilog;
 using XAUAT.EduApi.Caching;
 using XAUAT.EduApi.Extensions;
-using XAUAT.EduApi.ServiceDiscovery;
 
 // 先创建builder对象
 var builder = WebApplication.CreateBuilder(args);
@@ -25,9 +24,6 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddOpenApi();
 builder.Services.AddHttpContextAccessor();
-
-// 添加Prometheus监控服务
-builder.Services.AddPrometheus();
 
 builder.Services.AddCors(options =>
 {
@@ -51,9 +47,6 @@ builder.Services.AddAllServices(serviceConfig);
 
 var app = builder.Build();
 
-
-// 注册当前服务实例到服务注册中心
-var serviceRegistry = app.Services.GetRequiredService<IServiceRegistry>();
 var configuration = app.Configuration;
 
 var serviceName = configuration.GetValue<string>("Service:Name") ?? "XAUAT.EduApi";
@@ -62,13 +55,10 @@ var instanceId = configuration.GetValue<string>("Service:InstanceId") ?? $"{serv
 // 配置中间件管道
 app.UseErrorHandling()
     .UseAuthorization()
-    .UseCustomCors()
-    .UseMetricsCollection()
-    .UsePrometheusMonitoring();
+    .UseCustomCors();
 
 // 配置端点
-app.ConfigureApiEndpoints()
-    .ConfigureHealthChecks();
+app.ConfigureApiEndpoints();
 
 // Prometheus指标端点已通过UsePrometheusServer()配置，默认路径为/metrics
 
@@ -145,10 +135,8 @@ _ = Task.Run(async () =>
 });
 
 // 注册应用程序停止事件，用于清理资源
-AppDomain.CurrentDomain.ProcessExit += async (_, _) =>
+AppDomain.CurrentDomain.ProcessExit += (_, _) =>
 {
-    // 注销服务实例
-    await serviceRegistry.DeregisterAsync(serviceName, instanceId);
     // 确保所有日志都被正确写入
     Log.CloseAndFlush();
 };

@@ -114,7 +114,6 @@ XAUAT.EduApi/
 ├── Data/                     # 数据相关代码
 ├── Events/                   # 事件驱动相关代码
 ├── Extensions/               # 扩展方法
-├── HealthChecks/             # 健康检查相关代码
 ├── Interfaces/               # 接口定义
 ├── Middlewares/              # 中间件
 ├── Plugins/                  # 插件系统
@@ -235,7 +234,6 @@ docs/
    - 点击运行按钮或按下F5
 
 3. **验证项目是否成功运行**：
-   - 访问 `http://localhost:8080/health`，返回健康检查结果
    - 访问 `http://localhost:8080/scalar/v1`，查看API文档
 
 ### 3.5 运行测试

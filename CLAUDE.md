@@ -90,5 +90,4 @@ See `CACHE_STRATEGY.md` for detailed caching documentation.
 
 - OpenAPI spec: `/openapi/v1.json`
 - Scalar UI: `/scalar/v1`
-- Health check: `/health`
 - Prometheus metrics: `/metrics`

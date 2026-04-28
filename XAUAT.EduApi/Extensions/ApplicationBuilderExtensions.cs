@@ -1,5 +1,4 @@
 using XAUAT.EduApi.Middlewares;
-using Prometheus.Client.AspNetCore;
 using Scalar.AspNetCore;
 
 namespace XAUAT.EduApi.Extensions;
@@ -32,26 +31,6 @@ public static class ApplicationBuilderExtensions
             app.UseCors();
             return app;
         }
-
-        /// <summary>
-        /// 使用指标收集中间件
-        /// </summary>
-        /// <returns>应用程序构建器</returns>
-        public IApplicationBuilder UseMetricsCollection()
-        {
-            app.UseMiddleware<MetricsMiddleware>();
-            return app;
-        }
-
-        /// <summary>
-        /// 使用Prometheus监控中间件
-        /// </summary>
-        /// <returns>应用程序构建器</returns>
-        public IApplicationBuilder UsePrometheusMonitoring()
-        {
-            app.UsePrometheusServer();
-            return app;
-        }
     }
 
     /// <param name="app">应用程序</param>
@@ -69,17 +48,6 @@ public static class ApplicationBuilderExtensions
             return app;
         }
 
-        /// <summary>
-        /// 配置健康检查端点
-        /// </summary>
-        /// <returns>应用程序</returns>
-        public WebApplication ConfigureHealthChecks()
-        {
-            app.MapHealthChecks("/health")
-                .WithDisplayName("健康检查")
-                .WithDescription("检查服务的健康状态");
-            return app;
-        }
     }
 
     /// <summary>
@@ -92,9 +60,7 @@ public static class ApplicationBuilderExtensions
         return app
             .UseErrorHandling()
             .UseAuthorization()
-            .UseCustomCors()
-            .UseMetricsCollection()
-            .UsePrometheusMonitoring();
+            .UseCustomCors();
     }
 
     /// <summary>
@@ -109,7 +75,6 @@ public static class ApplicationBuilderExtensions
 
         // 配置端点
         app.ConfigureApiEndpoints();
-        app.ConfigureHealthChecks();
 
         return app;
     }

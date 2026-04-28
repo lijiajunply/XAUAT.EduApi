@@ -27,11 +27,6 @@ public class ServiceConfiguration
     public bool EnableLogging { get; set; } = true;
 
     /// <summary>
-    /// 是否启用健康检查
-    /// </summary>
-    public bool EnableHealthChecks { get; set; } = true;
-
-    /// <summary>
     /// 从配置中创建ServiceConfiguration实例
     /// </summary>
     /// <param name="configuration">配置</param>
@@ -44,8 +39,7 @@ public class ServiceConfiguration
             RedisConnectionString = Environment.GetEnvironmentVariable("REDIS", EnvironmentVariableTarget.Process) ??
                                     configuration["Redis"],
             EnablePrometheus = configuration.GetValue<bool>("Prometheus:Enabled", true),
-            EnableLogging = configuration.GetValue<bool>("Logging:Enabled", true),
-            EnableHealthChecks = configuration.GetValue<bool>("HealthChecks:Enabled", true)
+            EnableLogging = configuration.GetValue<bool>("Logging:Enabled", true)
         };
     }
 }

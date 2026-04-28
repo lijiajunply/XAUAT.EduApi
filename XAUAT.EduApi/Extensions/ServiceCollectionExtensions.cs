@@ -1,10 +1,7 @@
 using EduApi.Data;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 using StackExchange.Redis;
 using XAUAT.EduApi.Caching;
-using XAUAT.EduApi.ServiceDiscovery;
-using XAUAT.EduApi.HealthChecks;
 using XAUAT.EduApi.Interfaces;
 using XAUAT.EduApi.Queues;
 using XAUAT.EduApi.Repos;
@@ -20,16 +17,6 @@ public static class ServiceCollectionExtensions
     /// <param name="services">服务集合</param>
     extension(IServiceCollection services)
     {
-        /// <summary>
-        /// 注册Prometheus监控服务
-        /// </summary>
-        /// <returns>服务集合</returns>
-        public IServiceCollection AddPrometheus()
-        {
-            // 这里可以添加Prometheus相关的服务注册
-            // 例如：services.AddPrometheusMetrics();
-            return services;
-        }
 
         /// <summary>
         /// 注册数据库服务
@@ -99,9 +86,6 @@ public static class ServiceCollectionExtensions
             services.AddSingleton<IScorePersistenceQueue, ChannelScorePersistenceQueue>();
             services.AddHostedService<ScorePersistenceBackgroundService>();
 
-            // 添加监控服务
-            services.AddSingleton<IMonitoringService, MonitoringService>();
-
             return services;
         }
 
@@ -158,31 +142,6 @@ public static class ServiceCollectionExtensions
         }
 
         /// <summary>
-        /// 注册健康检查服务
-        /// </summary>
-        /// <returns>服务集合</returns>
-        public IServiceCollection AddHealthCheckServices()
-        {
-            services.AddHealthChecks()
-                .AddCheck<DatabaseHealthCheck>("database")
-                .AddCheck<RedisHealthCheck>("redis");
-
-            return services;
-        }
-
-        /// <summary>
-        /// 注册服务发现服务
-        /// </summary>
-        /// <returns>服务集合</returns>
-        public IServiceCollection AddServiceDiscoveryServices()
-        {
-            // 注册服务注册中心
-            services.TryAddSingleton<IServiceRegistry, InMemoryServiceRegistry>();
-
-            return services;
-        }
-
-        /// <summary>
         /// 注册所有服务
         /// </summary>
         /// <param name="sqlConnectionString">SQL连接字符串</param>
@@ -210,19 +169,7 @@ public static class ServiceCollectionExtensions
                 .AddCacheServices() // 添加缓存服务
                 .AddRepositoryServices()
                 .AddBusinessServices()
-                .AddHttpClientServices()
-                // 添加新架构服务
-                .AddServiceDiscoveryServices();
-
-            if (configuration.EnablePrometheus)
-            {
-                serviceCollection.AddPrometheus();
-            }
-
-            if (configuration.EnableHealthChecks)
-            {
-                serviceCollection.AddHealthCheckServices();
-            }
+                .AddHttpClientServices();
 
             return serviceCollection;
         }
