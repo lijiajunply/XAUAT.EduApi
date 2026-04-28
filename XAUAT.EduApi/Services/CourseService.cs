@@ -57,11 +57,6 @@ public class CourseService(
         // 合并结果
         var courses = allResults.SelectMany(r => r).ToList();
 
-        if (courses.Count == 0)
-        {
-            throw new InvalidOperationException("未找到课程数据");
-        }
-
         foreach (var item in courses)
         {
             item.WeekIndexes = item.WeekIndexes.OrderBy(x => x).ToList();
