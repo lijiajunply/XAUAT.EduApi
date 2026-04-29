@@ -24,7 +24,7 @@ public static class HttpTimeouts
     /// <summary>
     /// 教务系统请求超时时间
     /// </summary>
-    public static readonly TimeSpan EduSystem = TimeSpan.FromSeconds(8);
+    public static readonly TimeSpan EduSystem = TimeSpan.FromSeconds(15);
 
     /// <summary>
     /// 外部API请求超时时间
