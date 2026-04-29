@@ -130,8 +130,13 @@ public class CacheService : ICacheService, IDisposable
     /// <inheritdoc />
     public async Task<T> GetOrCreateAsync<T>(string key, Func<Task<T>> factory, TimeSpan? expiration = null,
         CacheLevel level = CacheLevel.MultiLevel, int businessPriority = 5,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default, bool isUse = true)
     {
+        if (!isUse)
+        {
+            return await factory();
+        }
+
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
 
         try
@@ -425,6 +430,7 @@ public class CacheService : ICacheService, IDisposable
                         syncTasks.Add(SetLocalCacheAsync(key, value, null, 5, cancellationToken));
                     }
                 }
+
                 await Task.WhenAll(syncTasks);
             }
 

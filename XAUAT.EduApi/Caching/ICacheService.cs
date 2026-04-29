@@ -24,10 +24,11 @@ public interface ICacheService
     /// <param name="level">缓存级别</param>
     /// <param name="businessPriority">业务优先级（1-10，10最高）</param>
     /// <param name="cancellationToken">取消令牌</param>
+    /// <param name="isUse">是否使用缓存</param>
     /// <returns>缓存项</returns>
     Task<T> GetOrCreateAsync<T>(string key, Func<Task<T>> factory, TimeSpan? expiration = null,
         CacheLevel level = CacheLevel.MultiLevel, int businessPriority = 5,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default, bool isUse = true);
 
     /// <summary>
     /// 设置缓存项

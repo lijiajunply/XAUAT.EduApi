@@ -200,10 +200,14 @@ public class PaymentService(
                 var data = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(responseBody);
                 if (data == null || !data.TryGetValue("data", out var dataPart)) return 0;
                 if (!dataPart.TryGetProperty("card", out var balanceElement) ||
-                    !balanceElement[0].TryGetProperty("elec_accamt", out var element)) return 0;
+                    !balanceElement[0].TryGetProperty("elec_accamt", out var element))
+                {
+                    return 0;
+                }
 
                 return element.GetDouble() / 100;
             },
-            TimeSpan.FromMinutes(20));
+            TimeSpan.FromMinutes(20),
+            isUse: false);
     }
 }
