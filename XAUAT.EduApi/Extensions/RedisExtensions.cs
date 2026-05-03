@@ -319,12 +319,6 @@ public static class CacheKeys
         => $"{Prefix}:courses:{SafeEncode(studentId)}";
 
     /// <summary>
-    /// 生成电费来源地址缓存键
-    /// </summary>
-    public static string ElectricitySourceUrl()
-        => $"{Prefix}:electricity:source_url";
-
-    /// <summary>
     /// 生成电费余额缓存键
     /// </summary>
     public static string ElectricityBalance(string sourceUrl)

@@ -68,7 +68,7 @@ public class ElectricityController(
     [HttpGet("WeeklyData")]
     [ProducesResponseType(typeof(List<ElectricData>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status500InternalServerError)]
-    public async Task<ActionResult<List<ElectricData>>> GetWeeklyData()
+    public async Task<ActionResult<List<ElectricData>>> GetWeeklyData([FromQuery] string? url = null)
     {
         try
         {
@@ -98,19 +98,19 @@ public class ElectricityController(
     [ProducesResponseType(typeof(string), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status500InternalServerError)]
-    public async Task<ActionResult<string>> GetRechargeUrl()
+    public async Task<ActionResult<string>> GetRechargeUrl([FromQuery] string? url = null)
     {
         try
         {
             logger.LogInformation("开始获取电费充值地址");
-            var url = await service.GetRechargeUrlAsync();
+            var urlData = await service.GetRechargeUrlAsync(url);
 
             if (string.IsNullOrWhiteSpace(url))
             {
                 return NotFound(new ErrorResponse { error = "未找到电费充值地址" });
             }
 
-            return Ok(url);
+            return Ok(urlData);
         }
         catch (Exception ex)
         {

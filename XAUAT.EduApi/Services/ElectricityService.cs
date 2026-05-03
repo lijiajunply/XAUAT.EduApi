@@ -9,8 +9,8 @@ namespace XAUAT.EduApi.Services;
 public interface IElectricityService
 {
     public Task<double?> FetchCurrentBalanceAsync(string? url = null);
-    public Task<List<ElectricData>> FetchWeeklyDataAsync();
-    public Task<string?> GetRechargeUrlAsync();
+    public Task<List<ElectricData>> FetchWeeklyDataAsync(string? url = null);
+    public Task<string?> GetRechargeUrlAsync(string? url = null);
 }
 
 public class ElectricityService(
@@ -19,30 +19,20 @@ public class ElectricityService(
 {
     private static readonly TimeSpan BalanceCacheExpiration = TimeSpan.FromMinutes(10);
     private static readonly TimeSpan WeeklyDataCacheExpiration = TimeSpan.FromMinutes(30);
-    private static readonly TimeSpan SourceUrlCacheExpiration = TimeSpan.FromDays(7);
 
     public async Task<double?> FetchCurrentBalanceAsync(string? url = null)
     {
         try
         {
-            var resolvedUrl = await ResolveSourceUrlAsync(url);
-            if (string.IsNullOrWhiteSpace(resolvedUrl))
+            if (string.IsNullOrWhiteSpace(url))
             {
                 return null;
             }
 
             var balance = await cacheService.GetOrCreateAsync(
-                CacheKeys.ElectricityBalance(resolvedUrl),
-                async () => await FetchBalanceFromRemoteAsync(resolvedUrl),
+                CacheKeys.ElectricityBalance(url),
+                async () => await FetchBalanceFromRemoteAsync(url),
                 BalanceCacheExpiration);
-
-            if (balance.HasValue)
-            {
-                await cacheService.SetAsync(
-                    CacheKeys.ElectricitySourceUrl(),
-                    resolvedUrl,
-                    SourceUrlCacheExpiration);
-            }
 
             return balance;
         }
@@ -52,35 +42,23 @@ public class ElectricityService(
         }
     }
 
-    public async Task<List<ElectricData>> FetchWeeklyDataAsync()
+    public async Task<List<ElectricData>> FetchWeeklyDataAsync(string? url = null)
     {
-        var sourceUrl = await cacheService.GetAsync<string>(CacheKeys.ElectricitySourceUrl());
-        if (string.IsNullOrWhiteSpace(sourceUrl))
+        if (string.IsNullOrWhiteSpace(url))
         {
             return [];
         }
 
-        var detailUrl = sourceUrl.Replace("wxAccount", "wxElecDtl");
+        var detailUrl = url.Replace("wxAccount", "wxElecDtl");
         return await cacheService.GetOrCreateAsync(
-            CacheKeys.ElectricityWeeklyData(sourceUrl),
+            CacheKeys.ElectricityWeeklyData(url),
             async () => await FetchWeeklyDataFromRemoteAsync(detailUrl),
             WeeklyDataCacheExpiration);
     }
 
-    public async Task<string?> GetRechargeUrlAsync()
+    public async Task<string?> GetRechargeUrlAsync(string? url = null)
     {
-        var sourceUrl = await cacheService.GetAsync<string>(CacheKeys.ElectricitySourceUrl());
-        return string.IsNullOrWhiteSpace(sourceUrl) ? null : sourceUrl.Replace("wxAccount", "wxCharge");
-    }
-
-    private async Task<string?> ResolveSourceUrlAsync(string? url)
-    {
-        if (!string.IsNullOrWhiteSpace(url))
-        {
-            return url;
-        }
-
-        return await cacheService.GetAsync<string>(CacheKeys.ElectricitySourceUrl());
+        return string.IsNullOrWhiteSpace(url) ? null : url.Replace("wxAccount", "wxCharge");
     }
 
     private async Task<double?> FetchBalanceFromRemoteAsync(string resolvedUrl)
