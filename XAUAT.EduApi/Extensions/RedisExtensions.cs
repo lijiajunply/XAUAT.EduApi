@@ -317,4 +317,7 @@ public static class CacheKeys
     /// </summary>
     public static string Courses(string studentId)
         => $"{Prefix}:courses:{SafeEncode(studentId)}";
+    
+    public static string Categories()
+        => $"{Prefix}:categories";
 }

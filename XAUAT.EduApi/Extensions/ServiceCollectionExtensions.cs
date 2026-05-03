@@ -19,7 +19,6 @@ public static class ServiceCollectionExtensions
     /// <param name="services">服务集合</param>
     extension(IServiceCollection services)
     {
-
         /// <summary>
         /// 注册数据库服务
         /// </summary>
@@ -99,6 +98,7 @@ public static class ServiceCollectionExtensions
             services.AddScoped<IScoreService, ScoreService>();
             services.AddScoped<IRedisService, RedisService>();
             services.AddScoped<ICookieCodeService, CookieCodeService>();
+            services.AddScoped<ISchoolNavService, SchoolNavService>();
             services.AddSingleton<IScorePersistenceQueue, ChannelScorePersistenceQueue>();
             services.AddHostedService<ScorePersistenceBackgroundService>();
 
