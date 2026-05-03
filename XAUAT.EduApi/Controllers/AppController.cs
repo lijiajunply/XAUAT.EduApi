@@ -1,3 +1,5 @@
+using System.Text.Json;
+using EduApi.Data.Models;
 using Microsoft.AspNetCore.Mvc;
 
 namespace XAUAT.EduApi.Controllers;
@@ -26,7 +28,7 @@ public class AppController(IHttpClientFactory httpClientFactory)
     /// GET /App?token=YOUR_GITEE_TOKEN
     /// </remarks>
     [HttpGet]
-    [ProducesResponseType(typeof(string), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(List<ReleaseInfo>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(string), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(string), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> GetTag(string? token)
@@ -46,6 +48,14 @@ public class AppController(IHttpClientFactory httpClientFactory)
         }
 
         var jsonString = await response.Content.ReadAsStringAsync();
-        return Ok(jsonString);
+
+        var result = JsonSerializer.Deserialize<List<ReleaseInfo>>(jsonString);
+
+        if (result == null)
+        {
+            return BadRequest("No releases found");
+        }
+        
+        return Ok(result);
     }
 }
