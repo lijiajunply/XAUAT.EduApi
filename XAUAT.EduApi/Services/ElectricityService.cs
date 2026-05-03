@@ -56,9 +56,16 @@ public class ElectricityService(
             WeeklyDataCacheExpiration);
     }
 
-    public async Task<string?> GetRechargeUrlAsync(string? url = null)
+    public Task<string?> GetRechargeUrlAsync(string? url = null)
     {
-        return string.IsNullOrWhiteSpace(url) ? null : url.Replace("wxAccount", "wxCharge");
+        try
+        {
+            return Task.FromResult(string.IsNullOrWhiteSpace(url) ? null : url.Replace("wxAccount", "wxCharge"));
+        }
+        catch (Exception exception)
+        {
+            return Task.FromException<string?>(exception);
+        }
     }
 
     private async Task<double?> FetchBalanceFromRemoteAsync(string resolvedUrl)
