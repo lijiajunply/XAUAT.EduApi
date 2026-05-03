@@ -12,7 +12,12 @@ namespace XAUAT.EduApi.Controllers;
 [ApiController]
 [Route("[controller]")]
 [Produces("application/json")]
-public class InfoController(IHttpClientFactory httpClientFactory, ILogger<CourseController> logger, IInfoService info)
+public class InfoController(
+    IHttpClientFactory httpClientFactory,
+    ILogger<CourseController> logger,
+    IInfoService info,
+    ITestAccountResolver? testAccountResolver = null,
+    ITestDataProvider? testDataProvider = null)
     : ControllerBase
 {
     /// <summary>
@@ -47,6 +52,13 @@ public class InfoController(IHttpClientFactory httpClientFactory, ILogger<Course
             if (string.IsNullOrEmpty(cookie) || cookie.StartsWith("Rider") || !cookie.StartsWith("__pstsid__"))
             {
                 cookie = Request.Headers["xauat"].ToString(); // 从请求中获取 cookie
+            }
+
+            if (testAccountResolver?.IsTestAccount(cookie: cookie) == true)
+            {
+                logger.LogInformation("测试账号命中学业进度测试数据");
+                var testData = await testDataProvider!.GetCompletionAsync();
+                return Ok(testData);
             }
 
             using var client = httpClientFactory.CreateClient();

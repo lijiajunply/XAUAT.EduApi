@@ -1,0 +1,18 @@
+[
+  {
+    "Name": "测试数据结构",
+    "LessonType": "必修",
+    "ExamMode": "考试",
+    "CourseTypeName": "专业核心课",
+    "Credits": 3.0,
+    "TermStr": "第三学期"
+  },
+  {
+    "Name": "测试软件工程",
+    "LessonType": "选修",
+    "ExamMode": "考查",
+    "CourseTypeName": "专业选修课",
+    "Credits": 2.0,
+    "TermStr": "第四学期"
+  }
+]

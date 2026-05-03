@@ -15,11 +15,19 @@ public class CourseService(
     ILogger<CourseService> logger,
     IExamService examService,
     ICacheService cacheService,
-    IInfoService infoService)
+    IInfoService infoService,
+    ITestAccountResolver? testAccountResolver = null,
+    ITestDataProvider? testDataProvider = null)
     : ICourseService
 {
     public async Task<List<CourseActivity>> GetCoursesAsync(string studentId, string cookie)
     {
+        if (testAccountResolver?.IsTestAccount(cookie: cookie, studentId: studentId) == true)
+        {
+            logger.LogInformation("测试账号命中课程测试数据，studentId: {StudentId}", studentId);
+            return await testDataProvider!.GetCoursesAsync();
+        }
+
         if (infoService.IsGreatThanStart(2))
         {
             // 使用缓存，Key 包含 studentId，过期时间设为1天

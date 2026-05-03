@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging;
 using XAUAT.EduApi.Exceptions;
 using XAUAT.EduApi.Interfaces;
 using XAUAT.EduApi.Services;
+using EduApi.Data.Models;
 
 namespace XAUAT.EduApi.Tests.Services;
 
@@ -126,5 +127,33 @@ public class SSOLoginServiceTests
 
         // Act & Assert
         await Assert.ThrowsAsync<Exception>(() => _service.LoginAsync(username, password));
+    }
+
+    [Fact]
+    public async Task LoginAsync_ShouldReturnTestAccountResponse_WhenCredentialsMatch()
+    {
+        var expected = new LoginResponse
+        {
+            Success = true,
+            StudentId = "20239999",
+            Cookie = "__pstsid__=frontend-test-marker; SESSION=frontend-test-marker;"
+        };
+
+        var resolver = new Mock<ITestAccountResolver>();
+        resolver.Setup(x => x.IsTestLogin("frontend-test", "frontend-test-password")).Returns(true);
+        resolver.Setup(x => x.CreateLoginResponse()).Returns(expected);
+
+        var service = new SSOLoginService(
+            _mockHttpClientFactory.Object,
+            _mockCookieCodeService.Object,
+            _mockLogger.Object,
+            resolver.Object);
+
+        var result = await service.LoginAsync("frontend-test", "frontend-test-password");
+
+        Assert.Equal(expected.StudentId, result.StudentId);
+        Assert.Equal(expected.Cookie, result.Cookie);
+        _mockHttpClientFactory.Verify(x => x.CreateClient(It.IsAny<string>()), Times.Never);
+        _mockCookieCodeService.Verify(x => x.GetCode(It.IsAny<string>()), Times.Never);
     }
 }

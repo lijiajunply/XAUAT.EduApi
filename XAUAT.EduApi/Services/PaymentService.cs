@@ -17,11 +17,19 @@ public interface IPaymentService
 public class PaymentService(
     ICacheService cacheService,
     IHttpClientFactory httpClientFactory,
-    ILogger<PaymentService> logger)
+    ILogger<PaymentService> logger,
+    ITestAccountResolver? testAccountResolver = null,
+    ITestDataProvider? testDataProvider = null)
     : IPaymentService
 {
     public async Task<string> Login(string cardNum)
     {
+        if (testAccountResolver?.IsTestAccount(cardNum: cardNum) == true)
+        {
+            logger.LogInformation("测试账号命中支付登录测试数据，cardNum: {CardNum}", cardNum);
+            return await testDataProvider!.GetPaymentTokenAsync();
+        }
+
         try
         {
             return await cacheService.GetOrCreateAsync(
@@ -100,6 +108,21 @@ public class PaymentService(
 
     public async Task<PaymentData> GetTurnoverAsync(string cardNum)
     {
+        if (testAccountResolver?.IsTestAccount(cardNum: cardNum) == true)
+        {
+            logger.LogInformation("测试账号命中支付流水测试数据，cardNum: {CardNum}", cardNum);
+            var paymentsTask = testDataProvider!.GetPaymentTurnoverAsync();
+            var balanceTask = testDataProvider.GetPaymentBalanceAsync();
+
+            await Task.WhenAll(paymentsTask, balanceTask).ConfigureAwait(false);
+
+            return new PaymentData
+            {
+                Records = await paymentsTask.ConfigureAwait(false),
+                Total = await balanceTask.ConfigureAwait(false)
+            };
+        }
+
         try
         {
             var token = await Login(cardNum);

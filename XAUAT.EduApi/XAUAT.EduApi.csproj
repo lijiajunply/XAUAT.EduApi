@@ -29,4 +29,10 @@
       <Folder Include="Repos\" />
     </ItemGroup>
 
+    <ItemGroup>
+      <Content Update="TestFixtures/**/*.json">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+    </ItemGroup>
+
 </Project>

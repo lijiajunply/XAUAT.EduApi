@@ -65,8 +65,9 @@ public class ScoreServicePerformanceTests
                 It.IsAny<TimeSpan?>(),
                 It.IsAny<CacheLevel>(),
                 It.IsAny<int>(),
-                It.IsAny<CancellationToken>()))
-            .Returns(async (string key, Func<Task<List<ScoreResponse>>> factory, TimeSpan? exp, CacheLevel level, int priority, CancellationToken ct) =>
+                It.IsAny<CancellationToken>(),
+                It.IsAny<bool>()))
+            .Returns(async (string key, Func<Task<List<ScoreResponse>>> factory, TimeSpan? exp, CacheLevel level, int priority, CancellationToken ct, bool isUse) =>
                 await factory());
 
         // 添加测试数据

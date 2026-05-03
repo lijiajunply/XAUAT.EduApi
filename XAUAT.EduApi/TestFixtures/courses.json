@@ -1,0 +1,28 @@
+[
+  {
+    "WeekIndexes": [1, 2, 3, 4, 5],
+    "Teachers": ["张老师"],
+    "Campus": "雁塔",
+    "Room": "教学楼A101",
+    "CourseName": "测试数据结构",
+    "CourseCode": "TEST101",
+    "Weekday": 1,
+    "StartUnit": 1,
+    "EndUnit": 2,
+    "Credits": "3.0",
+    "LessonId": "lesson-test-101"
+  },
+  {
+    "WeekIndexes": [1, 2, 3, 4, 5],
+    "Teachers": ["李老师"],
+    "Campus": "草堂",
+    "Room": "实验楼B202",
+    "CourseName": "测试软件工程",
+    "CourseCode": "TEST202",
+    "Weekday": 3,
+    "StartUnit": 3,
+    "EndUnit": 4,
+    "Credits": "2.0",
+    "LessonId": "lesson-test-202"
+  }
+]

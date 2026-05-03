@@ -51,8 +51,9 @@ public class ExamServiceTests
                 It.IsAny<TimeSpan?>(),
                 It.IsAny<CacheLevel>(),
                 It.IsAny<int>(),
-                It.IsAny<CancellationToken>()))
-            .Returns(async (string key, Func<Task<T>> factory, TimeSpan? exp, CacheLevel level, int priority, CancellationToken ct) =>
+                It.IsAny<CancellationToken>(),
+                It.IsAny<bool>()))
+            .Returns(async (string key, Func<Task<T>> factory, TimeSpan? exp, CacheLevel level, int priority, CancellationToken ct, bool isUse) =>
                 await factory());
     }
 
@@ -345,6 +346,37 @@ public class ExamServiceTests
 
         // Assert
         Assert.NotNull(result);
+    }
+
+    [Fact]
+    public async Task GetThisSemester_ShouldReturnTestFixtureData_WhenTestAccountMatched()
+    {
+        var resolver = new Mock<ITestAccountResolver>();
+        resolver.Setup(x => x.IsTestAccount("test-cookie", null, null)).Returns(true);
+
+        var provider = new Mock<ITestDataProvider>();
+        provider.Setup(x => x.GetCurrentSemesterAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new SemesterItem { Value = "301", Text = "2025-2026-1" });
+
+        var service = new ExamService(
+            _httpClientFactoryMock.Object,
+            _loggerMock.Object,
+            _infoServiceMock.Object,
+            _cacheServiceMock.Object,
+            resolver.Object,
+            provider.Object);
+
+        var result = await service.GetThisSemester("test-cookie");
+
+        Assert.Equal("301", result.Value);
+        _cacheServiceMock.Verify(x => x.GetOrCreateAsync(
+            It.IsAny<string>(),
+            It.IsAny<Func<Task<SemesterItem>>>(),
+            It.IsAny<TimeSpan?>(),
+            It.IsAny<CacheLevel>(),
+            It.IsAny<int>(),
+            It.IsAny<CancellationToken>()), Times.Never);
+        _httpClientFactoryMock.Verify(x => x.CreateClient(It.IsAny<string>()), Times.Never);
     }
 
     #endregion

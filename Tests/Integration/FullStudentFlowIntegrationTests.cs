@@ -55,8 +55,9 @@ public class FullStudentFlowIntegrationTests : IDisposable
                 It.IsAny<TimeSpan?>(),
                 It.IsAny<CacheLevel>(),
                 It.IsAny<int>(),
-                It.IsAny<CancellationToken>()))
-            .Returns(async (string key, Func<Task<List<CourseActivity>>> factory, TimeSpan? exp, CacheLevel level, int priority, CancellationToken ct) =>
+                It.IsAny<CancellationToken>(),
+                It.IsAny<bool>()))
+            .Returns(async (string key, Func<Task<List<CourseActivity>>> factory, TimeSpan? exp, CacheLevel level, int priority, CancellationToken ct, bool isUse) =>
                 await factory());
 
         // 默认: ScoreService GetOrCreateAsync 返回空列表

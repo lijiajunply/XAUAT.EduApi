@@ -68,8 +68,9 @@ public class PaymentServiceTests
                 It.IsAny<TimeSpan?>(),
                 It.IsAny<CacheLevel>(),
                 It.IsAny<int>(),
-                It.IsAny<CancellationToken>()))
-            .Returns(async (string key, Func<Task<string>> factory, TimeSpan? exp, CacheLevel level, int priority, CancellationToken ct) =>
+                It.IsAny<CancellationToken>(),
+                It.IsAny<bool>()))
+            .Returns(async (string key, Func<Task<string>> factory, TimeSpan? exp, CacheLevel level, int priority, CancellationToken ct, bool isUse) =>
                 await factory());
     }
 
@@ -82,8 +83,9 @@ public class PaymentServiceTests
                 It.IsAny<TimeSpan?>(),
                 It.IsAny<CacheLevel>(),
                 It.IsAny<int>(),
-                It.IsAny<CancellationToken>()))
-            .Returns(async (string key, Func<Task<List<PaymentModel>>> factory, TimeSpan? exp, CacheLevel level, int priority, CancellationToken ct) =>
+                It.IsAny<CancellationToken>(),
+                It.IsAny<bool>()))
+            .Returns(async (string key, Func<Task<List<PaymentModel>>> factory, TimeSpan? exp, CacheLevel level, int priority, CancellationToken ct, bool isUse) =>
                 await factory());
     }
 
@@ -96,8 +98,9 @@ public class PaymentServiceTests
                 It.IsAny<TimeSpan?>(),
                 It.IsAny<CacheLevel>(),
                 It.IsAny<int>(),
-                It.IsAny<CancellationToken>()))
-            .Returns(async (string key, Func<Task<double>> factory, TimeSpan? exp, CacheLevel level, int priority, CancellationToken ct) =>
+                It.IsAny<CancellationToken>(),
+                It.IsAny<bool>()))
+            .Returns(async (string key, Func<Task<double>> factory, TimeSpan? exp, CacheLevel level, int priority, CancellationToken ct, bool isUse) =>
                 await factory());
     }
 
@@ -519,5 +522,40 @@ public class PaymentServiceTests
             .Returns(CreateMockHttpClient(HttpStatusCode.OK, @"{""data"": {""invalidField"": ""value""}}"));
 
         await Assert.ThrowsAsync<PaymentServiceException>(() => _paymentService.Login(cardNum));
+    }
+
+    [Fact]
+    public async Task GetTurnoverAsync_ShouldReturnTestFixtureData_WhenTestAccountMatched()
+    {
+        var resolver = new Mock<ITestAccountResolver>();
+        resolver.Setup(x => x.IsTestAccount(null, null, "20239999")).Returns(true);
+
+        var provider = new Mock<ITestDataProvider>();
+        provider.Setup(x => x.GetPaymentTurnoverAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync([
+                new PaymentModel("消费", "2026-05-01 12:30:00", "测试食堂午餐", 18.5)
+            ]);
+        provider.Setup(x => x.GetPaymentBalanceAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(128.5);
+
+        var service = new PaymentService(
+            _cacheServiceMock.Object,
+            _httpClientFactoryMock.Object,
+            _loggerMock.Object,
+            resolver.Object,
+            provider.Object);
+
+        var result = await service.GetTurnoverAsync("20239999");
+
+        Assert.Single(result.Records);
+        Assert.Equal(128.5, result.Total);
+        _cacheServiceMock.Verify(x => x.GetOrCreateAsync(
+            It.IsAny<string>(),
+            It.IsAny<Func<Task<string>>>(),
+            It.IsAny<TimeSpan?>(),
+            It.IsAny<CacheLevel>(),
+            It.IsAny<int>(),
+            It.IsAny<CancellationToken>()), Times.Never);
+        _httpClientFactoryMock.Verify(x => x.CreateClient(It.IsAny<string>()), Times.Never);
     }
 }

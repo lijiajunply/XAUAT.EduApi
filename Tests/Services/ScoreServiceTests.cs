@@ -265,4 +265,46 @@ public class ScoreServiceTests
         Assert.NotNull(result);
         Assert.Equal(largeScoreList.Count, result.Count);
     }
+
+    [Fact]
+    public async Task GetScoresAsync_ShouldReturnTestFixtureData_WhenTestAccountMatched()
+    {
+        var resolver = new Mock<ITestAccountResolver>();
+        resolver.Setup(x => x.IsTestAccount("test-cookie", "20239999", null)).Returns(true);
+
+        var provider = new Mock<ITestDataProvider>();
+        provider.Setup(x => x.GetScoresAsync("301", It.IsAny<CancellationToken>()))
+            .ReturnsAsync([
+                new ScoreResponse
+                {
+                    Name = "测试数据结构",
+                    LessonCode = "TEST101",
+                    Grade = "92"
+                }
+            ]);
+
+        var scoreService = new ScoreService(
+            _httpClientFactoryMock.Object,
+            _loggerMock.Object,
+            _examServiceMock.Object,
+            _cacheServiceMock.Object,
+            _scoreRepositoryMock.Object,
+            null,
+            resolver.Object,
+            provider.Object);
+
+        var result = await scoreService.GetScoresAsync("20239999", "301", "test-cookie");
+
+        Assert.Single(result);
+        Assert.Equal("测试数据结构", result[0].Name);
+        _cacheServiceMock.Verify(x => x.GetOrCreateAsync(
+            It.IsAny<string>(),
+            It.IsAny<Func<Task<List<ScoreResponse>>>>(),
+            It.IsAny<TimeSpan?>(),
+            It.IsAny<CacheLevel>(),
+            It.IsAny<int>(),
+            It.IsAny<CancellationToken>()), Times.Never);
+        _scoreRepositoryMock.Verify(x => x.GetByUserIdAsync(It.IsAny<string>()), Times.Never);
+        _examServiceMock.Verify(x => x.GetThisSemester(It.IsAny<string>()), Times.Never);
+    }
 }

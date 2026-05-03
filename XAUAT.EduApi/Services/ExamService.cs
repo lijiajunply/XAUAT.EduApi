@@ -18,13 +18,21 @@ public class ExamService(
     IHttpClientFactory httpClientFactory,
     ILogger<ExamService> logger,
     IInfoService info,
-    ICacheService cacheService)
+    ICacheService cacheService,
+    ITestAccountResolver? testAccountResolver = null,
+    ITestDataProvider? testDataProvider = null)
     : IExamService
 {
     private const string BaseUrl = "https://swjw.xauat.edu.cn";
 
     public async Task<ExamResponse> GetExamArrangementsAsync(string cookie, string? id)
     {
+        if (testAccountResolver?.IsTestAccount(cookie: cookie, studentId: id) == true)
+        {
+            logger.LogInformation("测试账号命中考试测试数据，studentId: {StudentId}", id);
+            return await testDataProvider!.GetExamResponseAsync();
+        }
+
         if (string.IsNullOrEmpty(id) || !id.Contains(','))
         {
             return await GetExamArrangementAsync(cookie, id);
@@ -53,6 +61,12 @@ public class ExamService(
     /// <returns></returns>
     public async Task<SemesterItem> GetThisSemester(string cookie)
     {
+        if (testAccountResolver?.IsTestAccount(cookie: cookie) == true)
+        {
+            logger.LogInformation("测试账号命中当前学期测试数据");
+            return await testDataProvider!.GetCurrentSemesterAsync();
+        }
+
         logger.LogInformation("开始抓取学期数据");
 
         return await cacheService.GetOrCreateAsync(

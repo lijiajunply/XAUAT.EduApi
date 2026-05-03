@@ -22,7 +22,9 @@ public class ScoreService(
     IExamService examService,
     ICacheService cacheService,
     IScoreRepository scoreRepository,
-    IScorePersistenceQueue? scorePersistenceQueue = null)
+    IScorePersistenceQueue? scorePersistenceQueue = null,
+    ITestAccountResolver? testAccountResolver = null,
+    ITestDataProvider? testDataProvider = null)
     : IScoreService
 {
     private readonly IScorePersistenceQueue _scorePersistenceQueue =
@@ -30,6 +32,12 @@ public class ScoreService(
 
     public async Task<List<ScoreResponse>> GetScoresAsync(string studentId, string semester, string cookie)
     {
+        if (testAccountResolver?.IsTestAccount(cookie: cookie, studentId: studentId) == true)
+        {
+            logger.LogInformation("测试账号命中成绩测试数据，studentId: {StudentId}, semester: {Semester}", studentId, semester);
+            return await testDataProvider!.GetScoresAsync(semester);
+        }
+
         logger.LogInformation("开始获取考试分数");
 
         if (string.IsNullOrEmpty(studentId) || string.IsNullOrEmpty(cookie))
@@ -75,6 +83,12 @@ public class ScoreService(
 
     public async Task<SemesterResult> ParseSemesterAsync(string? studentId, string cookie)
     {
+        if (testAccountResolver?.IsTestAccount(cookie: cookie, studentId: studentId) == true)
+        {
+            logger.LogInformation("测试账号命中学期列表测试数据，studentId: {StudentId}", studentId);
+            return await testDataProvider!.GetSemesterResultAsync();
+        }
+
         logger.LogInformation("开始解析学期数据");
 
         return await cacheService.GetOrCreateAsync(

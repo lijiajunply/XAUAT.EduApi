@@ -17,7 +17,9 @@ public interface IProgramService
 public class ProgramService(
     IHttpClientFactory httpClientFactory,
     ICacheService cacheService,
-    ILogger<ProgramService>? logger = null)
+    ILogger<ProgramService>? logger = null,
+    ITestAccountResolver? testAccountResolver = null,
+    ITestDataProvider? testDataProvider = null)
     : IProgramService
 {
     private const string BaseUrl = "https://swjw.xauat.edu.cn";
@@ -34,6 +36,12 @@ public class ProgramService(
 
     private async Task<List<PlanCourse>> GetAllTrainProgramByOneId(string cookie, string id)
     {
+        if (testAccountResolver?.IsTestAccount(cookie: cookie, studentId: id) == true)
+        {
+            _logger?.LogInformation("测试账号命中培养方案测试数据，studentId: {StudentId}", id);
+            return await testDataProvider!.GetProgramAsync();
+        }
+
         return await cacheService.GetOrCreateAsync(
             CacheKeys.TrainProgram(id),
             async () =>

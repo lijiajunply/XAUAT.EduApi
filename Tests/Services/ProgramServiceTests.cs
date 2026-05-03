@@ -34,8 +34,9 @@ public class ProgramServiceTests
                 It.IsAny<TimeSpan?>(),
                 It.IsAny<CacheLevel>(),
                 It.IsAny<int>(),
-                It.IsAny<CancellationToken>()))
-            .Returns(async (string key, Func<Task<T>> factory, TimeSpan? exp, CacheLevel level, int priority, CancellationToken ct) =>
+                It.IsAny<CancellationToken>(),
+                It.IsAny<bool>()))
+            .Returns(async (string key, Func<Task<T>> factory, TimeSpan? exp, CacheLevel level, int priority, CancellationToken ct, bool isUse) =>
                 await factory());
     }
 
@@ -146,5 +147,42 @@ public class ProgramServiceTests
 
         // Act & Assert
         await Assert.ThrowsAsync<XAUAT.EduApi.Exceptions.UnAuthenticationError>(() => _service.GetAllTrainProgram(cookie, id));
+    }
+
+    [Fact]
+    public async Task GetAllTrainProgram_ShouldReturnTestFixtureData_WhenTestAccountMatched()
+    {
+        var resolver = new Mock<ITestAccountResolver>();
+        resolver.Setup(x => x.IsTestAccount("cookie", "20239999", null)).Returns(true);
+
+        var provider = new Mock<ITestDataProvider>();
+        provider.Setup(x => x.GetProgramAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync([
+                new PlanCourse
+                {
+                    Name = "测试软件工程",
+                    TermStr = "第四学期"
+                }
+            ]);
+
+        var service = new ProgramService(
+            _mockHttpClientFactory.Object,
+            _mockCacheService.Object,
+            null,
+            resolver.Object,
+            provider.Object);
+
+        var result = await service.GetAllTrainProgram("cookie", "20239999");
+
+        Assert.Single(result);
+        Assert.Equal("测试软件工程", result[0].Name);
+        _mockCacheService.Verify(x => x.GetOrCreateAsync(
+            It.IsAny<string>(),
+            It.IsAny<Func<Task<List<PlanCourse>>>>(),
+            It.IsAny<TimeSpan?>(),
+            It.IsAny<CacheLevel>(),
+            It.IsAny<int>(),
+            It.IsAny<CancellationToken>()), Times.Never);
+        _mockHttpClientFactory.Verify(x => x.CreateClient(It.IsAny<string>()), Times.Never);
     }
 }

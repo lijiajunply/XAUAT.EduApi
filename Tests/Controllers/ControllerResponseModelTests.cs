@@ -178,6 +178,39 @@ public class ControllerResponseModelTests
     }
 
     [Fact]
+    public async Task InfoController_ShouldReturnTestCompletionData_WhenTestAccountMatched()
+    {
+        var resolver = new Mock<ITestAccountResolver>();
+        resolver.Setup(x => x.IsTestAccount("test-cookie", null, null)).Returns(true);
+
+        var provider = new Mock<ITestDataProvider>();
+        provider.Setup(x => x.GetCompletionAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync([
+                new StudyModule
+                {
+                    Type = "主修"
+                }
+            ]);
+
+        var controller = new InfoController(
+            Mock.Of<IHttpClientFactory>(),
+            Mock.Of<ILogger<CourseController>>(),
+            Mock.Of<IInfoService>(),
+            resolver.Object,
+            provider.Object)
+        {
+            ControllerContext = BuildControllerContext("test-cookie")
+        };
+
+        var result = await controller.GetCompletion();
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        var payload = Assert.IsType<List<StudyModule>>(ok.Value);
+        Assert.Single(payload);
+        Assert.Equal("主修", payload[0].Type);
+    }
+
+    [Fact]
     public async Task PlaygroundController_ShouldReturnTypedJObject()
     {
         var handler = new StubHttpMessageHandler(_ => new HttpResponseMessage

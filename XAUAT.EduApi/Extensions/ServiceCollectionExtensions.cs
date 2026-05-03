@@ -1,7 +1,9 @@
 using EduApi.Data;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using StackExchange.Redis;
 using XAUAT.EduApi.Caching;
+using XAUAT.EduApi.Configuration;
 using XAUAT.EduApi.Interfaces;
 using XAUAT.EduApi.Queues;
 using XAUAT.EduApi.Repos;
@@ -63,6 +65,20 @@ public static class ServiceCollectionExtensions
         public IServiceCollection AddRepositoryServices()
         {
             services.AddScoped<IScoreRepository, ScoreRepository>();
+
+            return services;
+        }
+
+        /// <summary>
+        /// 注册测试账号相关服务
+        /// </summary>
+        /// <param name="options">测试账号配置</param>
+        /// <returns>服务集合</returns>
+        public IServiceCollection AddTestAccountServices(TestAccountOptions options)
+        {
+            services.AddSingleton(Options.Create(options));
+            services.AddSingleton<ITestAccountResolver, TestAccountResolver>();
+            services.AddSingleton<ITestDataProvider, TestDataProvider>();
 
             return services;
         }
@@ -166,6 +182,7 @@ public static class ServiceCollectionExtensions
             var serviceCollection = services
                 .AddDatabaseServices(configuration.SqlConnectionString)
                 .AddRedisServices(configuration.RedisConnectionString)
+                .AddTestAccountServices(configuration.TestAccount)
                 .AddCacheServices() // 添加缓存服务
                 .AddRepositoryServices()
                 .AddBusinessServices()

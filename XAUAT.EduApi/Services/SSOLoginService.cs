@@ -11,10 +11,17 @@ namespace XAUAT.EduApi.Services;
 public class SSOLoginService(
     IHttpClientFactory httpClientFactory,
     ICookieCodeService cookieCode,
-    ILogger<SSOLoginService> logger) : ILoginService
+    ILogger<SSOLoginService> logger,
+    ITestAccountResolver? testAccountResolver = null) : ILoginService
 {
     public async Task<LoginResponse> LoginAsync(string username, string password)
     {
+        if (testAccountResolver?.IsTestLogin(username, password) == true)
+        {
+            logger.LogInformation("用户 {Username} 命中测试账号登录", username);
+            return testAccountResolver.CreateLoginResponse();
+        }
+
         var retryPolicy = Policy
             .Handle<HttpRequestException>()
             .Or<TaskCanceledException>()

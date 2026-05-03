@@ -53,9 +53,10 @@ public class CourseServicePerformanceTests
                 It.IsAny<TimeSpan?>(),
                 It.IsAny<CacheLevel>(),
                 It.IsAny<int>(),
-                It.IsAny<CancellationToken>()))
-            .Returns<string, Func<Task<List<CourseActivity>>>, TimeSpan?, CacheLevel, int, CancellationToken>(async (
-                key, factory, expiration, level, priority, token) => await factory());
+                It.IsAny<CancellationToken>(),
+                It.IsAny<bool>()))
+            .Returns<string, Func<Task<List<CourseActivity>>>, TimeSpan?, CacheLevel, int, CancellationToken, bool>(async (
+                key, factory, expiration, level, priority, token, isUse) => await factory());
 
         var infoService = new InfoService();
 

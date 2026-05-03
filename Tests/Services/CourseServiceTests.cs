@@ -49,8 +49,9 @@ public class CourseServiceTests
                 It.IsAny<TimeSpan?>(),
                 It.IsAny<CacheLevel>(),
                 It.IsAny<int>(),
-                It.IsAny<CancellationToken>()))
-            .Returns(async (string key, Func<Task<List<CourseActivity>>> factory, TimeSpan? exp, CacheLevel level, int priority, CancellationToken ct) =>
+                It.IsAny<CancellationToken>(),
+                It.IsAny<bool>()))
+            .Returns(async (string key, Func<Task<List<CourseActivity>>> factory, TimeSpan? exp, CacheLevel level, int priority, CancellationToken ct, bool isUse) =>
                 await factory());
     }
 
@@ -315,5 +316,44 @@ public class CourseServiceTests
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
             _courseService.GetCoursesAsync(studentId, cookie));
+    }
+
+    [Fact]
+    public async Task GetCoursesAsync_ShouldReturnTestFixtureData_WhenTestAccountMatched()
+    {
+        var resolver = new Mock<ITestAccountResolver>();
+        resolver.Setup(x => x.IsTestAccount("test-cookie", "20239999", null)).Returns(true);
+
+        var provider = new Mock<ITestDataProvider>();
+        provider.Setup(x => x.GetCoursesAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync([
+                new CourseActivity
+                {
+                    CourseName = "测试数据结构",
+                    CourseCode = "TEST101"
+                }
+            ]);
+
+        var courseService = new CourseService(
+            _httpClientFactoryMock.Object,
+            _loggerMock.Object,
+            _examServiceMock.Object,
+            _cacheServiceMock.Object,
+            new InfoService(),
+            resolver.Object,
+            provider.Object);
+
+        var result = await courseService.GetCoursesAsync("20239999", "test-cookie");
+
+        Assert.Single(result);
+        Assert.Equal("测试数据结构", result[0].CourseName);
+        _cacheServiceMock.Verify(x => x.GetOrCreateAsync(
+            It.IsAny<string>(),
+            It.IsAny<Func<Task<List<CourseActivity>>>>(),
+            It.IsAny<TimeSpan?>(),
+            It.IsAny<CacheLevel>(),
+            It.IsAny<int>(),
+            It.IsAny<CancellationToken>()), Times.Never);
+        _httpClientFactoryMock.Verify(x => x.CreateClient(It.IsAny<string>()), Times.Never);
     }
 }
