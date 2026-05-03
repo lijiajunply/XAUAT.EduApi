@@ -99,6 +99,7 @@ public static class ServiceCollectionExtensions
             services.AddScoped<IRedisService, RedisService>();
             services.AddScoped<ICookieCodeService, CookieCodeService>();
             services.AddScoped<ISchoolNavService, SchoolNavService>();
+            services.AddScoped<IElectricityService, ElectricityService>();
             services.AddSingleton<IScorePersistenceQueue, ChannelScorePersistenceQueue>();
             services.AddHostedService<ScorePersistenceBackgroundService>();
 

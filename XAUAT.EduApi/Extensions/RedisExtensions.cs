@@ -317,7 +317,25 @@ public static class CacheKeys
     /// </summary>
     public static string Courses(string studentId)
         => $"{Prefix}:courses:{SafeEncode(studentId)}";
-    
+
+    /// <summary>
+    /// 生成电费来源地址缓存键
+    /// </summary>
+    public static string ElectricitySourceUrl()
+        => $"{Prefix}:electricity:source_url";
+
+    /// <summary>
+    /// 生成电费余额缓存键
+    /// </summary>
+    public static string ElectricityBalance(string sourceUrl)
+        => $"{Prefix}:electricity:balance:{SafeEncode(sourceUrl)}";
+
+    /// <summary>
+    /// 生成电费周明细缓存键
+    /// </summary>
+    public static string ElectricityWeeklyData(string sourceUrl)
+        => $"{Prefix}:electricity:weekly:{SafeEncode(sourceUrl)}";
+
     public static string Categories()
         => $"{Prefix}:categories";
 }
