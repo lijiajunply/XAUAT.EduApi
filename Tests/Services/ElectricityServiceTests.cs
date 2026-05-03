@@ -57,7 +57,7 @@ public class ElectricityServiceTests
     }
 
     [Fact]
-    public async Task FetchCurrentBalanceAsync_ShouldCacheSourceUrl_WhenBalanceFetchedSuccessfully()
+    public async Task FetchCurrentBalanceAsync_ShouldReturnBalance_WhenUrlProvided()
     {
         var url = "https://example.com/wxAccount?id=1";
         const string html = "<html><body>充值余额：¥12.34</body></html>";
@@ -75,40 +75,22 @@ public class ElectricityServiceTests
             It.IsAny<int>(),
             It.IsAny<CancellationToken>(),
             It.IsAny<bool>()), Times.Once);
-        _cacheServiceMock.Verify(x => x.SetAsync(
-            CacheKeys.ElectricitySourceUrl(),
-            url,
-            It.IsAny<TimeSpan?>(),
-            It.IsAny<CacheLevel>(),
-            It.IsAny<int>(),
-            It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
-    public async Task FetchCurrentBalanceAsync_ShouldUseCache_WhenSourceUrlNotProvided()
+    public async Task FetchCurrentBalanceAsync_ShouldReturnNull_WhenUrlNotProvided()
     {
-        var sourceUrl = "https://example.com/wxAccount?id=2";
-
-        _cacheServiceMock
-            .Setup(x => x.GetAsync<string>(
-                CacheKeys.ElectricitySourceUrl(),
-                It.IsAny<CancellationToken>()))
-            .ReturnsAsync(sourceUrl);
-
-        _cacheServiceMock
-            .Setup(x => x.GetOrCreateAsync(
-                CacheKeys.ElectricityBalance(sourceUrl),
-                It.IsAny<Func<Task<double?>>>(),
-                It.IsAny<TimeSpan?>(),
-                It.IsAny<CacheLevel>(),
-                It.IsAny<int>(),
-                It.IsAny<CancellationToken>(),
-                It.IsAny<bool>()))
-            .ReturnsAsync(25.6);
-
         var result = await _service.FetchCurrentBalanceAsync();
 
-        Assert.Equal(25.6, result);
+        Assert.Null(result);
+        _cacheServiceMock.Verify(x => x.GetOrCreateAsync(
+            It.IsAny<string>(),
+            It.IsAny<Func<Task<double?>>>(),
+            It.IsAny<TimeSpan?>(),
+            It.IsAny<CacheLevel>(),
+            It.IsAny<int>(),
+            It.IsAny<CancellationToken>(),
+            It.IsAny<bool>()), Times.Never);
         _httpClientFactoryMock.Verify(x => x.CreateClient(It.IsAny<string>()), Times.Never);
     }
 
@@ -128,15 +110,9 @@ public class ElectricityServiceTests
                             </html>
                             """;
 
-        _cacheServiceMock
-            .Setup(x => x.GetAsync<string>(
-                CacheKeys.ElectricitySourceUrl(),
-                It.IsAny<CancellationToken>()))
-            .ReturnsAsync(sourceUrl);
-
         ConfigureHttpClient(html);
 
-        var result = await _service.FetchWeeklyDataAsync();
+        var result = await _service.FetchWeeklyDataAsync(sourceUrl);
 
         Assert.Equal(2, result.Count);
         Assert.Equal(new DateTime(2026, 5, 1, 8, 0, 0), result[0].Timestamp);
@@ -157,13 +133,8 @@ public class ElectricityServiceTests
     public async Task GetRechargeUrlAsync_ShouldReturnDerivedUrl_WhenSourceUrlExists()
     {
         var sourceUrl = "https://example.com/wxAccount?id=4";
-        _cacheServiceMock
-            .Setup(x => x.GetAsync<string>(
-                CacheKeys.ElectricitySourceUrl(),
-                It.IsAny<CancellationToken>()))
-            .ReturnsAsync(sourceUrl);
 
-        var result = await _service.GetRechargeUrlAsync();
+        var result = await _service.GetRechargeUrlAsync(sourceUrl);
 
         Assert.Equal("https://example.com/wxCharge?id=4", result);
     }
