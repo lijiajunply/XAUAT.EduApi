@@ -50,7 +50,10 @@ public class DesignTimeDbContextFactory : IDesignTimeDbContextFactory<EduContext
     public EduContext CreateDbContext(string[] args)
     {
         var optionsBuilder = new DbContextOptionsBuilder<EduContext>();
-        optionsBuilder.UseSqlite("Data Source=Data.db");
+        var sqlConnectionString = Environment.GetEnvironmentVariable("SQL");
+
+        optionsBuilder.UseNpgsql(sqlConnectionString);
+
         return new EduContext(optionsBuilder.Options);
     }
 }

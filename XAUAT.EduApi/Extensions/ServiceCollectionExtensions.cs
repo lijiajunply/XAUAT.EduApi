@@ -1,6 +1,9 @@
 using EduApi.Data;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Options;
+using NpgsqlDataProtection;
 using StackExchange.Redis;
 using XAUAT.EduApi.Caching;
 using XAUAT.EduApi.Configuration;
@@ -29,14 +32,25 @@ public static class ServiceCollectionExtensions
             if (string.IsNullOrEmpty(sqlConnectionString))
             {
                 services.AddDbContextFactory<EduContext>(opt =>
+                {
                     opt.UseSqlite("Data Source=Data.db",
-                        o => o.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery)));
+                        o => o.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery));
+                    opt.ConfigureWarnings(w => w.Ignore(RelationalEventId.PendingModelChangesWarning));
+                });
+
+                services.AddDataProtection()
+                    .PersistKeysToFileSystem(new DirectoryInfo("./keys"));
             }
             else
             {
                 services.AddDbContextFactory<EduContext>(opt =>
+                {
                     opt.UseNpgsql(sqlConnectionString,
-                        o => o.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery)));
+                        o => o.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery));
+                    opt.ConfigureWarnings(w => w.Ignore(RelationalEventId.PendingModelChangesWarning));
+                });
+                services.AddDataProtection()
+                    .PersistKeysToPostgres(sqlConnectionString, true);
             }
 
             return services;
