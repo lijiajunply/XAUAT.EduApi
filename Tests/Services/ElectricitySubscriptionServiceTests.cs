@@ -88,4 +88,35 @@ public class ElectricitySubscriptionServiceTests
         _repositoryMock.Verify(x => x.DeleteAsync(It.IsAny<ElectricitySubscription>(), It.IsAny<CancellationToken>()),
             Times.Never);
     }
+
+    [Fact]
+    public async Task QueryByEmailAsync_ShouldReturnSubscriptionIds_WhenSubscriptionsExist()
+    {
+        _repositoryMock
+            .Setup(x => x.GetSubscriptionsAsync("user@example.com", It.IsAny<CancellationToken>()))
+            .ReturnsAsync([
+                new ElectricitySubscription { Id = "sub-1", Email = "user@example.com" },
+                new ElectricitySubscription { Id = "sub-2", Email = "user@example.com" }
+            ]);
+
+        var result = await _service.QueryByEmailAsync(" User@Example.com ");
+
+        Assert.Equal("user@example.com", result.Email);
+        Assert.True(result.HasSubscription);
+        Assert.Equal("sub-2", result.SubscriptionId);
+    }
+
+    [Fact]
+    public async Task QueryByEmailAsync_ShouldReturnNoSubscription_WhenSubscriptionsDoNotExist()
+    {
+        _repositoryMock
+            .Setup(x => x.GetSubscriptionsAsync("missing@example.com", It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
+
+        var result = await _service.QueryByEmailAsync("missing@example.com");
+
+        Assert.Equal("missing@example.com", result.Email);
+        Assert.False(result.HasSubscription);
+        Assert.Empty(result.SubscriptionId);
+    }
 }

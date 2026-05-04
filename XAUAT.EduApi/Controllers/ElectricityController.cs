@@ -1,4 +1,5 @@
 using EduApi.Data.Models;
+using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Mvc;
 using XAUAT.EduApi.Services;
 
@@ -143,6 +144,33 @@ public class ElectricityController(
         {
             logger.LogError(ex, "创建或更新电费订阅时出错，Email: {Email}", request.Email);
             return StatusCode(500, new ErrorResponse { error = "创建或更新电费订阅失败" });
+        }
+    }
+
+    /// <summary>
+    /// 根据邮箱查询电费订阅
+    /// </summary>
+    /// <param name="email">订阅邮箱</param>
+    /// <param name="cancellationToken">取消令牌</param>
+    /// <returns>是否存在订阅及对应订阅 ID</returns>
+    [HttpGet("Subscriptions")]
+    [ProducesResponseType(typeof(ElectricitySubscriptionQueryResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status500InternalServerError)]
+    public async Task<ActionResult<ElectricitySubscriptionQueryResponse>> QuerySubscriptionByEmail(
+        [FromQuery] [Required(ErrorMessage = "邮箱不能为空")] [EmailAddress(ErrorMessage = "邮箱格式不正确")]
+        string email,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            logger.LogInformation("开始根据邮箱查询电费订阅，Email: {Email}", email);
+            var result = await subscriptionService.QueryByEmailAsync(email, cancellationToken);
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "根据邮箱查询电费订阅时出错，Email: {Email}", email);
+            return StatusCode(500, new ErrorResponse { error = "查询电费订阅失败" });
         }
     }
 

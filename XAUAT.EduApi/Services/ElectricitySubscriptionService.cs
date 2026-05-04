@@ -8,6 +8,9 @@ public interface IElectricitySubscriptionService
     Task<ElectricitySubscriptionResponse> UpsertAsync(CreateElectricitySubscriptionRequest request,
         CancellationToken cancellationToken = default);
 
+    Task<ElectricitySubscriptionQueryResponse> QueryByEmailAsync(string email,
+        CancellationToken cancellationToken = default);
+
     Task<bool> DeleteAsync(string id, CancellationToken cancellationToken = default);
 }
 
@@ -49,6 +52,21 @@ public class ElectricitySubscriptionService(IElectricitySubscriptionRepository r
 
         await repository.AddAsync(subscription, cancellationToken).ConfigureAwait(false);
         return ElectricitySubscriptionResponse.FromEntity(subscription);
+    }
+
+    public async Task<ElectricitySubscriptionQueryResponse> QueryByEmailAsync(string email,
+        CancellationToken cancellationToken = default)
+    {
+        var normalizedEmail = email.Trim().ToLowerInvariant();
+        var subscriptions = await repository.GetSubscriptionsAsync(normalizedEmail, cancellationToken)
+            .ConfigureAwait(false);
+
+        return new ElectricitySubscriptionQueryResponse
+        {
+            Email = normalizedEmail,
+            HasSubscription = subscriptions.Count > 0,
+            SubscriptionId = subscriptions.Select(x => x.Id).FirstOrDefault() ?? ""
+        };
     }
 
     public async Task<bool> DeleteAsync(string id, CancellationToken cancellationToken = default)
