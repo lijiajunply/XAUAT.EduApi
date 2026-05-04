@@ -11,7 +11,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace EduApi.Data.Migrations
 {
     [DbContext(typeof(EduContext))]
-    [Migration("20260504040847_AddElectricitySubscription")]
+    [Migration("20260504051251_AddElectricitySubscription")]
     partial class AddElectricitySubscription
     {
         /// <inheritdoc />

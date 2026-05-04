@@ -51,8 +51,6 @@ builder.Host.UseSerilog((_, _, loggerConfiguration) =>
         .Enrich.FromLogContext();
 });
 
-// Add services to the container.
-
 // 基础服务配置
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();

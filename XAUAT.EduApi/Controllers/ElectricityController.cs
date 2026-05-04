@@ -124,6 +124,7 @@ public class ElectricityController(
     /// 创建或更新电费订阅
     /// </summary>
     /// <param name="request">订阅请求</param>
+    /// <param name="cancellationToken">取消令牌</param>
     /// <returns>订阅结果</returns>
     [HttpPost("Subscriptions")]
     [ProducesResponseType(typeof(ElectricitySubscriptionResponse), StatusCodes.Status200OK)]
@@ -149,6 +150,7 @@ public class ElectricityController(
     /// 查询电费订阅
     /// </summary>
     /// <param name="email">可选，按邮箱过滤</param>
+    /// <param name="cancellationToken">取消令牌</param>
     /// <returns>订阅列表</returns>
     [HttpGet("Subscriptions")]
     [ProducesResponseType(typeof(List<ElectricitySubscriptionResponse>), StatusCodes.Status200OK)]

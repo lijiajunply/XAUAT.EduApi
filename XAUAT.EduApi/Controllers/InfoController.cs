@@ -39,7 +39,7 @@ public class InfoController(
     /// xauat: YOUR_AUTH_COOKIE
     /// </remarks>
     [HttpGet("Completion")]
-    [ProducesResponseType(typeof(CreditInfo[]), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(StudyModule[]), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(string), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(string), StatusCodes.Status500InternalServerError)]
     [ProducesResponseType(typeof(string), StatusCodes.Status502BadGateway)]
