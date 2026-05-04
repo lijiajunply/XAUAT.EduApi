@@ -147,31 +147,6 @@ public class ElectricityController(
     }
 
     /// <summary>
-    /// 查询电费订阅
-    /// </summary>
-    /// <param name="email">可选，按邮箱过滤</param>
-    /// <param name="cancellationToken">取消令牌</param>
-    /// <returns>订阅列表</returns>
-    [HttpGet("Subscriptions")]
-    [ProducesResponseType(typeof(List<ElectricitySubscriptionResponse>), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status500InternalServerError)]
-    public async Task<ActionResult<IReadOnlyList<ElectricitySubscriptionResponse>>> GetSubscriptions(
-        [FromQuery] string? email,
-        CancellationToken cancellationToken)
-    {
-        try
-        {
-            var subscriptions = await subscriptionService.GetSubscriptionsAsync(email, cancellationToken);
-            return Ok(subscriptions);
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "查询电费订阅时出错，Email: {Email}", email);
-            return StatusCode(500, new ErrorResponse { error = "查询电费订阅失败" });
-        }
-    }
-
-    /// <summary>
     /// 删除电费订阅
     /// </summary>
     /// <param name="id">订阅 ID</param>

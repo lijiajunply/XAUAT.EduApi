@@ -15,12 +15,12 @@ public class ElectricitySubscriptionRepository(IDbContextFactory<EduContext> con
             .ConfigureAwait(false);
     }
 
-    public async Task<ElectricitySubscription?> GetByEmailAndUrlAsync(string email, string electricityUrl,
+    public async Task<ElectricitySubscription?> GetByEmailAsync(string email,
         CancellationToken cancellationToken = default)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
         return await context.ElectricitySubscriptions
-            .FirstOrDefaultAsync(x => x.Email == email && x.ElectricityUrl == electricityUrl, cancellationToken)
+            .FirstOrDefaultAsync(x => x.Email == email, cancellationToken)
             .ConfigureAwait(false);
     }
 

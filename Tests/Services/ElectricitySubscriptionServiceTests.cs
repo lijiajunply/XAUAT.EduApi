@@ -26,7 +26,7 @@ public class ElectricitySubscriptionServiceTests
         };
 
         _repositoryMock
-            .Setup(x => x.GetByEmailAndUrlAsync("user@example.com", "https://example.com/wxAccount?id=1",
+            .Setup(x => x.GetByEmailAsync("user@example.com",
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync((ElectricitySubscription?)null);
 
@@ -58,7 +58,7 @@ public class ElectricitySubscriptionServiceTests
         };
 
         _repositoryMock
-            .Setup(x => x.GetByEmailAndUrlAsync(existing.Email, existing.ElectricityUrl, It.IsAny<CancellationToken>()))
+            .Setup(x => x.GetByEmailAsync(existing.Email, It.IsAny<CancellationToken>()))
             .ReturnsAsync(existing);
 
         var request = new CreateElectricitySubscriptionRequest

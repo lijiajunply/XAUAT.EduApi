@@ -7,8 +7,7 @@ public interface IElectricitySubscriptionService
 {
     Task<ElectricitySubscriptionResponse> UpsertAsync(CreateElectricitySubscriptionRequest request,
         CancellationToken cancellationToken = default);
-    Task<IReadOnlyList<ElectricitySubscriptionResponse>> GetSubscriptionsAsync(string? email = null,
-        CancellationToken cancellationToken = default);
+
     Task<bool> DeleteAsync(string id, CancellationToken cancellationToken = default);
 }
 
@@ -22,12 +21,13 @@ public class ElectricitySubscriptionService(IElectricitySubscriptionRepository r
         var normalizedEmail = request.Email.Trim().ToLowerInvariant();
         var now = DateTime.UtcNow;
 
-        var existing = await repository.GetByEmailAndUrlAsync(normalizedEmail, normalizedUrl, cancellationToken)
+        var existing = await repository.GetByEmailAsync(normalizedEmail, cancellationToken)
             .ConfigureAwait(false);
 
         if (existing is not null)
         {
             existing.Threshold = request.Threshold;
+            existing.ElectricityUrl = normalizedUrl;
             existing.IsActive = true;
             existing.UpdatedAt = now;
             existing.NextCheckAt = now;
@@ -49,18 +49,6 @@ public class ElectricitySubscriptionService(IElectricitySubscriptionRepository r
 
         await repository.AddAsync(subscription, cancellationToken).ConfigureAwait(false);
         return ElectricitySubscriptionResponse.FromEntity(subscription);
-    }
-
-    public async Task<IReadOnlyList<ElectricitySubscriptionResponse>> GetSubscriptionsAsync(string? email = null,
-        CancellationToken cancellationToken = default)
-    {
-        var normalizedEmail = string.IsNullOrWhiteSpace(email) ? null : email.Trim().ToLowerInvariant();
-        var subscriptions = await repository.GetSubscriptionsAsync(normalizedEmail, cancellationToken)
-            .ConfigureAwait(false);
-
-        return subscriptions
-            .Select(ElectricitySubscriptionResponse.FromEntity)
-            .ToList();
     }
 
     public async Task<bool> DeleteAsync(string id, CancellationToken cancellationToken = default)
