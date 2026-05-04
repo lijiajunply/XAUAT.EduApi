@@ -10,6 +10,8 @@ namespace EduApi.Data;
 public class EduContext(DbContextOptions<EduContext> options) : DbContext(options)
 {
     public DbSet<ScoreResponse> Scores { get; set; }
+    public DbSet<ElectricitySubscription> ElectricitySubscriptions { get; set; }
+    public DbSet<ElectricityNotificationLog> ElectricityNotificationLogs { get; set; }
     
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -18,6 +20,24 @@ public class EduContext(DbContextOptions<EduContext> options) : DbContext(option
             entity.HasIndex(e => e.UserId);
             entity.HasIndex(e => e.Semester);
             entity.HasIndex(e => new { e.UserId, e.Semester });
+        });
+
+        modelBuilder.Entity<ElectricitySubscription>(entity =>
+        {
+            entity.HasIndex(e => new { e.Email, e.ElectricityUrl }).IsUnique();
+            entity.HasIndex(e => new { e.IsActive, e.NextCheckAt });
+            entity.Property(e => e.Threshold).HasDefaultValue(0);
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+            entity.Property(e => e.UpdatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+        });
+
+        modelBuilder.Entity<ElectricityNotificationLog>(entity =>
+        {
+            entity.HasIndex(e => new { e.SubscriptionId, e.CreatedAt });
+            entity.HasOne(e => e.Subscription)
+                .WithMany(s => s.NotificationLogs)
+                .HasForeignKey(e => e.SubscriptionId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
         
         base.OnModelCreating(modelBuilder);

@@ -1,21 +1,55 @@
+using DotNetEnv;
 using EduApi.Data;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Serilog;
+using Serilog.Events;
 using XAUAT.EduApi.Caching;
 using XAUAT.EduApi.Extensions;
+
+LoadDotEnvIfPresent();
 
 // 先创建builder对象
 var builder = WebApplication.CreateBuilder(args);
 
 // 启用顶级语句异步支持
-// 配置Serilog
-Log.Logger = new LoggerConfiguration()
-    .ReadFrom.Configuration(builder.Configuration)
-    .Enrich.FromLogContext()
-    .CreateLogger();
-
 // 使用Serilog作为日志提供程序
-builder.Host.UseSerilog();
+builder.Host.UseSerilog((_, _, loggerConfiguration) =>
+{
+    loggerConfiguration
+        .MinimumLevel.Is(EnvironmentVariableHelper.GetLogEventLevelOrDefault(
+            LogEventLevel.Information,
+            "SERILOG_MINIMUM_LEVEL_DEFAULT",
+            "Serilog__MinimumLevel__Default"))
+        .MinimumLevel.Override(
+            "Microsoft",
+            EnvironmentVariableHelper.GetLogEventLevelOrDefault(
+                LogEventLevel.Warning,
+                "SERILOG_MINIMUM_LEVEL_MICROSOFT",
+                "Serilog__MinimumLevel__Override__Microsoft"))
+        .MinimumLevel.Override(
+            "System",
+            EnvironmentVariableHelper.GetLogEventLevelOrDefault(
+                LogEventLevel.Warning,
+                "SERILOG_MINIMUM_LEVEL_SYSTEM",
+                "Serilog__MinimumLevel__Override__System"))
+        .WriteTo.Console(
+            outputTemplate:
+            "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} {Level:u3}] {Message:lj} {Properties:j}{NewLine}{Exception}")
+        .WriteTo.File(
+            EnvironmentVariableHelper.GetStringOrDefault(
+                "./logs/log-.txt",
+                "SERILOG_FILE_PATH",
+                "Serilog__WriteTo__0__Args__path"),
+            rollingInterval: RollingInterval.Day,
+            retainedFileCountLimit: EnvironmentVariableHelper.GetIntOrDefault(
+                7,
+                "SERILOG_RETAINED_FILE_COUNT_LIMIT",
+                "Serilog__WriteTo__0__Args__retainedFileCountLimit"),
+            outputTemplate:
+            "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} {Level:u3}] {Message:lj} {Properties:j}{NewLine}{Exception}")
+        .Enrich.FromLogContext();
+});
 
 // Add services to the container.
 
@@ -24,6 +58,10 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddOpenApi();
 builder.Services.AddHttpContextAccessor();
+builder.Services.AddSingleton(
+    Options.Create(EnvironmentVariableHelper.BuildElectricitySubscriptionOptions()));
+builder.Services.AddSingleton(
+    Options.Create(EnvironmentVariableHelper.BuildSmtpOptions()));
 
 builder.Services.AddCors(options =>
 {
@@ -40,17 +78,12 @@ builder.Services.AddCors(options =>
 });
 
 // 获取配置
-var serviceConfig = ServiceConfiguration.FromConfiguration(builder.Configuration);
+var serviceConfig = ServiceConfiguration.FromEnvironment();
 
 // 模块化服务注册
 builder.Services.AddAllServices(serviceConfig);
 
 var app = builder.Build();
-
-var configuration = app.Configuration;
-
-var serviceName = configuration.GetValue<string>("Service:Name") ?? "XAUAT.EduApi";
-var instanceId = configuration.GetValue<string>("Service:InstanceId") ?? $"{serviceName}-{Guid.NewGuid()}";
 
 // 配置中间件管道
 app.UseErrorHandling()
@@ -59,8 +92,6 @@ app.UseErrorHandling()
 
 // 配置端点
 app.ConfigureApiEndpoints();
-
-// Prometheus指标端点已通过UsePrometheusServer()配置，默认路径为/metrics
 
 // 应用数据库迁移
 using (var scope = app.Services.CreateScope())
@@ -149,3 +180,21 @@ app.Run();
 
 // 确保所有日志都被正确写入
 Log.CloseAndFlush();
+return;
+
+void LoadDotEnvIfPresent()
+{
+    var currentDirectory = new DirectoryInfo(Directory.GetCurrentDirectory());
+
+    while (currentDirectory is not null)
+    {
+        var dotEnvPath = Path.Combine(currentDirectory.FullName, ".env");
+        if (File.Exists(dotEnvPath))
+        {
+            Env.NoClobber().Load(dotEnvPath);
+            return;
+        }
+
+        currentDirectory = currentDirectory.Parent;
+    }
+}

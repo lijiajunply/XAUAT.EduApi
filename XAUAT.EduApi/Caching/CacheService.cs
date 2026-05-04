@@ -40,7 +40,7 @@ public class CacheService : ICacheService, IDisposable
     /// <param name="logger">日志记录器</param>
     /// <param name="monitoringService">监控服务</param>
     public CacheService(
-        IConnectionMultiplexer? connectionMultiplexer,
+        IEnumerable<IConnectionMultiplexer> multiplexers,
         IOptions<CacheOptions> options,
         ILogger<CacheService> logger,
         IMonitoringService? monitoringService = null)
@@ -48,6 +48,7 @@ public class CacheService : ICacheService, IDisposable
         _options = options.Value;
         _logger = logger;
         _monitoringService = monitoringService;
+        var connectionMultiplexer = multiplexers.FirstOrDefault();
 
         // 初始化本地缓存
         _localCache = new LocalCacheManager(_options);

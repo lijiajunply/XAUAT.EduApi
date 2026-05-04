@@ -13,6 +13,7 @@ namespace XAUAT.EduApi.Controllers;
 [Produces("application/json")]
 public class ElectricityController(
     IElectricityService service,
+    IElectricitySubscriptionService subscriptionService,
     ILogger<ElectricityController> logger) : ControllerBase
 {
     /// <summary>
@@ -116,6 +117,83 @@ public class ElectricityController(
         {
             logger.LogError(ex, "获取电费充值地址时出错");
             return StatusCode(500, new ErrorResponse { error = "获取电费充值地址失败" });
+        }
+    }
+
+    /// <summary>
+    /// 创建或更新电费订阅
+    /// </summary>
+    /// <param name="request">订阅请求</param>
+    /// <returns>订阅结果</returns>
+    [HttpPost("Subscriptions")]
+    [ProducesResponseType(typeof(ElectricitySubscriptionResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status500InternalServerError)]
+    public async Task<ActionResult<ElectricitySubscriptionResponse>> UpsertSubscription(
+        [FromBody] CreateElectricitySubscriptionRequest request,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            logger.LogInformation("开始创建或更新电费订阅，Email: {Email}", request.Email);
+            var subscription = await subscriptionService.UpsertAsync(request, cancellationToken);
+            return Ok(subscription);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "创建或更新电费订阅时出错，Email: {Email}", request.Email);
+            return StatusCode(500, new ErrorResponse { error = "创建或更新电费订阅失败" });
+        }
+    }
+
+    /// <summary>
+    /// 查询电费订阅
+    /// </summary>
+    /// <param name="email">可选，按邮箱过滤</param>
+    /// <returns>订阅列表</returns>
+    [HttpGet("Subscriptions")]
+    [ProducesResponseType(typeof(List<ElectricitySubscriptionResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status500InternalServerError)]
+    public async Task<ActionResult<IReadOnlyList<ElectricitySubscriptionResponse>>> GetSubscriptions(
+        [FromQuery] string? email,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var subscriptions = await subscriptionService.GetSubscriptionsAsync(email, cancellationToken);
+            return Ok(subscriptions);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "查询电费订阅时出错，Email: {Email}", email);
+            return StatusCode(500, new ErrorResponse { error = "查询电费订阅失败" });
+        }
+    }
+
+    /// <summary>
+    /// 删除电费订阅
+    /// </summary>
+    /// <param name="id">订阅 ID</param>
+    /// <returns>删除结果</returns>
+    [HttpDelete("Subscriptions/{id}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> DeleteSubscription(string id, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var deleted = await subscriptionService.DeleteAsync(id, cancellationToken);
+            if (!deleted)
+            {
+                return NotFound(new ErrorResponse { error = "未找到对应的电费订阅" });
+            }
+
+            return NoContent();
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "删除电费订阅时出错，SubscriptionId: {SubscriptionId}", id);
+            return StatusCode(500, new ErrorResponse { error = "删除电费订阅失败" });
         }
     }
 }

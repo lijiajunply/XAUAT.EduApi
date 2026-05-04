@@ -24,7 +24,7 @@ public class RedisServiceTests
         _redisMock.Setup(m => m.GetDatabase(It.IsAny<int>(), It.IsAny<object>())).Returns(redisDatabaseMock.Object);
         
         // 创建RedisService实例
-        _redisService = new RedisService(_redisMock.Object);
+        _redisService = new RedisService([_redisMock.Object]);
     }
     
     /// <summary>
@@ -44,7 +44,7 @@ public class RedisServiceTests
         _redisMock.Setup(m => m.GetDatabase(It.IsAny<int>(), It.IsAny<object>())).Returns(redisDatabaseMock.Object);
         
         // 创建RedisService实例
-        var redisService = new RedisService(_redisMock.Object);
+        var redisService = new RedisService([_redisMock.Object]);
         
         // Act
         var result = await redisService.GetKeyValueAsync(key);
@@ -69,7 +69,7 @@ public class RedisServiceTests
         _redisMock.Setup(m => m.GetDatabase(It.IsAny<int>(), It.IsAny<object>())).Returns(redisDatabaseMock.Object);
         
         // 创建RedisService实例
-        var redisService = new RedisService(_redisMock.Object);
+        var redisService = new RedisService([_redisMock.Object]);
         
         // Act
         var result = await redisService.GetKeyValueAsync(key);
@@ -84,11 +84,8 @@ public class RedisServiceTests
     [Fact]
     public void RedisService_ShouldBeCreated_WhenMuxerIsNull()
     {
-        // Arrange
-        IConnectionMultiplexer? muxer = null;
-        
         // Act
-        var redisService = new RedisService(muxer);
+        var redisService = new RedisService([]);
         
         // Assert
         Assert.NotNull(redisService);

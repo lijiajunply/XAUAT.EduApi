@@ -15,8 +15,9 @@ public class RedisService : IRedisService
     private readonly bool _redisAvailable;
     private readonly IConnectionMultiplexer? _multiplexer;
     
-    public RedisService(IConnectionMultiplexer? muxer)
+    public RedisService(IEnumerable<IConnectionMultiplexer> multiplexers)
     {
+        var muxer = multiplexers.FirstOrDefault();
         _multiplexer = muxer;
         _redisAvailable = muxer != null;
         if (_redisAvailable && muxer != null)

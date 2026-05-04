@@ -207,11 +207,11 @@ docs/
    ```
 
 2. **配置开发环境变量**：
-   - 复制 `appsettings.Development.json` 文件：
+   - 复制 `.env.example` 文件：
      ```bash
-     cp XAUAT.EduApi/appsettings.Development.json XAUAT.EduApi/appsettings.Development.local.json
+     cp .env.example .env
      ```
-   - 编辑 `appsettings.Development.local.json` 文件，配置开发环境变量
+   - 编辑 `.env` 文件，使用 `SERVICE_NAME`、`REDIS` 等全大写下划线环境变量配置项目
 
 3. **初始化数据库**：
    ```bash

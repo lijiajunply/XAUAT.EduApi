@@ -64,6 +64,7 @@ public static class ServiceCollectionExtensions
         public IServiceCollection AddRepositoryServices()
         {
             services.AddScoped<IScoreRepository, ScoreRepository>();
+            services.AddScoped<IElectricitySubscriptionRepository, ElectricitySubscriptionRepository>();
 
             return services;
         }
@@ -100,8 +101,13 @@ public static class ServiceCollectionExtensions
             services.AddScoped<ICookieCodeService, CookieCodeService>();
             services.AddScoped<ISchoolNavService, SchoolNavService>();
             services.AddScoped<IElectricityService, ElectricityService>();
+            services.AddScoped<IElectricitySubscriptionService, ElectricitySubscriptionService>();
+            services.AddScoped<IElectricityNotificationEmailService, ElectricityNotificationEmailService>();
             services.AddSingleton<IScorePersistenceQueue, ChannelScorePersistenceQueue>();
             services.AddHostedService<ScorePersistenceBackgroundService>();
+            services.AddSingleton<IElectricityNotificationQueue, ChannelElectricityNotificationQueue>();
+            services.AddHostedService<ElectricitySubscriptionMonitorBackgroundService>();
+            services.AddHostedService<ElectricityNotificationBackgroundService>();
 
             return services;
         }

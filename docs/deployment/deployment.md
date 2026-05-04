@@ -117,28 +117,17 @@
 
 ### 2.3 配置开发环境变量
 
-1. 复制 `appsettings.Development.json` 文件：
+1. 复制 `.env.example` 文件：
    ```bash
-   cp XAUAT.EduApi/appsettings.Development.json XAUAT.EduApi/appsettings.Development.local.json
+   cp .env.example .env
    ```
 
-2. 编辑 `appsettings.Development.local.json` 文件，配置开发环境变量：
-   ```json
-   {
-     "Service": {
-       "Name": "XAUAT.EduApi",
-       "InstanceId": "dev-instance-1",
-       "Host": "localhost",
-       "Port": 8080,
-       "IsHttps": false
-     },
-     "Logging": {
-       "LogLevel": {
-         "Default": "Information",
-         "Microsoft.AspNetCore": "Warning"
-       }
-     }
-   }
+2. 编辑 `.env` 文件，配置开发环境变量：
+   ```dotenv
+   ASPNETCORE_ENVIRONMENT=Development
+   SERVICE_NAME=XAUAT.EduApi
+   SERVICE_INSTANCE_ID=dev-instance-1
+   REDIS=localhost:6379
    ```
 
 ### 2.4 初始化数据库
@@ -287,11 +276,11 @@ export ASPNETCORE_URLS=http://*:8080
 export DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false
 
 # 服务配置
-export Service__Name=XAUAT.EduApi
-export Service__InstanceId=prod-instance-1
-export Service__Host=0.0.0.0
-export Service__Port=8080
-export Service__IsHttps=false
+export SERVICE_NAME=XAUAT.EduApi
+export SERVICE_INSTANCE_ID=prod-instance-1
+export SERVICE_HOST=0.0.0.0
+export SERVICE_PORT=8080
+export SERVICE_IS_HTTPS=false
 
 # 数据库配置
 export SQL=Host=db;Port=5432;Database=xauat_edu_prod;Username=postgres;Password=your_secure_password
@@ -300,8 +289,8 @@ export SQL=Host=db;Port=5432;Database=xauat_edu_prod;Username=postgres;Password=
 export REDIS=redis-cluster:6379,password=your_redis_password
 
 # 日志配置
-export Serilog__MinimumLevel__Default=Warning
-export Serilog__WriteTo__0__Args__path=/var/log/xauat-eduapi/log-.txt
+export SERILOG_MINIMUM_LEVEL_DEFAULT=Warning
+export SERILOG_FILE_PATH=/var/log/xauat-eduapi/log-.txt
 
 # 第三方服务配置
 export GITEE_ACCESS_TOKEN=your_gitee_token
@@ -493,11 +482,11 @@ jobs:
 
 | 变量名 | 类型 | 说明 | 示例值 |
 |--------|------|------|--------|
-| Service__Name | string | 服务名称 | XAUAT.EduApi |
-| Service__InstanceId | string | 服务实例ID | prod-instance-1 |
-| Service__Host | string | 服务主机地址 | 0.0.0.0 |
-| Service__Port | int | 服务端口 | 8080 |
-| Service__IsHttps | bool | 是否使用HTTPS | false |
+| SERVICE_NAME | string | 服务名称 | XAUAT.EduApi |
+| SERVICE_INSTANCE_ID | string | 服务实例ID | prod-instance-1 |
+| SERVICE_HOST | string | 服务主机地址 | 0.0.0.0 |
+| SERVICE_PORT | int | 服务端口 | 8080 |
+| SERVICE_IS_HTTPS | bool | 是否使用HTTPS | false |
 
 ### 6.5 第三方服务环境变量
 

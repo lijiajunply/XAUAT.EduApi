@@ -34,12 +34,22 @@
 - 支持 Docker 容器化部署
 - 使用 CORS 解决跨域问题
 
-## 环境变量配置
+## 环境配置
+
+项目启动时会自动使用 `DotNetEnv` 加载根目录下的 `.env` 文件，不再依赖 `appsettings.json`。
+
+```bash
+cp .env.example .env
+```
 
 | 变量名 | 说明 | 示例 |
 |-------|------|-----|
 | SQL | 数据库连接字符串（PostgreSQL） | `Host=localhost;Database=xauat_edu` |
 | REDIS | Redis 连接字符串 | `localhost:6379` |
+| SERVICE_NAME | 服务名称 | `XAUAT.EduApi` |
+| ELECTRICITY_SUBSCRIPTION_SCAN_INTERVAL_MINUTES | 电费订阅扫描间隔（分钟） | `15` |
+| SMTP_HOST | SMTP 服务器地址 | `smtp.qq.com` |
+| TEST_ACCOUNT_ENABLED | 是否启用测试账号 | `false` |
 
 ## 部署方式
 
@@ -53,7 +63,8 @@ docker run -d -p 8080:8080 xauat-edu-api
 ### 本地运行
 
 ```bash
-dotnet run
+cp .env.example .env
+dotnet run --project XAUAT.EduApi
 ```
 
 ## API 接口文档

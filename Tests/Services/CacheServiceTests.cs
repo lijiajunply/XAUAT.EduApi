@@ -41,7 +41,7 @@ public class CacheServiceTests : IDisposable
         optionsMock.Setup(x => x.Value).Returns(_cacheOptions);
 
         _cacheService = new CacheService(
-            _connectionMultiplexerMock.Object,
+            [_connectionMultiplexerMock.Object],
             optionsMock.Object,
             _loggerMock.Object,
             _monitoringServiceMock.Object);
