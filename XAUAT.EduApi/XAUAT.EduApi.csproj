@@ -12,6 +12,7 @@
         <PackageReference Include="Flurl.Http" Version="4.0.2" />
         <PackageReference Include="HtmlAgilityPack" Version="1.12.4" />
         <PackageReference Include="JetBrains.Annotations" Version="2025.2.4" />
+        <PackageReference Include="MailKit" Version="4.16.0" />
         <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.7" />
         <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.7">
             <PrivateAssets>all</PrivateAssets>

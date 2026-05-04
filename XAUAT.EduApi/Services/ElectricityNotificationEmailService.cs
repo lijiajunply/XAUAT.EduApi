@@ -1,6 +1,8 @@
-using System.Net;
-using System.Net.Mail;
+using MailKit.Net.Smtp;
+using MailKit.Security;
 using Microsoft.Extensions.Options;
+using MimeKit;
+using MimeKit.Text;
 using XAUAT.EduApi.Configuration;
 using XAUAT.EduApi.Queues;
 
@@ -26,28 +28,34 @@ public class ElectricityNotificationEmailService(
         var rechargeUrl = await electricityService.GetRechargeUrlAsync(notificationEvent.ElectricityUrl)
             .ConfigureAwait(false);
 
-        using var message = new MailMessage
+        var message = new MimeMessage();
+        message.From.Add(new MailboxAddress(options.FromName, options.FromAddress));
+        message.To.Add(MailboxAddress.Parse(notificationEvent.Email));
+        message.Subject = $"[XAUAT EduApi] 电费余额提醒：当前余额 {notificationEvent.Balance:F2} 元";
+        message.Body = new TextPart(TextFormat.Plain)
         {
-            From = new MailAddress(options.FromAddress, options.FromName),
-            Subject = $"[XAUAT EduApi] 电费余额提醒：当前余额 {notificationEvent.Balance:F2} 元",
-            Body = BuildBody(notificationEvent, rechargeUrl),
-            IsBodyHtml = false
+            Text = BuildBody(notificationEvent, rechargeUrl)
         };
 
-        message.To.Add(notificationEvent.Email);
+        using var client = new SmtpClient();
 
-        using var client = new SmtpClient(options.Host, options.Port)
-        {
-            EnableSsl = options.EnableSsl
-        };
+        cancellationToken.ThrowIfCancellationRequested();
+
+        await client.ConnectAsync(
+                options.Host,
+                options.Port,
+                GetSecureSocketOptions(options),
+                cancellationToken)
+            .ConfigureAwait(false);
 
         if (!string.IsNullOrWhiteSpace(options.UserName))
         {
-            client.Credentials = new NetworkCredential(options.UserName, options.Password);
+            await client.AuthenticateAsync(options.UserName, options.Password, cancellationToken)
+                .ConfigureAwait(false);
         }
 
-        cancellationToken.ThrowIfCancellationRequested();
-        await client.SendMailAsync(message).ConfigureAwait(false);
+        await client.SendAsync(message, cancellationToken).ConfigureAwait(false);
+        await client.DisconnectAsync(true, cancellationToken).ConfigureAwait(false);
     }
 
     private static string BuildBody(ElectricityLowBalanceEvent notificationEvent, string? rechargeUrl)
@@ -78,5 +86,17 @@ public class ElectricityNotificationEmailService(
         {
             throw new InvalidOperationException("SMTP FromAddress 未配置");
         }
+    }
+
+    private static SecureSocketOptions GetSecureSocketOptions(SmtpOptions options)
+    {
+        if (!options.EnableSsl)
+        {
+            return SecureSocketOptions.None;
+        }
+
+        return options.Port == 465
+            ? SecureSocketOptions.SslOnConnect
+            : SecureSocketOptions.StartTls;
     }
 }
