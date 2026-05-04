@@ -60,12 +60,14 @@ public class ElectricitySubscriptionService(IElectricitySubscriptionRepository r
         var normalizedEmail = email.Trim().ToLowerInvariant();
         var subscriptions = await repository.GetSubscriptionsAsync(normalizedEmail, cancellationToken)
             .ConfigureAwait(false);
+        var threshold = subscriptions.Count > 0 ? subscriptions.First().Threshold : 0;
 
         return new ElectricitySubscriptionQueryResponse
         {
             Email = normalizedEmail,
             HasSubscription = subscriptions.Count > 0,
-            SubscriptionId = subscriptions.Select(x => x.Id).FirstOrDefault() ?? ""
+            SubscriptionId = subscriptions.Select(x => x.Id).FirstOrDefault() ?? "",
+            Threshold = threshold
         };
     }
 

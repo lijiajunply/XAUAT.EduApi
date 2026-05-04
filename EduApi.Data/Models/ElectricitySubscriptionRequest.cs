@@ -57,6 +57,7 @@ public class ElectricitySubscriptionResponse
 public class ElectricitySubscriptionQueryResponse
 {
     public string Email { get; set; } = "";
+    public double Threshold { get; set; }
     public bool HasSubscription { get; set; }
     public string SubscriptionId { get; set; } = "";
 }
