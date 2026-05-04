@@ -11,8 +11,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace EduApi.Data.Migrations
 {
     [DbContext(typeof(EduContext))]
-    [Migration("20260504051251_AddElectricitySubscription")]
-    partial class AddElectricitySubscription
+    [Migration("20260504055122_Initial")]
+    partial class Initial
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
