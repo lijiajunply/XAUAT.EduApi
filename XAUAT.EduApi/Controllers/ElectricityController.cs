@@ -73,7 +73,7 @@ public class ElectricityController(
         try
         {
             logger.LogInformation("开始获取电费周明细");
-            var data = await service.FetchWeeklyDataAsync();
+            var data = await service.FetchWeeklyDataAsync(url);
             return Ok(data);
         }
         catch (Exception ex)

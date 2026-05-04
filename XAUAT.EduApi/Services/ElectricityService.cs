@@ -53,7 +53,7 @@ public class ElectricityService(
         return await cacheService.GetOrCreateAsync(
             CacheKeys.ElectricityWeeklyData(url),
             async () => await FetchWeeklyDataFromRemoteAsync(detailUrl),
-            WeeklyDataCacheExpiration);
+            WeeklyDataCacheExpiration, isUse: false);
     }
 
     public Task<string?> GetRechargeUrlAsync(string? url = null)
@@ -118,68 +118,55 @@ public class ElectricityService(
 
         var tables = document.DocumentNode.SelectNodes("//table");
         var data = new List<ElectricData>();
-
-        if (tables == null!)
+        foreach (var table in tables)
         {
-            return data;
-        }
-
-        foreach (var cells in tables.Select(table => table.SelectNodes(".//tr"))
-                     .Where(rows => rows != null!)
-                     .SelectMany(rows => rows.Select(row => row.SelectNodes(".//td"))))
-        {
-            if (cells is not { Count: 3 })
+            var rows = table.SelectNodes(".//tr");
+            if (rows == null!)
             {
                 continue;
             }
 
-            var timestamp = ParseTimestamp(cells[1].InnerText.Trim());
-            var valueText = cells[2].InnerText.Trim();
-
-            if (timestamp == null ||
-                !double.TryParse(valueText, NumberStyles.Any, CultureInfo.InvariantCulture, out var value))
+            foreach (var row in rows)
             {
-                continue;
-            }
-
-            if (data.Count == 0 || data[^1].Timestamp.Hour != timestamp.Value.Hour)
-            {
-                data.Add(new ElectricData
+                var cells = row.SelectNodes("./td");
+                if (cells is not { Count: 3 })
                 {
-                    Timestamp = timestamp.Value,
-                    Value = value
-                });
-            }
-            else
-            {
-                data[^1].Value += value;
+                    continue;
+                }
+
+                var timestamp = ParseTimestamp(cells[1].InnerText.Trim());
+                var valueText = cells[2].InnerText.Trim();
+                if (timestamp == null ||
+                    !double.TryParse(valueText, NumberStyles.Any, CultureInfo.InvariantCulture, out var value))
+                {
+                    continue;
+                }
+
+                if (data.Count == 0 || data[^1].Timestamp.Hour != timestamp.Value.Hour)
+                {
+                    data.Add(new ElectricData()
+                    {
+                        Timestamp = timestamp.Value, Value = value
+                    });
+                }
+                else
+                {
+                    data[^1].Value += value;
+                }
             }
         }
 
-        return data.OrderBy(x => x.Timestamp).ToList();
+        data.Sort((left, right) => left.Timestamp.CompareTo(right.Timestamp));
+        return data;
     }
 
     private static DateTime? ParseTimestamp(string rawValue)
     {
-        var parts = rawValue.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-        if (parts.Length != 2)
+        if (DateTime.TryParse(rawValue, out var timestamp))
         {
-            return null;
+            return timestamp;
         }
 
-        var datePart = parts[0];
-        var timePart = parts[1];
-
-        if (!DateTime.TryParseExact(
-                $"{datePart} {timePart}",
-                ["yyyy/M/d HH:mm", "yyyy/MM/dd HH:mm"],
-                CultureInfo.InvariantCulture,
-                DateTimeStyles.None,
-                out var result))
-        {
-            return null;
-        }
-
-        return new DateTime(result.Year, result.Month, result.Day, result.Hour, 0, 0);
+        return null;
     }
 }
