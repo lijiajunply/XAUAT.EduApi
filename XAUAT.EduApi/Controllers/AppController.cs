@@ -1,6 +1,6 @@
-using System.Text.Json;
 using EduApi.Data.Models;
 using Microsoft.AspNetCore.Mvc;
+using Newtonsoft.Json.Linq;
 
 namespace XAUAT.EduApi.Controllers;
 
@@ -56,7 +56,6 @@ public class AppController(IHttpClientFactory httpClientFactory)
     /// 获取最新应用版本
     /// 从Gitee仓库获取移动端应用的最新发布版本信息
     /// </summary>
-    /// <param name="token">可选，Gitee API访问令牌</param>
     /// <returns>最新版本信息，包含版本号、发布时间、更新日志等</returns>
     /// <response code="200">成功获取最新版本信息</response>
     /// <response code="401">未授权，Gitee API令牌无效</response>
@@ -69,16 +68,11 @@ public class AppController(IHttpClientFactory httpClientFactory)
     [ProducesResponseType(typeof(List<ReleaseInfo>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(string), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(string), StatusCodes.Status500InternalServerError)]
-    public async Task<IActionResult> GetTagModel(string? token)
+    public async Task<IActionResult> GetTagModel()
     {
-        if (string.IsNullOrEmpty(token))
-        {
-            token = Environment.GetEnvironmentVariable("GITEE_ACCESS_TOKEN", EnvironmentVariableTarget.Process);
-        }
-
         using var client = httpClientFactory.CreateClient();
         var response = await client.GetAsync(
-            $"https://gitee.com/api/v5/repos/luckyfishisdashen/iOSClub.AppMobile/releases?access_token={token}&page=1&per_page=1&direction=desc");
+            "https://appapi.xauat.site/api/App/5f278ffc-5a70-4805-a6bf-0543040981a8/latest?channelId=9e1a198a-a0c2-4017-b492-f2d0e5bee437");
 
         if (!response.IsSuccessStatusCode)
         {
@@ -87,12 +81,25 @@ public class AppController(IHttpClientFactory httpClientFactory)
 
         var jsonString = await response.Content.ReadAsStringAsync();
 
-        var result = JsonSerializer.Deserialize<List<ReleaseInfo>>(jsonString);
+        var obj = JObject.Parse(jsonString);
 
-        if (result == null)
+        var result = new List<ReleaseInfo>
         {
-            return BadRequest("No releases found");
-        }
+            new()
+            {
+                TagName = obj["releaseId"]?.ToObject<string>(),
+                Body = obj["context"]?.ToObject<string>(),
+                Assets =
+                [
+                    new AssetInfo()
+                    {
+                        Name = obj["softs"]?[0]?["name"]?.ToObject<string>(),
+                        BrowserDownloadUrl = obj["softs"]?[0]?["url"]?.ToObject<string>()
+                    }
+                ]
+            }
+        };
+
 
         return Ok(result);
     }
