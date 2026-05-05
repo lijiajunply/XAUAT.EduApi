@@ -94,7 +94,7 @@ public class AppController(IHttpClientFactory httpClientFactory)
                     new AssetInfo()
                     {
                         Name = obj["softs"]?[0]?["name"]?.ToObject<string>(),
-                        BrowserDownloadUrl = obj["softs"]?[0]?["url"]?.ToObject<string>()
+                        BrowserDownloadUrl = obj["softs"]?[0]?["softUrl"]?.ToObject<string>()
                     }
                 ]
             }
