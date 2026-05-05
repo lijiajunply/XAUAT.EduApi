@@ -88,6 +88,7 @@ public class AppController(IHttpClientFactory httpClientFactory)
             new()
             {
                 TagName = obj["releaseId"]?.ToObject<string>(),
+                Name = obj["releaseId"]?.ToObject<string>(),
                 Body = obj["context"]?.ToObject<string>(),
                 Assets =
                 [
