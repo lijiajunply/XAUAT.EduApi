@@ -225,17 +225,22 @@ public class ScoreService(
             return [];
         }
 
-        var list = (json["semesterId2studentGrades"]?[semester]!).Select(item => new ScoreResponse()
+        var list = (json["semesterId2studentGrades"]?[semester]!).Select(item =>
         {
-            Name = item["course"]!["nameZh"]!.ToString(),
-            Credit = item["course"]!["credits"]!.ToString(),
-            LessonCode = item["lessonCode"]!.ToString(),
-            LessonName = item["lessonNameZh"]!.ToString(),
-            Grade = item["gaGrade"]!.ToString(),
-            Gpa = item["gp"]!.ToString(),
-            GradeDetail = string.Join("; ",
+            var gradeDetail = string.Join("; ",
                 Regex.Matches(item["gradeDetail"]!.ToString(), @"<span[^>]*>([^<]+)<\/span>")
-                    .Select(m => m.Groups[1].Value.Trim()))
+                    .Select(m => m.Groups[1].Value.Trim()));
+
+            return new ScoreResponse()
+            {
+                Name = Truncate(item["course"]!["nameZh"]!.ToString(), 256),
+                Credit = item["course"]!["credits"]!.ToString(),
+                LessonCode = item["lessonCode"]!.ToString(),
+                LessonName = Truncate(item["lessonNameZh"]!.ToString(), 256),
+                Grade = Truncate(item["gaGrade"]!.ToString(), 256),
+                Gpa = item["gp"]!.ToString(),
+                GradeDetail = Truncate(gradeDetail, 512),
+            };
         }).ToList();
 
         if (list.Count == 0) return list;
@@ -248,5 +253,10 @@ public class ScoreService(
         }
 
         return list;
+    }
+
+    private static string Truncate(string value, int maxLength)
+    {
+        return value.Length <= maxLength ? value : value[..maxLength];
     }
 }

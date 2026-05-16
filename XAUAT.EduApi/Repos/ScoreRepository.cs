@@ -23,8 +23,21 @@ public class ScoreRepository(IDbContextFactory<EduContext> contextFactory) : Rep
 
     public async Task AddRangeAsync(IEnumerable<ScoreResponse> scores)
     {
+        foreach (var score in scores)
+        {
+            TruncateIfNeeded(score);
+        }
+
         await using var context = CreateContext();
         await context.Scores.AddRangeAsync(scores);
         await context.SaveChangesAsync();
+    }
+
+    private static void TruncateIfNeeded(ScoreResponse score)
+    {
+        if (score.Name.Length > 256) score.Name = score.Name[..256];
+        if (score.LessonName.Length > 256) score.LessonName = score.LessonName[..256];
+        if (score.Grade.Length > 256) score.Grade = score.Grade[..256];
+        if (score.GradeDetail.Length > 512) score.GradeDetail = score.GradeDetail[..512];
     }
 }
