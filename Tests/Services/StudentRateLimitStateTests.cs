@@ -44,4 +44,22 @@ public class StudentRateLimitStateTests
         Assert.True(state.TryGetBlockedUntil("A", out _));
         Assert.False(state.TryGetBlockedUntil("B", out _));
     }
+
+    [Fact]
+    public async Task StudentRateLimitExecutor_ShouldShortCircuit_WhenStudentIsBlocked()
+    {
+        var state = new StudentRateLimitState();
+        state.MarkRateLimited("A");
+        var executor = new StudentRateLimitExecutor(state);
+        var invoked = false;
+
+        await Assert.ThrowsAsync<XAUAT.EduApi.Exceptions.StudentCooldownException>(() =>
+            executor.ExecuteAsync(["A"], () =>
+            {
+                invoked = true;
+                return Task.FromResult(1);
+            }));
+
+        Assert.False(invoked);
+    }
 }

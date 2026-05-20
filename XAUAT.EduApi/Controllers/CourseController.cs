@@ -66,6 +66,10 @@ public class CourseController(
                 ExpirationTime = DateTime.Now.AddDays(7)
             });
         }
+        catch (Exceptions.StudentCooldownException)
+        {
+            return RateLimited(ApiMessageKey.EduSystemRateLimited);
+        }
         catch (Exceptions.UnAuthenticationError)
         {
             return Unauthorized(new CourseErrorResponse { Success = false, Message = Message(ApiMessageKey.AuthenticationFailed) });

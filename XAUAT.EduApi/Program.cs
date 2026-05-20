@@ -15,42 +15,42 @@ var builder = WebApplication.CreateBuilder(args);
 
 // 启用顶级语句异步支持
 // 使用Serilog作为日志提供程序
-builder.Host.UseSerilog((_, _, loggerConfiguration) =>
-{
-    loggerConfiguration
-        .MinimumLevel.Is(EnvironmentVariableHelper.GetLogEventLevelOrDefault(
-            LogEventLevel.Information,
-            "SERILOG_MINIMUM_LEVEL_DEFAULT",
-            "Serilog__MinimumLevel__Default"))
-        .MinimumLevel.Override(
-            "Microsoft",
-            EnvironmentVariableHelper.GetLogEventLevelOrDefault(
-                LogEventLevel.Warning,
-                "SERILOG_MINIMUM_LEVEL_MICROSOFT",
-                "Serilog__MinimumLevel__Override__Microsoft"))
-        .MinimumLevel.Override(
-            "System",
-            EnvironmentVariableHelper.GetLogEventLevelOrDefault(
-                LogEventLevel.Warning,
-                "SERILOG_MINIMUM_LEVEL_SYSTEM",
-                "Serilog__MinimumLevel__Override__System"))
-        .WriteTo.Console(
-            outputTemplate:
-            "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} {Level:u3}] {Message:lj} {Properties:j}{NewLine}{Exception}")
-        .WriteTo.File(
-            EnvironmentVariableHelper.GetStringOrDefault(
-                "./logs/log-.txt",
-                "SERILOG_FILE_PATH",
-                "Serilog__WriteTo__0__Args__path"),
-            rollingInterval: RollingInterval.Day,
-            retainedFileCountLimit: EnvironmentVariableHelper.GetIntOrDefault(
-                7,
-                "SERILOG_RETAINED_FILE_COUNT_LIMIT",
-                "Serilog__WriteTo__0__Args__retainedFileCountLimit"),
-            outputTemplate:
-            "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} {Level:u3}] {Message:lj} {Properties:j}{NewLine}{Exception}")
-        .Enrich.FromLogContext();
-});
+// builder.Host.UseSerilog((_, _, loggerConfiguration) =>
+// {
+//     loggerConfiguration
+//         .MinimumLevel.Is(EnvironmentVariableHelper.GetLogEventLevelOrDefault(
+//             LogEventLevel.Information,
+//             "SERILOG_MINIMUM_LEVEL_DEFAULT",
+//             "Serilog__MinimumLevel__Default"))
+//         .MinimumLevel.Override(
+//             "Microsoft",
+//             EnvironmentVariableHelper.GetLogEventLevelOrDefault(
+//                 LogEventLevel.Warning,
+//                 "SERILOG_MINIMUM_LEVEL_MICROSOFT",
+//                 "Serilog__MinimumLevel__Override__Microsoft"))
+//         .MinimumLevel.Override(
+//             "System",
+//             EnvironmentVariableHelper.GetLogEventLevelOrDefault(
+//                 LogEventLevel.Warning,
+//                 "SERILOG_MINIMUM_LEVEL_SYSTEM",
+//                 "Serilog__MinimumLevel__Override__System"))
+//         .WriteTo.Console(
+//             outputTemplate:
+//             "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} {Level:u3}] {Message:lj} {Properties:j}{NewLine}{Exception}")
+//         .WriteTo.File(
+//             EnvironmentVariableHelper.GetStringOrDefault(
+//                 "./logs/log-.txt",
+//                 "SERILOG_FILE_PATH",
+//                 "Serilog__WriteTo__0__Args__path"),
+//             rollingInterval: RollingInterval.Day,
+//             retainedFileCountLimit: EnvironmentVariableHelper.GetIntOrDefault(
+//                 7,
+//                 "SERILOG_RETAINED_FILE_COUNT_LIMIT",
+//                 "Serilog__WriteTo__0__Args__retainedFileCountLimit"),
+//             outputTemplate:
+//             "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} {Level:u3}] {Message:lj} {Properties:j}{NewLine}{Exception}")
+//         .Enrich.FromLogContext();
+// });
 
 // 基础服务配置
 builder.Services.AddControllers();

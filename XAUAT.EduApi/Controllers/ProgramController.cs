@@ -66,6 +66,10 @@ public class ProgramController(
 
             return Ok(result);
         }
+        catch (Exceptions.StudentCooldownException)
+        {
+            return RateLimited(ApiMessageKey.EduSystemRateLimited);
+        }
         catch (Exceptions.UnAuthenticationError)
         {
             return Unauthorized(Message(ApiMessageKey.AuthenticationFailed));
@@ -114,6 +118,10 @@ public class ProgramController(
 
             var result = await program.GetAllTrainPrograms(cookie, id, Language);
             return Ok(result);
+        }
+        catch (Exceptions.StudentCooldownException)
+        {
+            return RateLimited(ApiMessageKey.EduSystemRateLimited);
         }
         catch (Exceptions.UnAuthenticationError)
         {

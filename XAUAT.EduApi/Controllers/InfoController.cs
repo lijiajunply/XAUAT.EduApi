@@ -91,6 +91,10 @@ public class InfoController(
 
             return Ok(data);
         }
+        catch (Exceptions.StudentCooldownException)
+        {
+            return RateLimited(ApiMessageKey.EduSystemRateLimited);
+        }
         catch (Exceptions.UnAuthenticationError)
         {
             return Unauthorized(Message(ApiMessageKey.AuthenticationFailed));

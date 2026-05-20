@@ -149,6 +149,48 @@ public class ControllerResponseModelTests
     }
 
     [Fact]
+    public async Task ExamController_ShouldReturnRateLimitResponse_WhenServiceThrowsRateLimitException()
+    {
+        var examService = new Mock<IExamService>();
+        examService.Setup(x => x.GetExamArrangementsAsync(
+                It.IsAny<string>(),
+                It.IsAny<string?>(),
+                It.IsAny<string>(),
+                It.IsAny<IEnumerable<string>?>()))
+            .ThrowsAsync(new RateLimitException());
+
+        var rateLimitState = new StudentRateLimitState();
+        rateLimitState.MarkRateLimited("20230001");
+
+        var services = new ServiceCollection()
+            .AddSingleton<IStudentRateLimitState>(rateLimitState)
+            .BuildServiceProvider();
+
+        var context = BuildControllerContext("test-cookie");
+        context.HttpContext.RequestServices = services;
+        context.HttpContext.SetResolvedStudentIds(["20230001"]);
+
+        var controller = new ExamController(
+            examService.Object,
+            Mock.Of<ILogger<ExamController>>(),
+            LanguageResolver,
+            MessageLocalizer)
+        {
+            ControllerContext = context
+        };
+
+        var result = await controller.GetExamArrangements("20230001");
+
+        var objectResult = Assert.IsType<ObjectResult>(result.Result);
+        Assert.Equal(StatusCodes.Status429TooManyRequests, objectResult.StatusCode);
+        var payload = Assert.IsType<RateLimitErrorResponse>(objectResult.Value);
+        Assert.Equal("rate_limited", payload.error);
+        Assert.Equal("教务系统当前限流，请稍后重试", payload.message);
+        Assert.True(payload.retryAfterSeconds >= 1);
+        Assert.True(context.HttpContext.Response.Headers.ContainsKey("Retry-After"));
+    }
+
+    [Fact]
     public async Task CourseController_ShouldReturnEnglishUnauthorizedError_WhenLanguageHeaderIsEnglish()
     {
         var courseService = new Mock<ICourseService>();

@@ -53,6 +53,10 @@ namespace XAUAT.EduApi.Controllers
                 var result = await scoreService.ParseSemesterAsync(studentId, cookie, Language);
                 return result;
             }
+            catch (Exceptions.StudentCooldownException)
+            {
+                return RateLimited(ApiMessageKey.EduSystemRateLimited);
+            }
             catch (Exceptions.UnAuthenticationError)
             {
                 return Unauthorized(Message(ApiMessageKey.AuthenticationFailed));
@@ -90,9 +94,14 @@ namespace XAUAT.EduApi.Controllers
             try
             {
                 var cookie = Request.GetEduAuthCookie();
-                var resolvedStudentId = HttpContext.GetResolvedStudentIds().FirstOrDefault();
+                var resolvedStudentId = HttpContext.GetResolvedStudentIds()
+                    .FirstOrDefault(x => !x.StartsWith("cookie:", StringComparison.Ordinal));
 
                 return await scoreService.GetThisSemesterAsync(cookie, Language, resolvedStudentId);
+            }
+            catch (Exceptions.StudentCooldownException)
+            {
+                return RateLimited(ApiMessageKey.EduSystemRateLimited);
             }
             catch (Exceptions.UnAuthenticationError)
             {
@@ -139,6 +148,10 @@ namespace XAUAT.EduApi.Controllers
 
                 var scores = await scoreService.GetScoresAsync(studentId, semester, cookie, Language);
                 return scores;
+            }
+            catch (Exceptions.StudentCooldownException)
+            {
+                return RateLimited(ApiMessageKey.EduSystemRateLimited);
             }
             catch (ArgumentNullException ex)
             {

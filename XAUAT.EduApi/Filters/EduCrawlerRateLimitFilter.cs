@@ -31,32 +31,41 @@ public class EduCrawlerRateLimitFilter(
     private async Task<string[]> ResolveStudentIdsAsync(ActionExecutingContext context)
     {
         var controllerName = context.Controller.GetType().Name;
+        var identities = new List<string>();
+        var cookie = context.HttpContext.Request.GetEduAuthCookie();
+        var cookieIdentity = HttpContextStudentExtensions.CreateCookieRateLimitIdentity(cookie);
+        if (!string.IsNullOrWhiteSpace(cookieIdentity))
+        {
+            identities.Add(cookieIdentity);
+        }
 
         if (context.ActionArguments.TryGetValue("studentId", out var studentIdArg))
         {
-            return HttpContextStudentExtensions.ParseStudentIds(studentIdArg as string);
+            identities.AddRange(HttpContextStudentExtensions.ParseStudentIds(studentIdArg as string));
+            return identities.Distinct(StringComparer.Ordinal).ToArray();
         }
 
         if (controllerName == "ProgramController" &&
             context.ActionArguments.TryGetValue("id", out var idArg))
         {
-            return HttpContextStudentExtensions.ParseStudentIds(idArg as string);
+            identities.AddRange(HttpContextStudentExtensions.ParseStudentIds(idArg as string));
+            return identities.Distinct(StringComparer.Ordinal).ToArray();
         }
 
-        var cookie = context.HttpContext.Request.GetEduAuthCookie();
         if (string.IsNullOrWhiteSpace(cookie))
         {
-            return [];
+            return identities.Distinct(StringComparer.Ordinal).ToArray();
         }
 
         try
         {
             var resolvedStudentIds = await cookieCodeService.GetCode(cookie);
-            return HttpContextStudentExtensions.ParseStudentIds(resolvedStudentIds);
+            identities.AddRange(HttpContextStudentExtensions.ParseStudentIds(resolvedStudentIds));
         }
         catch
         {
-            return [];
         }
+
+        return identities.Distinct(StringComparer.Ordinal).ToArray();
     }
 }

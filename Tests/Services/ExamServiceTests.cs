@@ -267,6 +267,39 @@ public class ExamServiceTests
     }
 
     [Fact]
+    public async Task GetExamArrangementsAsync_ShouldThrowRateLimitException_WithoutRetrying_WhenRateLimitPageReturned()
+    {
+        // Arrange
+        var cookie = "test-cookie";
+        var id = "123";
+        var callCount = 0;
+
+        var handlerMock = new Mock<HttpMessageHandler>();
+        handlerMock.Protected()
+            .Setup<Task<HttpResponseMessage>>(
+                "SendAsync",
+                ItExpr.IsAny<HttpRequestMessage>(),
+                ItExpr.IsAny<CancellationToken>())
+            .ReturnsAsync(() =>
+            {
+                callCount++;
+                return new HttpResponseMessage
+                {
+                    StatusCode = HttpStatusCode.OK,
+                    Content = new StringContent("<html>系统限流中</html>")
+                };
+            });
+
+        var httpClient = new HttpClient(handlerMock.Object);
+        _httpClientFactoryMock.Setup(m => m.CreateClient(It.IsAny<string>())).Returns(httpClient);
+
+        // Act & Assert
+        await Assert.ThrowsAsync<XAUAT.EduApi.Exceptions.RateLimitException>(() =>
+            _examService.GetExamArrangementsAsync(cookie, id));
+        Assert.Equal(1, callCount);
+    }
+
+    [Fact]
     public async Task GetExamArrangementsAsync_ShouldFetchInParallel_WhenMultipleIds()
     {
         // Arrange

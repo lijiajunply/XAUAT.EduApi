@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using XAUAT.EduApi.Services;
 
 namespace XAUAT.EduApi.Extensions;
@@ -51,5 +53,16 @@ public static class HttpContextStudentExtensions
             .Where(studentId => !string.IsNullOrWhiteSpace(studentId))
             .Distinct(StringComparer.Ordinal)
             .ToArray();
+    }
+
+    public static string? CreateCookieRateLimitIdentity(string? cookie)
+    {
+        if (string.IsNullOrWhiteSpace(cookie))
+        {
+            return null;
+        }
+
+        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(cookie.Trim()));
+        return $"cookie:{Convert.ToHexString(bytes)}";
     }
 }

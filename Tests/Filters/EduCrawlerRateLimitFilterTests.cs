@@ -62,7 +62,29 @@ public class EduCrawlerRateLimitFilterTests
         });
 
         Assert.True(executed);
-        Assert.Empty(context.HttpContext.GetResolvedStudentIds());
+        var identities = context.HttpContext.GetResolvedStudentIds();
+        Assert.Single(identities);
+        Assert.StartsWith("cookie:", identities.Single());
+    }
+
+    [Fact]
+    public async Task OnActionExecutionAsync_ShouldBlockByCookieIdentity_WhenStudentIdCannotBeResolved()
+    {
+        var cookie = "test-cookie";
+        var state = new StudentRateLimitState();
+        var cookieIdentity = HttpContextStudentExtensions.CreateCookieRateLimitIdentity(cookie)!;
+        state.MarkRateLimited(cookieIdentity);
+
+        var cookieCodeService = new Mock<ICookieCodeService>();
+        cookieCodeService.Setup(x => x.GetCode(cookie))
+            .ThrowsAsync(new InvalidOperationException("parse failed"));
+
+        var filter = new EduCrawlerRateLimitFilter(state, cookieCodeService.Object);
+        var context = BuildContext(controller: new object());
+        context.HttpContext.Request.Headers["xauat"] = cookie;
+
+        await Assert.ThrowsAsync<StudentCooldownException>(() =>
+            filter.OnActionExecutionAsync(context, () => throw new NotImplementedException()));
     }
 
     private static ActionExecutingContext BuildContext(object controller, Dictionary<string, object?>? arguments = null)

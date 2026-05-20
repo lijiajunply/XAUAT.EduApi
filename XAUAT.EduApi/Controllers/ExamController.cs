@@ -53,11 +53,13 @@ public class ExamController(
         {
             var cookie = Request.GetEduAuthCookie();
 
-            var requestStudentIds = string.IsNullOrWhiteSpace(studentId)
-                ? HttpContext.GetResolvedStudentIds()
-                : HttpContextStudentExtensions.ParseStudentIds(studentId);
+            var requestStudentIds = HttpContext.GetResolvedStudentIds();
             var result = await examService.GetExamArrangementsAsync(cookie, studentId, Language, requestStudentIds);
             return Ok(result);
+        }
+        catch (Exceptions.StudentCooldownException)
+        {
+            return RateLimited(ApiMessageKey.EduSystemRateLimited);
         }
         catch (Exceptions.UnAuthenticationError)
         {

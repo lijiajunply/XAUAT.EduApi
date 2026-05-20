@@ -8,6 +8,14 @@ public class StudentRateLimitExecutor(IStudentRateLimitState rateLimitState) : I
     {
         var normalizedIds = NormalizeStudentIds(studentIds);
 
+        foreach (var studentId in normalizedIds)
+        {
+            if (rateLimitState.TryGetBlockedUntil(studentId, out var blockedUntil))
+            {
+                throw new StudentCooldownException(studentId, blockedUntil);
+            }
+        }
+
         try
         {
             var result = await action();

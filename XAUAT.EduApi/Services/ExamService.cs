@@ -88,7 +88,6 @@ public class ExamService(
                 var retryPolicy = Policy
                     .Handle<HttpRequestException>()
                     .Or<TaskCanceledException>()
-                    .Or<RateLimitException>()
                     .WaitAndRetryAsync(3, retryAttempt => TimeSpan.FromSeconds(6 * Math.Pow(2, retryAttempt - 1)));
 
                 return await retryPolicy.ExecuteAsync(async () =>
@@ -155,61 +154,68 @@ public class ExamService(
             var retryPolicy = Policy
                 .Handle<HttpRequestException>()
                 .Or<TaskCanceledException>()
-                .Or<RateLimitException>()
                 .WaitAndRetryAsync(3, retryAttempt =>
                     TimeSpan.FromSeconds(6 * Math.Pow(2, retryAttempt - 1)));
 
-            var response = await _rateLimitExecutor.ExecuteAsync(
+            return await _rateLimitExecutor.ExecuteAsync(
                 requestStudentIds ?? [],
                 () => retryPolicy.ExecuteAsync(async ct =>
                 {
                     var requestPolicy = new HttpRequestMessage(HttpMethod.Get, url).WithCookie(cookie);
-                    return await httpClient.SendAsync(requestPolicy, ct);
+                    var response = await httpClient.SendAsync(requestPolicy, ct);
+                    var content = await response.Content.ReadAsStringAsync(ct);
+
+                    // 限流页识别必须放在执行器内部，这样第一次命中才能真正写入冷却状态
+                    content.ThrowIfAuthOrRateLimited();
+
+                    var match = Regex.Match(content, @"var studentExamInfoVms = (.*?)\];", RegexOptions.Singleline);
+                    if (!match.Success)
+                    {
+                        logger.LogWarning("Failed to match exam data pattern");
+                        return new ExamResponse
+                        {
+                            Exams = [],
+                            CanClick = false,
+                            Error = "Failed to match exam data pattern"
+                        };
+                    }
+
+                    var jsonData = match.Groups[1].Value + "]";
+                    jsonData = jsonData.Replace("'", "\"");
+                    jsonData = Regex.Replace(jsonData, @"\\x[0-9A-Fa-f]{2}", "");
+
+                    var examData = JsonConvert.DeserializeObject<List<ExamDataRaw>>(jsonData);
+                    if (examData == null)
+                    {
+                        logger.LogWarning("Failed to deserialize exam data");
+                        return new ExamResponse
+                        {
+                            Exams = [],
+                            CanClick = false,
+                            Error = "Failed to deserialize exam data"
+                        };
+                    }
+
+                    return new ExamResponse
+                    {
+                        Exams = examData.Select(d => new ExamInfo
+                        {
+                            Name = d.Course.NameZh,
+                            Time = d.ExamTime,
+                            Location = d.Room,
+                            Seat = d.SeatNo
+                        }).ToList(),
+                        CanClick = examData.Count != 0
+                    };
                 }, cts.Token));
-
-            var content = await response.Content.ReadAsStringAsync(cts.Token);
-
-            content.ThrowIfAuthOrRateLimited();
-
-            var match = Regex.Match(content, @"var studentExamInfoVms = (.*?)\];", RegexOptions.Singleline);
-            if (!match.Success)
-            {
-                logger.LogWarning("Failed to match exam data pattern");
-                return new ExamResponse
-                {
-                    Exams = [],
-                    CanClick = false,
-                    Error = "Failed to match exam data pattern"
-                };
-            }
-
-            var jsonData = match.Groups[1].Value + "]";
-            jsonData = jsonData.Replace("'", "\"");
-            jsonData = Regex.Replace(jsonData, @"\\x[0-9A-Fa-f]{2}", "");
-
-            var examData = JsonConvert.DeserializeObject<List<ExamDataRaw>>(jsonData);
-            if (examData == null)
-            {
-                logger.LogWarning("Failed to deserialize exam data");
-                return new ExamResponse
-                {
-                    Exams = [],
-                    CanClick = false,
-                    Error = "Failed to deserialize exam data"
-                };
-            }
-
-            return new ExamResponse
-            {
-                Exams = examData.Select(d => new ExamInfo
-                {
-                    Name = d.Course.NameZh,
-                    Time = d.ExamTime,
-                    Location = d.Room,
-                    Seat = d.SeatNo
-                }).ToList(),
-                CanClick = examData.Count != 0
-            };
+        }
+        catch (RateLimitException)
+        {
+            throw;
+        }
+        catch (UnAuthenticationError)
+        {
+            throw;
         }
         catch (Exception ex)
         {
