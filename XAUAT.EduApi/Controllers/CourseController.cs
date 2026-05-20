@@ -1,5 +1,6 @@
 using EduApi.Data.Models;
 using Microsoft.AspNetCore.Mvc;
+using XAUAT.EduApi.Localization;
 using XAUAT.EduApi.Services;
 
 namespace XAUAT.EduApi.Controllers;
@@ -12,8 +13,12 @@ namespace XAUAT.EduApi.Controllers;
 [Route("[controller]")]
 [Produces("application/json")]
 [Consumes("application/json")]
-public class CourseController(ILogger<CourseController> logger, ICourseService courseService)
-    : ControllerBase
+public class CourseController(
+    ILogger<CourseController> logger,
+    ICourseService courseService,
+    ILanguageResolver languageResolver,
+    IApiMessageLocalizer messageLocalizer)
+    : LanguageAwareControllerBase(languageResolver, messageLocalizer)
 {
     /// <summary>
     /// 获取学生课程信息
@@ -29,6 +34,8 @@ public class CourseController(ILogger<CourseController> logger, ICourseService c
     /// <remarks>
     /// 示例请求：
     /// GET /Course?studentId=123456
+    /// Header:
+    /// x-language: zh
     /// </remarks>
     [HttpGet]
     [ProducesResponseType(typeof(CourseResultResponse), StatusCodes.Status200OK)]
@@ -48,7 +55,7 @@ public class CourseController(ILogger<CourseController> logger, ICourseService c
                 cookie = Request.Headers["xauat"].ToString(); // 从请求中获取 cookie
             }
 
-            var courses = await courseService.GetCoursesAsync(studentId, cookie);
+            var courses = await courseService.GetCoursesAsync(studentId, cookie, Language);
 
             // 返回处理后的课程数据
             return Ok(new CourseResultResponse
@@ -60,7 +67,7 @@ public class CourseController(ILogger<CourseController> logger, ICourseService c
         }
         catch (Exceptions.UnAuthenticationError)
         {
-            return Unauthorized(new CourseErrorResponse { Success = false, Message = "认证失败，请重新登录" });
+            return Unauthorized(new CourseErrorResponse { Success = false, Message = Message(ApiMessageKey.AuthenticationFailed) });
         }
         catch (ArgumentNullException ex)
         {
@@ -80,7 +87,7 @@ public class CourseController(ILogger<CourseController> logger, ICourseService c
         catch (Exception ex)
         {
             logger.LogError(ex, "获取课程时发生错误");
-            return StatusCode(500, new CourseErrorResponse { Success = false, Message = "服务器内部错误" });
+            return StatusCode(500, new CourseErrorResponse { Success = false, Message = Message(ApiMessageKey.InternalServerError) });
         }
     }
 }

@@ -2,6 +2,7 @@ using EduApi.Data.Models;
 using Microsoft.AspNetCore.Mvc;
 using XAUAT.EduApi.Exceptions;
 using XAUAT.EduApi.Interfaces;
+using XAUAT.EduApi.Localization;
 
 namespace XAUAT.EduApi.Controllers;
 
@@ -13,8 +14,12 @@ namespace XAUAT.EduApi.Controllers;
 [Route("[controller]")]
 [Produces("application/json")]
 [Consumes("application/json")]
-public class LoginController(ILoginService loginService, ILogger<LoginController> logger)
-    : ControllerBase
+public class LoginController(
+    ILoginService loginService,
+    ILogger<LoginController> logger,
+    ILanguageResolver languageResolver,
+    IApiMessageLocalizer messageLocalizer)
+    : LanguageAwareControllerBase(languageResolver, messageLocalizer)
 {
     /// <summary>
     /// 学生登录
@@ -29,6 +34,8 @@ public class LoginController(ILoginService loginService, ILogger<LoginController
     /// <remarks>
     /// 示例请求：
     /// POST /Login
+    /// Header:
+    /// x-language: zh
     /// {
     ///   "username": "123456",
     ///   "password": "password123"
@@ -45,20 +52,20 @@ public class LoginController(ILoginService loginService, ILogger<LoginController
         {
             if (string.IsNullOrWhiteSpace(request.Username) || string.IsNullOrWhiteSpace(request.Password))
             {
-                return BadRequest("用户名或密码不能为空");
+                return BadRequest(Message(ApiMessageKey.UsernameOrPasswordRequired));
             }
 
-            var result = await loginService.LoginAsync(request.Username, request.Password);
+            var result = await loginService.LoginAsync(request.Username, request.Password, Language);
             return Ok(result);
         }
         catch (LoginFailedException)
         {
-            return Unauthorized("用户名或密码错误");
+            return Unauthorized(Message(ApiMessageKey.InvalidUsernameOrPassword));
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "用户 {Username} 登录失败", request.Username);
-            return StatusCode(500, "教务处系统访问失败，请联系管理员");
+            return StatusCode(500, Message(ApiMessageKey.EduSystemAccessFailed));
         }
     }
 }

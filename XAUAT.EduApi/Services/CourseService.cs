@@ -7,7 +7,7 @@ namespace XAUAT.EduApi.Services;
 
 public interface ICourseService
 {
-    Task<List<CourseActivity>> GetCoursesAsync(string studentId, string cookie);
+    Task<List<CourseActivity>> GetCoursesAsync(string studentId, string cookie, string language = "zh");
 }
 
 public class CourseService(
@@ -20,7 +20,7 @@ public class CourseService(
     ITestDataProvider? testDataProvider = null)
     : ICourseService
 {
-    public async Task<List<CourseActivity>> GetCoursesAsync(string studentId, string cookie)
+    public async Task<List<CourseActivity>> GetCoursesAsync(string studentId, string cookie, string language = "zh")
     {
         if (testAccountResolver?.IsTestAccount(cookie: cookie, studentId: studentId) == true)
         {
@@ -33,14 +33,14 @@ public class CourseService(
             // 使用缓存，Key 包含 studentId，过期时间设为1天
             return await cacheService.GetOrCreateAsync(
                 CacheKeys.Courses(studentId),
-                async () => await FetchCoursesFromRemoteAsync(studentId, cookie),
+                async () => await FetchCoursesFromRemoteAsync(studentId, cookie, language),
                 TimeSpan.FromDays(1));
         }
 
-        return await FetchCoursesFromRemoteAsync(studentId, cookie);
+        return await FetchCoursesFromRemoteAsync(studentId, cookie, language);
     }
 
-    private async Task<List<CourseActivity>> FetchCoursesFromRemoteAsync(string studentId, string cookie)
+    private async Task<List<CourseActivity>> FetchCoursesFromRemoteAsync(string studentId, string cookie, string language)
     {
         logger.LogInformation("开始抓取课程");
 
@@ -51,7 +51,7 @@ public class CourseService(
 
         var split = studentId.Split(',');
 
-        var semester = await examService.GetThisSemester(cookie);
+        var semester = await examService.GetThisSemester(cookie, language);
 
         if (string.IsNullOrEmpty(semester.Value))
         {
@@ -59,7 +59,7 @@ public class CourseService(
         }
 
         // 使用 Task.WhenAll 并行获取所有学生的课程，解决 N+1 问题
-        var tasks = split.Select(a => FetchCourseForStudent(semester.Value, a, cookie)).ToArray();
+        var tasks = split.Select(a => FetchCourseForStudent(semester.Value, a, cookie, language)).ToArray();
         var allResults = await Task.WhenAll(tasks).ConfigureAwait(false);
 
         // 合并结果
@@ -78,7 +78,7 @@ public class CourseService(
     /// 获取单个学生的课程数据
     /// </summary>
     private async Task<List<CourseActivity>> FetchCourseForStudent(string semesterValue,
-        string studentId, string cookie)
+        string studentId, string cookie, string language)
     {
         // 为每个请求创建新的 HttpClient 以避免并发问题
         using var newClient = httpClientFactory.CreateClient();

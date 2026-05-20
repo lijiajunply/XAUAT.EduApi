@@ -14,7 +14,7 @@ public class SSOLoginService(
     ILogger<SSOLoginService> logger,
     ITestAccountResolver? testAccountResolver = null) : ILoginService
 {
-    public async Task<LoginResponse> LoginAsync(string username, string password)
+    public async Task<LoginResponse> LoginAsync(string username, string password, string language = "zh")
     {
         if (testAccountResolver?.IsTestLogin(username, password) == true)
         {

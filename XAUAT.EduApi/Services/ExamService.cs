@@ -9,9 +9,9 @@ namespace XAUAT.EduApi.Services;
 
 public interface IExamService
 {
-    Task<ExamResponse> GetExamArrangementsAsync(string cookie, string? id);
+    Task<ExamResponse> GetExamArrangementsAsync(string cookie, string? id, string language = "zh");
 
-    Task<SemesterItem> GetThisSemester(string cookie);
+    Task<SemesterItem> GetThisSemester(string cookie, string language = "zh");
 }
 
 public class ExamService(
@@ -25,7 +25,7 @@ public class ExamService(
 {
     private const string BaseUrl = "https://swjw.xauat.edu.cn";
 
-    public async Task<ExamResponse> GetExamArrangementsAsync(string cookie, string? id)
+    public async Task<ExamResponse> GetExamArrangementsAsync(string cookie, string? id, string language = "zh")
     {
         if (testAccountResolver?.IsTestAccount(cookie: cookie, studentId: id) == true)
         {
@@ -35,13 +35,13 @@ public class ExamService(
 
         if (string.IsNullOrEmpty(id) || !id.Contains(','))
         {
-            return await GetExamArrangementAsync(cookie, id);
+            return await GetExamArrangementAsync(cookie, id, language);
         }
 
         var split = id.Split(',');
 
         // 使用 Task.WhenAll 并行获取所有学生的考试安排，解决 N+1 问题
-        var tasks = split.Select(s => GetExamArrangementAsync(cookie, s)).ToArray();
+        var tasks = split.Select(s => GetExamArrangementAsync(cookie, s, language)).ToArray();
         var allResults = await Task.WhenAll(tasks).ConfigureAwait(false);
 
         // 合并结果
@@ -59,7 +59,7 @@ public class ExamService(
     /// </summary>
     /// <param name="cookie"></param>
     /// <returns></returns>
-    public async Task<SemesterItem> GetThisSemester(string cookie)
+    public async Task<SemesterItem> GetThisSemester(string cookie, string language = "zh")
     {
         if (testAccountResolver?.IsTestAccount(cookie: cookie) == true)
         {
@@ -104,21 +104,21 @@ public class ExamService(
     /// <param name="cookie"></param>
     /// <param name="id"></param>
     /// <returns></returns>
-    private async Task<ExamResponse> GetExamArrangementAsync(string cookie, string? id = null)
+    private async Task<ExamResponse> GetExamArrangementAsync(string cookie, string? id = null, string language = "zh")
     {
         // 无id时不使用缓存
         if (string.IsNullOrEmpty(id))
         {
-            return await FetchExamArrangementAsync(cookie, null);
+            return await FetchExamArrangementAsync(cookie, null, language);
         }
 
         return await cacheService.GetOrCreateAsync(
             CacheKeys.ExamArrangement(id),
-            async () => await FetchExamArrangementAsync(cookie, id),
+            async () => await FetchExamArrangementAsync(cookie, id, language),
             TimeSpan.FromHours(1));
     }
 
-    private async Task<ExamResponse> FetchExamArrangementAsync(string cookie, string? id)
+    private async Task<ExamResponse> FetchExamArrangementAsync(string cookie, string? id, string language)
     {
         try
         {

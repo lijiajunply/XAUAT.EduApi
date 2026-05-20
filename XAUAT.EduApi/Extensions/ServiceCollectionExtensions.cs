@@ -8,6 +8,7 @@ using StackExchange.Redis;
 using XAUAT.EduApi.Caching;
 using XAUAT.EduApi.Configuration;
 using XAUAT.EduApi.Interfaces;
+using XAUAT.EduApi.Localization;
 using XAUAT.EduApi.Queues;
 using XAUAT.EduApi.Repos;
 using XAUAT.EduApi.Services;
@@ -103,6 +104,8 @@ public static class ServiceCollectionExtensions
         /// <returns>服务集合</returns>
         public IServiceCollection AddBusinessServices()
         {
+            services.AddSingleton<ILanguageResolver, HeaderLanguageResolver>();
+            services.AddSingleton<IApiMessageLocalizer, ApiMessageLocalizer>();
             services.AddScoped<ICodeService, CodeService>();
             services.AddScoped<ILoginService, SSOLoginService>();
             services.AddScoped<IExamService, ExamService>();
@@ -111,6 +114,7 @@ public static class ServiceCollectionExtensions
             services.AddScoped<IPaymentService, PaymentService>();
             services.AddScoped<ICourseService, CourseService>();
             services.AddScoped<IScoreService, ScoreService>();
+            services.AddScoped<IBusService, BusService>();
             services.AddScoped<IRedisService, RedisService>();
             services.AddScoped<ICookieCodeService, CookieCodeService>();
             services.AddScoped<ISchoolNavService, SchoolNavService>();

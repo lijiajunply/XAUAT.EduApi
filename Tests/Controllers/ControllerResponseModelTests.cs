@@ -8,12 +8,16 @@ using Newtonsoft.Json.Linq;
 using XAUAT.EduApi.Controllers;
 using XAUAT.EduApi.Exceptions;
 using XAUAT.EduApi.Interfaces;
+using XAUAT.EduApi.Localization;
 using XAUAT.EduApi.Services;
 
 namespace XAUAT.EduApi.Tests.Controllers;
 
 public class ControllerResponseModelTests
 {
+    private static readonly ILanguageResolver LanguageResolver = new HeaderLanguageResolver();
+    private static readonly IApiMessageLocalizer MessageLocalizer = new ApiMessageLocalizer();
+
     [Fact]
     public async Task LoginController_ShouldReturnTypedSuccessResponse()
     {
@@ -26,7 +30,11 @@ public class ControllerResponseModelTests
                 Cookie = "foo=bar"
             });
 
-        var controller = new LoginController(loginService.Object, Mock.Of<ILogger<LoginController>>());
+        var controller = new LoginController(
+            loginService.Object,
+            Mock.Of<ILogger<LoginController>>(),
+            LanguageResolver,
+            MessageLocalizer);
 
         var result = await controller.Login(new LoginRequest
         {
@@ -45,7 +53,7 @@ public class ControllerResponseModelTests
     public async Task CourseController_ShouldPreserveSuccessJsonShape()
     {
         var courseService = new Mock<ICourseService>();
-        courseService.Setup(x => x.GetCoursesAsync("20230001", "test-cookie"))
+        courseService.Setup(x => x.GetCoursesAsync("20230001", "test-cookie", It.IsAny<string>()))
             .ReturnsAsync([
                 new CourseActivity
                 {
@@ -54,7 +62,11 @@ public class ControllerResponseModelTests
                 }
             ]);
 
-        var controller = new CourseController(Mock.Of<ILogger<CourseController>>(), courseService.Object)
+        var controller = new CourseController(
+            Mock.Of<ILogger<CourseController>>(),
+            courseService.Object,
+            LanguageResolver,
+            MessageLocalizer)
         {
             ControllerContext = BuildControllerContext("test-cookie")
         };
@@ -76,10 +88,14 @@ public class ControllerResponseModelTests
     public async Task CourseController_ShouldReturnTypedUnauthorizedError()
     {
         var courseService = new Mock<ICourseService>();
-        courseService.Setup(x => x.GetCoursesAsync(It.IsAny<string>(), It.IsAny<string>()))
+        courseService.Setup(x => x.GetCoursesAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()))
             .ThrowsAsync(new UnAuthenticationError());
 
-        var controller = new CourseController(Mock.Of<ILogger<CourseController>>(), courseService.Object)
+        var controller = new CourseController(
+            Mock.Of<ILogger<CourseController>>(),
+            courseService.Object,
+            LanguageResolver,
+            MessageLocalizer)
         {
             ControllerContext = BuildControllerContext("test-cookie")
         };
@@ -93,13 +109,64 @@ public class ControllerResponseModelTests
     }
 
     [Fact]
+    public async Task CourseController_ShouldReturnEnglishUnauthorizedError_WhenLanguageHeaderIsEnglish()
+    {
+        var courseService = new Mock<ICourseService>();
+        courseService.Setup(x => x.GetCoursesAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()))
+            .ThrowsAsync(new UnAuthenticationError());
+
+        var controller = new CourseController(
+            Mock.Of<ILogger<CourseController>>(),
+            courseService.Object,
+            LanguageResolver,
+            MessageLocalizer)
+        {
+            ControllerContext = BuildControllerContext("test-cookie", language: "en")
+        };
+
+        var result = await controller.GetCourse("20230001");
+
+        var unauthorized = Assert.IsType<UnauthorizedObjectResult>(result.Result);
+        var payload = Assert.IsType<CourseErrorResponse>(unauthorized.Value);
+        Assert.False(payload.Success);
+        Assert.Equal("Authentication failed. Please sign in again.", payload.Message);
+    }
+
+    [Fact]
+    public async Task CourseController_ShouldFallbackToChinese_WhenLanguageHeaderIsUnsupported()
+    {
+        var courseService = new Mock<ICourseService>();
+        courseService.Setup(x => x.GetCoursesAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()))
+            .ThrowsAsync(new UnAuthenticationError());
+
+        var controller = new CourseController(
+            Mock.Of<ILogger<CourseController>>(),
+            courseService.Object,
+            LanguageResolver,
+            MessageLocalizer)
+        {
+            ControllerContext = BuildControllerContext("test-cookie", language: "fr")
+        };
+
+        var result = await controller.GetCourse("20230001");
+
+        var unauthorized = Assert.IsType<UnauthorizedObjectResult>(result.Result);
+        var payload = Assert.IsType<CourseErrorResponse>(unauthorized.Value);
+        Assert.Equal("认证失败，请重新登录", payload.Message);
+    }
+
+    [Fact]
     public async Task PaymentController_ShouldReturnTypedServiceUnavailableError()
     {
         var paymentService = new Mock<IPaymentService>();
-        paymentService.Setup(x => x.Login("123456"))
+        paymentService.Setup(x => x.Login("123456", It.IsAny<string>()))
             .ThrowsAsync(new PaymentServiceException("远端失败"));
 
-        var controller = new PaymentController(paymentService.Object, Mock.Of<ILogger<PaymentController>>());
+        var controller = new PaymentController(
+            paymentService.Object,
+            Mock.Of<ILogger<PaymentController>>(),
+            LanguageResolver,
+            MessageLocalizer);
 
         var result = await controller.Login("123456");
 
@@ -114,10 +181,14 @@ public class ControllerResponseModelTests
     public async Task ScoreController_ShouldReturnTypedBadRequestError()
     {
         var scoreService = new Mock<IScoreService>();
-        scoreService.Setup(x => x.GetScoresAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()))
+        scoreService.Setup(x => x.GetScoresAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()))
             .ThrowsAsync(new ArgumentNullException("semester", "semester is required"));
 
-        var controller = new ScoreController(Mock.Of<ILogger<ScoreController>>(), scoreService.Object)
+        var controller = new ScoreController(
+            Mock.Of<ILogger<ScoreController>>(),
+            scoreService.Object,
+            LanguageResolver,
+            MessageLocalizer)
         {
             ControllerContext = BuildControllerContext("test-cookie")
         };
@@ -133,7 +204,7 @@ public class ControllerResponseModelTests
     public async Task ProgramController_ShouldReturnTypedProgramList()
     {
         var programService = new Mock<IProgramService>();
-        programService.Setup(x => x.GetAllTrainProgram("test-cookie", "3241"))
+        programService.Setup(x => x.GetAllTrainProgram("test-cookie", "3241", It.IsAny<string>()))
             .ReturnsAsync([
                 new PlanCourse
                 {
@@ -142,7 +213,11 @@ public class ControllerResponseModelTests
                 }
             ]);
 
-        var controller = new ProgramController(Mock.Of<ILogger<ProgramController>>(), programService.Object)
+        var controller = new ProgramController(
+            Mock.Of<ILogger<ProgramController>>(),
+            programService.Object,
+            LanguageResolver,
+            MessageLocalizer)
         {
             ControllerContext = BuildControllerContext("test-cookie")
         };
@@ -152,6 +227,29 @@ public class ControllerResponseModelTests
         var ok = Assert.IsType<OkObjectResult>(result.Result);
         var payload = Assert.IsType<List<PlanCourse>>(ok.Value);
         Assert.Single(payload);
+    }
+
+    [Fact]
+    public async Task BusController_ShouldReturnEnglishError_WhenServiceFails()
+    {
+        var busService = new Mock<IBusService>();
+        busService.Setup(x => x.GetBusFromOldDataAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<bool>()))
+            .ThrowsAsync(new HttpRequestException("boom"));
+
+        var controller = new BusController(
+            busService.Object,
+            Mock.Of<ILogger<BusController>>(),
+            LanguageResolver,
+            MessageLocalizer)
+        {
+            ControllerContext = BuildControllerContext("test-cookie", language: "en")
+        };
+
+        var result = await controller.GetBus("2024-12-01");
+
+        var objectResult = Assert.IsType<ObjectResult>(result.Result);
+        Assert.Equal(StatusCodes.Status500InternalServerError, objectResult.StatusCode);
+        Assert.Equal("Failed to get bus schedule data.", objectResult.Value);
     }
 
     [Fact]
@@ -167,7 +265,9 @@ public class ControllerResponseModelTests
         var controller = new InfoController(
             Mock.Of<IHttpClientFactory>(),
             Mock.Of<ILogger<CourseController>>(),
-            infoService.Object);
+            infoService.Object,
+            LanguageResolver,
+            MessageLocalizer);
 
         var result = controller.GetTime();
 
@@ -196,6 +296,8 @@ public class ControllerResponseModelTests
             Mock.Of<IHttpClientFactory>(),
             Mock.Of<ILogger<CourseController>>(),
             Mock.Of<IInfoService>(),
+            LanguageResolver,
+            MessageLocalizer,
             resolver.Object,
             provider.Object)
         {
@@ -234,10 +336,14 @@ public class ControllerResponseModelTests
         Assert.True(payload.Value<bool>("ok"));
     }
 
-    private static ControllerContext BuildControllerContext(string cookie)
+    private static ControllerContext BuildControllerContext(string cookie, string? language = null)
     {
         var httpContext = new DefaultHttpContext();
         httpContext.Request.Headers["xauat"] = cookie;
+        if (!string.IsNullOrWhiteSpace(language))
+        {
+            httpContext.Request.Headers[RequestLanguage.HeaderName] = language;
+        }
 
         return new ControllerContext
         {

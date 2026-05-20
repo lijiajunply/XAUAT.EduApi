@@ -1,5 +1,6 @@
 using EduApi.Data.Models;
 using Microsoft.AspNetCore.Mvc;
+using XAUAT.EduApi.Localization;
 using XAUAT.EduApi.Services;
 
 namespace XAUAT.EduApi.Controllers;
@@ -13,7 +14,9 @@ namespace XAUAT.EduApi.Controllers;
 [Produces("application/json")]
 public class ProgramController(
     ILogger<ProgramController> logger,
-    IProgramService program) : ControllerBase
+    IProgramService program,
+    ILanguageResolver languageResolver,
+    IApiMessageLocalizer messageLocalizer) : LanguageAwareControllerBase(languageResolver, messageLocalizer)
 {
     /// <summary>
     /// 获取所有培养方案
@@ -28,6 +31,8 @@ public class ProgramController(
     /// <remarks>
     /// 示例请求：
     /// GET /Program?id=123456
+    /// Header:
+    /// x-language: zh
     /// 
     /// 按名称过滤：
     /// GET /Program?id=123456& name=计算机
@@ -52,7 +57,7 @@ public class ProgramController(
                 cookie = Request.Headers["xauat"].ToString(); // 从请求中获取 cookie
             }
 
-            var result = await program.GetAllTrainProgram(cookie, id);
+            var result = await program.GetAllTrainProgram(cookie, id, Language);
             if (!string.IsNullOrEmpty(name))
             {
                 result = result.Where(x => x.Name.Contains(name)).ToList();
@@ -62,12 +67,12 @@ public class ProgramController(
         }
         catch (Exceptions.UnAuthenticationError)
         {
-            return Unauthorized("认证失败，请重新登录");
+            return Unauthorized(Message(ApiMessageKey.AuthenticationFailed));
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to get training program");
-            return StatusCode(500, "获取培养方案失败");
+            return StatusCode(500, Message(ApiMessageKey.ProgramFetchFailed));
         }
     }
 
@@ -83,6 +88,8 @@ public class ProgramController(
     /// <remarks>
     /// 示例请求：
     /// GET /Program/GetDic?id=123456
+    /// Header:
+    /// x-language: zh
     /// 
     /// 请求头：
     /// Cookie: YOUR_AUTH_COOKIE
@@ -104,17 +111,17 @@ public class ProgramController(
                 cookie = Request.Headers["xauat"].ToString(); // 从请求中获取 cookie
             }
 
-            var result = await program.GetAllTrainPrograms(cookie, id);
+            var result = await program.GetAllTrainPrograms(cookie, id, Language);
             return Ok(result);
         }
         catch (Exceptions.UnAuthenticationError)
         {
-            return Unauthorized("认证失败，请重新登录");
+            return Unauthorized(Message(ApiMessageKey.AuthenticationFailed));
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to get training program");
-            return StatusCode(500, "获取培养方案失败");
+            return StatusCode(500, Message(ApiMessageKey.ProgramFetchFailed));
         }
     }
 }

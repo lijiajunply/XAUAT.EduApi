@@ -1,5 +1,6 @@
 using EduApi.Data.Models;
 using Microsoft.AspNetCore.Mvc;
+using XAUAT.EduApi.Localization;
 using XAUAT.EduApi.Services;
 
 namespace XAUAT.EduApi.Controllers;
@@ -14,7 +15,9 @@ namespace XAUAT.EduApi.Controllers;
 [Consumes("application/json")]
 public class ExamController(
     IExamService examService,
-    ILogger<ExamController> logger) : ControllerBase
+    ILogger<ExamController> logger,
+    ILanguageResolver languageResolver,
+    IApiMessageLocalizer messageLocalizer) : LanguageAwareControllerBase(languageResolver, messageLocalizer)
 {
     /// <summary>
     /// 获取考试安排
@@ -28,6 +31,9 @@ public class ExamController(
     /// <remarks>
     /// 示例请求：
     /// GET /Exam?studentId=123456
+    /// 
+    /// Header:
+    /// x-language: zh
     /// 
     /// 注意：
     /// 需要在Headers中添加xauat的Cookie信息，或者直接使用Cookie头
@@ -46,17 +52,17 @@ public class ExamController(
                 cookie = Request.Headers["xauat"].ToString(); // 从请求中获取 cookie
             }
 
-            var result = await examService.GetExamArrangementsAsync(cookie, studentId);
+            var result = await examService.GetExamArrangementsAsync(cookie, studentId, Language);
             return Ok(result);
         }
         catch (Exceptions.UnAuthenticationError)
         {
-            return Unauthorized("认证失败，请重新登录");
+            return Unauthorized(Message(ApiMessageKey.AuthenticationFailed));
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to get exam arrangements");
-            return StatusCode(500, "获取考试安排失败");
+            return StatusCode(500, Message(ApiMessageKey.ExamFetchFailed));
         }
     }
 }

@@ -11,9 +11,9 @@ namespace XAUAT.EduApi.Services;
 
 public interface IScoreService
 {
-    Task<List<ScoreResponse>> GetScoresAsync(string studentId, string semester, string cookie);
-    Task<SemesterResult> ParseSemesterAsync(string? studentId, string cookie);
-    Task<SemesterItem> GetThisSemesterAsync(string cookie);
+    Task<List<ScoreResponse>> GetScoresAsync(string studentId, string semester, string cookie, string language = "zh");
+    Task<SemesterResult> ParseSemesterAsync(string? studentId, string cookie, string language = "zh");
+    Task<SemesterItem> GetThisSemesterAsync(string cookie, string language = "zh");
 }
 
 public class ScoreService(
@@ -30,7 +30,7 @@ public class ScoreService(
     private readonly IScorePersistenceQueue _scorePersistenceQueue =
         scorePersistenceQueue ?? NullScorePersistenceQueue.Instance;
 
-    public async Task<List<ScoreResponse>> GetScoresAsync(string studentId, string semester, string cookie)
+    public async Task<List<ScoreResponse>> GetScoresAsync(string studentId, string semester, string cookie, string language = "zh")
     {
         if (testAccountResolver?.IsTestAccount(cookie: cookie, studentId: studentId) == true)
         {
@@ -52,7 +52,7 @@ public class ScoreService(
                 var split = studentId.Split(',');
 
                 // 使用 Task.WhenAll 并行获取所有学生的成绩，解决 N+1 问题
-                var tasks = split.Select((s, index) => GetScoreResponseWithIndex(s, semester, cookie, index)).ToArray();
+                var tasks = split.Select((s, index) => GetScoreResponseWithIndex(s, semester, cookie, language, index)).ToArray();
                 var allResults = await Task.WhenAll(tasks).ConfigureAwait(false);
 
                 // 合并结果
@@ -64,9 +64,9 @@ public class ScoreService(
     /// <summary>
     /// 获取成绩并标记是否为辅修
     /// </summary>
-    private async Task<List<ScoreResponse>> GetScoreResponseWithIndex(string studentId, string semester, string cookie, int index)
+    private async Task<List<ScoreResponse>> GetScoreResponseWithIndex(string studentId, string semester, string cookie, string language, int index)
     {
-        var scoreResponse = await GetScoreResponse(studentId, semester, cookie).ConfigureAwait(false);
+        var scoreResponse = await GetScoreResponse(studentId, semester, cookie, language).ConfigureAwait(false);
         var scoreResponses = scoreResponse.ToList();
 
         // 非第一个学号的成绩标记为辅修
@@ -81,7 +81,7 @@ public class ScoreService(
         return scoreResponses;
     }
 
-    public async Task<SemesterResult> ParseSemesterAsync(string? studentId, string cookie)
+    public async Task<SemesterResult> ParseSemesterAsync(string? studentId, string cookie, string language = "zh")
     {
         if (testAccountResolver?.IsTestAccount(cookie: cookie, studentId: studentId) == true)
         {
@@ -120,15 +120,15 @@ public class ScoreService(
             TimeSpan.FromHours(1));
     }
 
-    public async Task<SemesterItem> GetThisSemesterAsync(string cookie)
+    public async Task<SemesterItem> GetThisSemesterAsync(string cookie, string language = "zh")
     {
-        return await examService.GetThisSemester(cookie);
+        return await examService.GetThisSemester(cookie, language);
     }
 
-    private async Task<IEnumerable<ScoreResponse>> GetScoreResponse(string studentId, string semester, string cookie)
+    private async Task<IEnumerable<ScoreResponse>> GetScoreResponse(string studentId, string semester, string cookie, string language)
     {
         // 判断是否为当前学期
-        var thisSemester = await examService.GetThisSemester(cookie).ConfigureAwait(false);
+        var thisSemester = await examService.GetThisSemester(cookie, language).ConfigureAwait(false);
         var isCurrentSemester = thisSemester != null! && thisSemester.Value == semester;
 
         if (!isCurrentSemester && thisSemester != null)
@@ -154,7 +154,7 @@ public class ScoreService(
             }
         }
 
-        var crawledScores = await CrawlScores(studentId, semester, cookie).ConfigureAwait(false);
+        var crawledScores = await CrawlScores(studentId, semester, cookie, language).ConfigureAwait(false);
         var scoresToSave = crawledScores.Select(score =>
         {
             // 为每个成绩项生成唯一键值
@@ -185,7 +185,7 @@ public class ScoreService(
         return crawledScores;
     }
 
-    private async Task<List<ScoreResponse>> CrawlScores(string studentId, string semester, string cookie)
+    private async Task<List<ScoreResponse>> CrawlScores(string studentId, string semester, string cookie, string language)
     {
         using var client = httpClientFactory.CreateClient();
         client.ConfigureForEduSystem(cookie, HttpTimeouts.EduSystem);
@@ -249,7 +249,7 @@ public class ScoreService(
         var thisSemesterCache = await cacheService.GetAsync<string>(CacheKeys.ThisSemester);
         if (string.IsNullOrEmpty(thisSemesterCache))
         {
-            await examService.GetThisSemester(cookie).ConfigureAwait(false);
+            await examService.GetThisSemester(cookie, language).ConfigureAwait(false);
         }
 
         return list;

@@ -178,6 +178,7 @@ public class ElectricityController(
     /// 删除电费订阅
     /// </summary>
     /// <param name="id">订阅 ID</param>
+    /// <param name="cancellationToken">取消令牌</param>
     /// <returns>删除结果</returns>
     [HttpDelete("Subscriptions/{id}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]

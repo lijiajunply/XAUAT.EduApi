@@ -1,5 +1,6 @@
 using EduApi.Data.Models;
 using Microsoft.AspNetCore.Mvc;
+using XAUAT.EduApi.Localization;
 using XAUAT.EduApi.Services;
 
 namespace XAUAT.EduApi.Controllers
@@ -12,8 +13,12 @@ namespace XAUAT.EduApi.Controllers
     [Route("[controller]")]
     [Produces("application/json")]
     [Consumes("application/json")]
-    public class ScoreController(ILogger<ScoreController> logger, IScoreService scoreService)
-        : ControllerBase
+    public class ScoreController(
+        ILogger<ScoreController> logger,
+        IScoreService scoreService,
+        ILanguageResolver languageResolver,
+        IApiMessageLocalizer messageLocalizer)
+        : LanguageAwareControllerBase(languageResolver, messageLocalizer)
     {
         /// <summary>
         /// 解析学期数据
@@ -26,6 +31,8 @@ namespace XAUAT.EduApi.Controllers
         /// <remarks>
         /// 示例请求：
         /// GET /Score/Semester?studentId=123456
+        /// Header:
+        /// x-language: zh
         /// </remarks>
         [HttpGet("Semester")]
         [ProducesResponseType(typeof(SemesterResult), StatusCodes.Status200OK)]
@@ -42,12 +49,12 @@ namespace XAUAT.EduApi.Controllers
                     cookie = Request.Headers["xauat"].ToString();
                 }
 
-                var result = await scoreService.ParseSemesterAsync(studentId, cookie);
+                var result = await scoreService.ParseSemesterAsync(studentId, cookie, Language);
                 return result;
             }
             catch (Exceptions.UnAuthenticationError)
             {
-                return Unauthorized("认证失败，请重新登录");
+                return Unauthorized(Message(ApiMessageKey.AuthenticationFailed));
             }
             catch (Exception ex)
             {
@@ -66,6 +73,8 @@ namespace XAUAT.EduApi.Controllers
         /// <remarks>
         /// 示例请求：
         /// GET /Score/ThisSemester
+        /// Header:
+        /// x-language: zh
         /// </remarks>
         [HttpGet("ThisSemester")]
         [ProducesResponseType(typeof(SemesterItem), StatusCodes.Status200OK)]
@@ -81,11 +90,11 @@ namespace XAUAT.EduApi.Controllers
                     cookie = Request.Headers["xauat"].ToString();
                 }
 
-                return await scoreService.GetThisSemesterAsync(cookie);
+                return await scoreService.GetThisSemesterAsync(cookie, Language);
             }
             catch (Exceptions.UnAuthenticationError)
             {
-                return Unauthorized("认证失败，请重新登录");
+                return Unauthorized(Message(ApiMessageKey.AuthenticationFailed));
             }
             catch (Exception ex)
             {
@@ -107,6 +116,8 @@ namespace XAUAT.EduApi.Controllers
         /// <remarks>
         /// 示例请求：
         /// GET /Score?studentId=123456 & semester=2024-2025-2
+        /// Header:
+        /// x-language: zh
         /// </remarks>
         [HttpGet]
         [ProducesResponseType(typeof(List<ScoreResponse>), StatusCodes.Status200OK)]
@@ -124,7 +135,7 @@ namespace XAUAT.EduApi.Controllers
                     cookie = Request.Headers["xauat"].ToString();
                 }
 
-                var scores = await scoreService.GetScoresAsync(studentId, semester, cookie);
+                var scores = await scoreService.GetScoresAsync(studentId, semester, cookie, Language);
                 return scores;
             }
             catch (ArgumentNullException ex)
@@ -134,7 +145,7 @@ namespace XAUAT.EduApi.Controllers
             }
             catch (Exceptions.UnAuthenticationError)
             {
-                return Unauthorized("认证失败，请重新登录");
+                return Unauthorized(Message(ApiMessageKey.AuthenticationFailed));
             }
             catch (Exception ex)
             {

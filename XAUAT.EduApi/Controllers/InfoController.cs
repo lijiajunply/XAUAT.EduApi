@@ -1,6 +1,7 @@
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json;
+using XAUAT.EduApi.Localization;
 using XAUAT.EduApi.Services;
 
 namespace XAUAT.EduApi.Controllers;
@@ -16,9 +17,11 @@ public class InfoController(
     IHttpClientFactory httpClientFactory,
     ILogger<CourseController> logger,
     IInfoService info,
+    ILanguageResolver languageResolver,
+    IApiMessageLocalizer messageLocalizer,
     ITestAccountResolver? testAccountResolver = null,
     ITestDataProvider? testDataProvider = null)
-    : ControllerBase
+    : LanguageAwareControllerBase(languageResolver, messageLocalizer)
 {
     /// <summary>
     /// 获取学业进度
@@ -32,6 +35,7 @@ public class InfoController(
     /// <remarks>
     /// 示例请求：
     /// GET /Info/Completion
+    /// x-language: zh
     /// Cookie: YOUR_AUTH_COOKIE
     /// 
     /// 或使用自定义请求头：
@@ -80,12 +84,12 @@ public class InfoController(
         }
         catch (Exceptions.UnAuthenticationError)
         {
-            return Unauthorized("认证失败，请重新登录");
+            return Unauthorized(Message(ApiMessageKey.AuthenticationFailed));
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "获取学业进度时出错");
-            return StatusCode(500, "获取学业进度失败");
+            return StatusCode(500, Message(ApiMessageKey.CompletionFetchFailed));
         }
     }
 

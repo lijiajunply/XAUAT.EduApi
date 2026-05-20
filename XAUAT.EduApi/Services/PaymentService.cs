@@ -10,8 +10,8 @@ namespace XAUAT.EduApi.Services;
 
 public interface IPaymentService
 {
-    Task<string> Login(string cardNum);
-    Task<PaymentData> GetTurnoverAsync(string cardNum);
+    Task<string> Login(string cardNum, string language = "zh");
+    Task<PaymentData> GetTurnoverAsync(string cardNum, string language = "zh");
 }
 
 public class PaymentService(
@@ -22,7 +22,7 @@ public class PaymentService(
     ITestDataProvider? testDataProvider = null)
     : IPaymentService
 {
-    public async Task<string> Login(string cardNum)
+    public async Task<string> Login(string cardNum, string language = "zh")
     {
         if (testAccountResolver?.IsTestAccount(cardNum: cardNum) == true)
         {
@@ -106,7 +106,7 @@ public class PaymentService(
         }
     }
 
-    public async Task<PaymentData> GetTurnoverAsync(string cardNum)
+    public async Task<PaymentData> GetTurnoverAsync(string cardNum, string language = "zh")
     {
         if (testAccountResolver?.IsTestAccount(cardNum: cardNum) == true)
         {
@@ -125,7 +125,7 @@ public class PaymentService(
 
         try
         {
-            var token = await Login(cardNum);
+            var token = await Login(cardNum, language);
 
             // 并行获取支付列表和余额，解决 N+1 问题
             var paymentsTask = GetPayments(token, cardNum);

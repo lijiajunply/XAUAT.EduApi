@@ -9,9 +9,9 @@ namespace XAUAT.EduApi.Services;
 
 public interface IProgramService
 {
-    public Task<List<PlanCourse>> GetAllTrainProgram(string cookie, string id);
+    public Task<List<PlanCourse>> GetAllTrainProgram(string cookie, string id, string language = "zh");
 
-    public Task<Dictionary<string, List<PlanCourse>>> GetAllTrainPrograms(string cookie, string id);
+    public Task<Dictionary<string, List<PlanCourse>>> GetAllTrainPrograms(string cookie, string id, string language = "zh");
 }
 
 public class ProgramService(
@@ -25,16 +25,16 @@ public class ProgramService(
     private const string BaseUrl = "https://swjw.xauat.edu.cn";
     private readonly ILogger<ProgramService>? _logger = logger;
 
-    public async Task<List<PlanCourse>> GetAllTrainProgram(string cookie, string id)
+    public async Task<List<PlanCourse>> GetAllTrainProgram(string cookie, string id, string language = "zh")
     {
         var ids = id.Split(",");
-        var tasks = ids.Select(item => GetAllTrainProgramByOneId(cookie, item));
+        var tasks = ids.Select(item => GetAllTrainProgramByOneId(cookie, item, language));
         var results = await Task.WhenAll(tasks);
 
         return results.SelectMany(x => x).ToList();
     }
 
-    private async Task<List<PlanCourse>> GetAllTrainProgramByOneId(string cookie, string id)
+    private async Task<List<PlanCourse>> GetAllTrainProgramByOneId(string cookie, string id, string language)
     {
         if (testAccountResolver?.IsTestAccount(cookie: cookie, studentId: id) == true)
         {
@@ -90,9 +90,9 @@ public class ProgramService(
         return list;
     }
 
-    public async Task<Dictionary<string, List<PlanCourse>>> GetAllTrainPrograms(string cookie, string id)
+    public async Task<Dictionary<string, List<PlanCourse>>> GetAllTrainPrograms(string cookie, string id, string language = "zh")
     {
-        var result = await GetAllTrainProgram(cookie, id);
+        var result = await GetAllTrainProgram(cookie, id, language);
 
         return result.GroupBy(x => x.TermStr.Contains(',') ? "特殊分组" : x.TermStr)
             .OrderBy(x => x.Key)

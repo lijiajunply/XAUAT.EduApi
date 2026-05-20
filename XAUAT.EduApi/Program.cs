@@ -6,6 +6,7 @@ using Serilog;
 using Serilog.Events;
 using XAUAT.EduApi.Caching;
 using XAUAT.EduApi.Extensions;
+using XAUAT.EduApi.OpenApi;
 
 LoadDotEnvIfPresent();
 
@@ -54,7 +55,10 @@ builder.Host.UseSerilog((_, _, loggerConfiguration) =>
 // 基础服务配置
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddOpenApi();
+builder.Services.AddOpenApi(options =>
+{
+    options.AddOperationTransformer<LanguageHeaderOperationTransformer>();
+});
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddSingleton(
     Options.Create(EnvironmentVariableHelper.BuildElectricitySubscriptionOptions()));
