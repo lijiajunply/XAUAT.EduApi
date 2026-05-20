@@ -1,5 +1,8 @@
 using EduApi.Data.Models;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.Mvc;
+using XAUAT.EduApi.Extensions;
+using XAUAT.EduApi.Filters;
 using XAUAT.EduApi.Localization;
 using XAUAT.EduApi.Services;
 
@@ -12,6 +15,8 @@ namespace XAUAT.EduApi.Controllers;
 [ApiController]
 [Route("[controller]")]
 [Produces("application/json")]
+[ServiceFilter(typeof(EduCrawlerRateLimitFilter))]
+[EnableRateLimiting("EduCrawler")]
 public class ProgramController(
     ILogger<ProgramController> logger,
     IProgramService program,
@@ -51,11 +56,7 @@ public class ProgramController(
     {
         try
         {
-            var cookie = Request.Headers.Cookie.ToString();
-            if (string.IsNullOrEmpty(cookie) || cookie.StartsWith("Rider") || !cookie.Contains("__pstsid__"))
-            {
-                cookie = Request.Headers["xauat"].ToString(); // 从请求中获取 cookie
-            }
+            var cookie = Request.GetEduAuthCookie();
 
             var result = await program.GetAllTrainProgram(cookie, id, Language);
             if (!string.IsNullOrEmpty(name))
@@ -68,6 +69,10 @@ public class ProgramController(
         catch (Exceptions.UnAuthenticationError)
         {
             return Unauthorized(Message(ApiMessageKey.AuthenticationFailed));
+        }
+        catch (Exceptions.RateLimitException)
+        {
+            return RateLimited(ApiMessageKey.EduSystemRateLimited);
         }
         catch (Exception ex)
         {
@@ -105,11 +110,7 @@ public class ProgramController(
     {
         try
         {
-            var cookie = Request.Headers.Cookie.ToString();
-            if (string.IsNullOrEmpty(cookie) || cookie.StartsWith("Rider"))
-            {
-                cookie = Request.Headers["xauat"].ToString(); // 从请求中获取 cookie
-            }
+            var cookie = Request.GetEduAuthCookie();
 
             var result = await program.GetAllTrainPrograms(cookie, id, Language);
             return Ok(result);
@@ -117,6 +118,10 @@ public class ProgramController(
         catch (Exceptions.UnAuthenticationError)
         {
             return Unauthorized(Message(ApiMessageKey.AuthenticationFailed));
+        }
+        catch (Exceptions.RateLimitException)
+        {
+            return RateLimited(ApiMessageKey.EduSystemRateLimited);
         }
         catch (Exception ex)
         {

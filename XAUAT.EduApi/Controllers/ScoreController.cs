@@ -1,5 +1,8 @@
 using EduApi.Data.Models;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.Mvc;
+using XAUAT.EduApi.Extensions;
+using XAUAT.EduApi.Filters;
 using XAUAT.EduApi.Localization;
 using XAUAT.EduApi.Services;
 
@@ -13,6 +16,8 @@ namespace XAUAT.EduApi.Controllers
     [Route("[controller]")]
     [Produces("application/json")]
     [Consumes("application/json")]
+    [ServiceFilter(typeof(EduCrawlerRateLimitFilter))]
+    [EnableRateLimiting("EduCrawler")]
     public class ScoreController(
         ILogger<ScoreController> logger,
         IScoreService scoreService,
@@ -43,11 +48,7 @@ namespace XAUAT.EduApi.Controllers
             try
             {
                 logger.LogInformation("开始解析学期数据");
-                var cookie = Request.Headers.Cookie.ToString();
-                if (string.IsNullOrEmpty(cookie) || cookie.StartsWith("Rider") || !cookie.Contains("__pstsid__"))
-                {
-                    cookie = Request.Headers["xauat"].ToString();
-                }
+                var cookie = Request.GetEduAuthCookie();
 
                 var result = await scoreService.ParseSemesterAsync(studentId, cookie, Language);
                 return result;
@@ -55,6 +56,10 @@ namespace XAUAT.EduApi.Controllers
             catch (Exceptions.UnAuthenticationError)
             {
                 return Unauthorized(Message(ApiMessageKey.AuthenticationFailed));
+            }
+            catch (Exceptions.RateLimitException)
+            {
+                return RateLimited(ApiMessageKey.EduSystemRateLimited);
             }
             catch (Exception ex)
             {
@@ -84,17 +89,18 @@ namespace XAUAT.EduApi.Controllers
         {
             try
             {
-                var cookie = Request.Headers.Cookie.ToString();
-                if (string.IsNullOrEmpty(cookie) || cookie.StartsWith("Rider") || !cookie.Contains("__pstsid__"))
-                {
-                    cookie = Request.Headers["xauat"].ToString();
-                }
+                var cookie = Request.GetEduAuthCookie();
+                var resolvedStudentId = HttpContext.GetResolvedStudentIds().FirstOrDefault();
 
-                return await scoreService.GetThisSemesterAsync(cookie, Language);
+                return await scoreService.GetThisSemesterAsync(cookie, Language, resolvedStudentId);
             }
             catch (Exceptions.UnAuthenticationError)
             {
                 return Unauthorized(Message(ApiMessageKey.AuthenticationFailed));
+            }
+            catch (Exceptions.RateLimitException)
+            {
+                return RateLimited(ApiMessageKey.EduSystemRateLimited);
             }
             catch (Exception ex)
             {
@@ -129,11 +135,7 @@ namespace XAUAT.EduApi.Controllers
             try
             {
                 logger.LogInformation("开始获取考试分数");
-                var cookie = Request.Headers.Cookie.ToString();
-                if (string.IsNullOrEmpty(cookie) || cookie.StartsWith("Rider") || !cookie.Contains("__pstsid__"))
-                {
-                    cookie = Request.Headers["xauat"].ToString();
-                }
+                var cookie = Request.GetEduAuthCookie();
 
                 var scores = await scoreService.GetScoresAsync(studentId, semester, cookie, Language);
                 return scores;
@@ -146,6 +148,10 @@ namespace XAUAT.EduApi.Controllers
             catch (Exceptions.UnAuthenticationError)
             {
                 return Unauthorized(Message(ApiMessageKey.AuthenticationFailed));
+            }
+            catch (Exceptions.RateLimitException)
+            {
+                return RateLimited(ApiMessageKey.EduSystemRateLimited);
             }
             catch (Exception ex)
             {

@@ -10,7 +10,11 @@ namespace XAUAT.EduApi.Services;
 
 public interface IExamService
 {
-    Task<ExamResponse> GetExamArrangementsAsync(string cookie, string? id, string language = "zh");
+    Task<ExamResponse> GetExamArrangementsAsync(
+        string cookie,
+        string? id,
+        string language = "zh",
+        IEnumerable<string>? requestStudentIds = null);
 
     Task<SemesterItem> GetThisSemester(string cookie, string language = "zh");
 }
@@ -21,12 +25,19 @@ public class ExamService(
     IInfoService info,
     ICacheService cacheService,
     ITestAccountResolver? testAccountResolver = null,
-    ITestDataProvider? testDataProvider = null)
+    ITestDataProvider? testDataProvider = null,
+    IStudentRateLimitExecutor? rateLimitExecutor = null)
     : IExamService
 {
     private const string BaseUrl = "https://swjw.xauat.edu.cn";
+    private readonly IStudentRateLimitExecutor _rateLimitExecutor =
+        rateLimitExecutor ?? NoOpStudentRateLimitExecutor.Instance;
 
-    public async Task<ExamResponse> GetExamArrangementsAsync(string cookie, string? id, string language = "zh")
+    public async Task<ExamResponse> GetExamArrangementsAsync(
+        string cookie,
+        string? id,
+        string language = "zh",
+        IEnumerable<string>? requestStudentIds = null)
     {
         if (testAccountResolver?.IsTestAccount(cookie: cookie, studentId: id) == true)
         {
@@ -36,13 +47,13 @@ public class ExamService(
 
         if (string.IsNullOrEmpty(id) || !id.Contains(','))
         {
-            return await GetExamArrangementAsync(cookie, id, language);
+            return await GetExamArrangementAsync(cookie, id, language, requestStudentIds);
         }
 
         var split = id.Split(',');
 
         // 使用 Task.WhenAll 并行获取所有学生的考试安排，解决 N+1 问题
-        var tasks = split.Select(s => GetExamArrangementAsync(cookie, s, language)).ToArray();
+        var tasks = split.Select(s => GetExamArrangementAsync(cookie, s, language, [s])).ToArray();
         var allResults = await Task.WhenAll(tasks).ConfigureAwait(false);
 
         // 合并结果
@@ -103,21 +114,29 @@ public class ExamService(
     /// <param name="cookie"></param>
     /// <param name="id"></param>
     /// <returns></returns>
-    private async Task<ExamResponse> GetExamArrangementAsync(string cookie, string? id = null, string language = "zh")
+    private async Task<ExamResponse> GetExamArrangementAsync(
+        string cookie,
+        string? id = null,
+        string language = "zh",
+        IEnumerable<string>? requestStudentIds = null)
     {
         // 无id时不使用缓存
         if (string.IsNullOrEmpty(id))
         {
-            return await FetchExamArrangementAsync(cookie, null, language);
+            return await FetchExamArrangementAsync(cookie, null, language, requestStudentIds);
         }
 
         return await cacheService.GetOrCreateAsync(
             CacheKeys.ExamArrangement(id),
-            async () => await FetchExamArrangementAsync(cookie, id, language),
+            async () => await FetchExamArrangementAsync(cookie, id, language, requestStudentIds ?? [id]),
             TimeSpan.FromHours(1), isUse: false);
     }
 
-    private async Task<ExamResponse> FetchExamArrangementAsync(string cookie, string? id, string language)
+    private async Task<ExamResponse> FetchExamArrangementAsync(
+        string cookie,
+        string? id,
+        string language,
+        IEnumerable<string>? requestStudentIds)
     {
         try
         {
@@ -140,11 +159,13 @@ public class ExamService(
                 .WaitAndRetryAsync(3, retryAttempt =>
                     TimeSpan.FromSeconds(6 * Math.Pow(2, retryAttempt - 1)));
 
-            var response = await retryPolicy.ExecuteAsync(async ct =>
-            {
-                var requestPolicy = new HttpRequestMessage(HttpMethod.Get, url).WithCookie(cookie);
-                return await httpClient.SendAsync(requestPolicy, ct);
-            }, cts.Token);
+            var response = await _rateLimitExecutor.ExecuteAsync(
+                requestStudentIds ?? [],
+                () => retryPolicy.ExecuteAsync(async ct =>
+                {
+                    var requestPolicy = new HttpRequestMessage(HttpMethod.Get, url).WithCookie(cookie);
+                    return await httpClient.SendAsync(requestPolicy, ct);
+                }, cts.Token));
 
             var content = await response.Content.ReadAsStringAsync(cts.Token);
 

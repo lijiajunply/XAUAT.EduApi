@@ -34,3 +34,10 @@ public class ErrorWithMessageResponse : ErrorResponse
 {
     public string message { get; set; } = "";
 }
+
+[Serializable]
+public class RateLimitErrorResponse : ErrorResponse
+{
+    public string message { get; set; } = "";
+    public int retryAfterSeconds { get; set; }
+}

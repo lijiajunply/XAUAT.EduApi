@@ -1,5 +1,8 @@
 using EduApi.Data.Models;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.Mvc;
+using XAUAT.EduApi.Extensions;
+using XAUAT.EduApi.Filters;
 using XAUAT.EduApi.Localization;
 using XAUAT.EduApi.Services;
 
@@ -13,6 +16,8 @@ namespace XAUAT.EduApi.Controllers;
 [Route("[controller]")]
 [Produces("application/json")]
 [Consumes("application/json")]
+[ServiceFilter(typeof(EduCrawlerRateLimitFilter))]
+[EnableRateLimiting("EduCrawler")]
 public class CourseController(
     ILogger<CourseController> logger,
     ICourseService courseService,
@@ -49,11 +54,7 @@ public class CourseController(
         try
         {
             logger.LogInformation("开始获取课程信息");
-            var cookie = Request.Headers.Cookie.ToString();
-            if (string.IsNullOrEmpty(cookie) || cookie.StartsWith("Rider") || !cookie.Contains("__pstsid__"))
-            {
-                cookie = Request.Headers["xauat"].ToString(); // 从请求中获取 cookie
-            }
+            var cookie = Request.GetEduAuthCookie();
 
             var courses = await courseService.GetCoursesAsync(studentId, cookie, Language);
 
@@ -73,6 +74,10 @@ public class CourseController(
         {
             logger.LogWarning(ex, "参数错误");
             return BadRequest(new CourseErrorResponse { Success = false, Message = ex.Message });
+        }
+        catch (Exceptions.RateLimitException)
+        {
+            return RateLimited(ApiMessageKey.EduSystemRateLimited);
         }
         catch (HttpRequestException ex)
         {

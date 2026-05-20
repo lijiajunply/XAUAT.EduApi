@@ -13,6 +13,7 @@ public static class ApiMessageKey
     public const string BusFetchFailed = nameof(BusFetchFailed);
     public const string BusOldPlatformSuffix = nameof(BusOldPlatformSuffix);
     public const string ServiceUnavailable = nameof(ServiceUnavailable);
+    public const string EduSystemRateLimited = nameof(EduSystemRateLimited);
     public const string PaymentLoginUnknownError = nameof(PaymentLoginUnknownError);
     public const string PaymentTurnoverUnknownError = nameof(PaymentTurnoverUnknownError);
 }

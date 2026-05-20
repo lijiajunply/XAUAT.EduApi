@@ -89,6 +89,7 @@ var app = builder.Build();
 
 // 配置中间件管道
 app.UseErrorHandling()
+    .UseRateLimiter()
     .UseAuthorization()
     .UseCustomCors();
 

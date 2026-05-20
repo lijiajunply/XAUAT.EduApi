@@ -2,6 +2,7 @@ using System.Text.RegularExpressions;
 using EduApi.Data.Models;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using Polly;
 using XAUAT.EduApi.Caching;
 using XAUAT.EduApi.Extensions;
 using XAUAT.EduApi.Queues;
@@ -13,7 +14,7 @@ public interface IScoreService
 {
     Task<List<ScoreResponse>> GetScoresAsync(string studentId, string semester, string cookie, string language = "zh");
     Task<SemesterResult> ParseSemesterAsync(string? studentId, string cookie, string language = "zh");
-    Task<SemesterItem> GetThisSemesterAsync(string cookie, string language = "zh");
+    Task<SemesterItem> GetThisSemesterAsync(string cookie, string language = "zh", string? studentId = null);
 }
 
 public class ScoreService(
@@ -24,11 +25,14 @@ public class ScoreService(
     IScoreRepository scoreRepository,
     IScorePersistenceQueue? scorePersistenceQueue = null,
     ITestAccountResolver? testAccountResolver = null,
-    ITestDataProvider? testDataProvider = null)
+    ITestDataProvider? testDataProvider = null,
+    IStudentRateLimitExecutor? rateLimitExecutor = null)
     : IScoreService
 {
     private readonly IScorePersistenceQueue _scorePersistenceQueue =
         scorePersistenceQueue ?? NullScorePersistenceQueue.Instance;
+    private readonly IStudentRateLimitExecutor _rateLimitExecutor =
+        rateLimitExecutor ?? NoOpStudentRateLimitExecutor.Instance;
 
     public async Task<List<ScoreResponse>> GetScoresAsync(string studentId, string semester, string cookie, string language = "zh")
     {
@@ -49,7 +53,7 @@ public class ScoreService(
             CacheKeys.Scores(studentId, semester),
             async () =>
             {
-                var split = studentId.Split(',');
+                var split = HttpContextStudentExtensions.ParseStudentIds(studentId);
 
                 // 使用 Task.WhenAll 并行获取所有学生的成绩，解决 N+1 问题
                 var tasks = split.Select((s, index) => GetScoreResponseWithIndex(s, semester, cookie, language, index)).ToArray();
@@ -95,37 +99,46 @@ public class ScoreService(
             CacheKeys.SemesterResult(studentId),
             async () =>
             {
-                using var client = httpClientFactory.CreateClient();
-                client.ConfigureForEduSystem(cookie, HttpTimeouts.EduSystem);
+                return await _rateLimitExecutor.ExecuteAsync(
+                    HttpContextStudentExtensions.ParseStudentIds(studentId),
+                    async () =>
+                    {
+                        using var client = httpClientFactory.CreateClient();
+                        client.ConfigureForEduSystem(cookie, HttpTimeouts.EduSystem);
 
-                var url = "https://swjw.xauat.edu.cn/student/for-std/grade/sheet";
-                if (!string.IsNullOrEmpty(studentId))
-                {
-                    var split = studentId.Split(',');
-                    var firstId = split.FirstOrDefault();
-                    url += $"/semester-index/{firstId}";
-                }
+                        var url = "https://swjw.xauat.edu.cn/student/for-std/grade/sheet";
+                        if (!string.IsNullOrEmpty(studentId))
+                        {
+                            var split = HttpContextStudentExtensions.ParseStudentIds(studentId);
+                            var firstId = split.FirstOrDefault();
+                            url += $"/semester-index/{firstId}";
+                        }
 
-                var html = await client.GetStringAsync(url).ConfigureAwait(false);
+                        var html = await client.GetStringAsync(url).ConfigureAwait(false);
 
-                html.ThrowIfAuthOrRateLimited();
+                        html.ThrowIfAuthOrRateLimited();
 
-                var result = new SemesterResult();
-                result.Parse(html);
-                return result;
+                        var result = new SemesterResult();
+                        result.Parse(html);
+                        return result;
+                    });
             },
             TimeSpan.FromHours(1));
     }
 
-    public async Task<SemesterItem> GetThisSemesterAsync(string cookie, string language = "zh")
+    public async Task<SemesterItem> GetThisSemesterAsync(string cookie, string language = "zh", string? studentId = null)
     {
-        return await examService.GetThisSemester(cookie, language);
+        return await _rateLimitExecutor.ExecuteAsync(
+            HttpContextStudentExtensions.ParseStudentIds(studentId),
+            () => examService.GetThisSemester(cookie, language));
     }
 
     private async Task<IEnumerable<ScoreResponse>> GetScoreResponse(string studentId, string semester, string cookie, string language)
     {
         // 判断是否为当前学期
-        var thisSemester = await examService.GetThisSemester(cookie, language).ConfigureAwait(false);
+        var thisSemester = await _rateLimitExecutor.ExecuteAsync(
+            [studentId],
+            () => examService.GetThisSemester(cookie, language)).ConfigureAwait(false);
         var isCurrentSemester = thisSemester != null! && thisSemester.Value == semester;
 
         if (!isCurrentSemester && thisSemester != null)
@@ -187,72 +200,78 @@ public class ScoreService(
         using var client = httpClientFactory.CreateClient();
         client.ConfigureForEduSystem(cookie, HttpTimeouts.EduSystem);
 
-        var response = await client.GetAsync(
-                $"https://swjw.xauat.edu.cn/student/for-std/grade/sheet/info/{studentId}?semester={semester}")
-            .ConfigureAwait(false);
+        var retryPolicy = Policy
+            .Handle<Exceptions.RateLimitException>()
+            .WaitAndRetryAsync(3, retryAttempt => TimeSpan.FromSeconds(6 * Math.Pow(2, retryAttempt - 1)));
 
-        if (!response.IsSuccessStatusCode)
-        {
-            logger.LogWarning("获取成绩数据失败，HTTP状态码: {StatusCode}", response.StatusCode);
-            return [];
-        }
-
-        var content = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
-
-        // 先检查是否为限流页面
-        content.ThrowIfRateLimited();
-
-        // 检查返回的内容是否为HTML（表示可能需要重新登录）
-        if (content.StartsWith('<'))
-        {
-            logger.LogWarning("获取成绩数据失败，返回了HTML内容而非JSON，可能Cookie已过期");
-            if (content.Contains("登入页面"))
+        return await _rateLimitExecutor.ExecuteAsync([studentId], () =>
+            retryPolicy.ExecuteAsync(async () =>
             {
-                throw new Exceptions.UnAuthenticationError();
-            }
+                var response = await client.GetAsync(
+                        $"https://swjw.xauat.edu.cn/student/for-std/grade/sheet/info/{studentId}?semester={semester}")
+                    .ConfigureAwait(false);
 
-            return [];
-        }
+                if (!response.IsSuccessStatusCode)
+                {
+                    logger.LogWarning("获取成绩数据失败，HTTP状态码: {StatusCode}", response.StatusCode);
+                    return [];
+                }
 
-        JObject json;
-        try
-        {
-            json = JObject.Parse(content);
-        }
-        catch (JsonReaderException ex)
-        {
-            logger.LogError(ex, "解析成绩JSON数据失败，原始内容: {Content}", content);
-            return [];
-        }
+                var content = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
 
-        var list = (json["semesterId2studentGrades"]?[semester]!).Select(item =>
-        {
-            var gradeDetail = string.Join("; ",
-                Regex.Matches(item["gradeDetail"]!.ToString(), @"<span[^>]*>([^<]+)<\/span>")
-                    .Select(m => m.Groups[1].Value.Trim()));
+                content.ThrowIfRateLimited();
 
-            return new ScoreResponse()
-            {
-                Name = Truncate(item["course"]!["nameZh"]!.ToString(), 256),
-                Credit = item["course"]!["credits"]!.ToString(),
-                LessonCode = item["lessonCode"]!.ToString(),
-                LessonName = Truncate(item["lessonNameZh"]!.ToString(), 256),
-                Grade = Truncate(item["gaGrade"]!.ToString(), 256),
-                Gpa = item["gp"]!.ToString(),
-                GradeDetail = Truncate(gradeDetail, 512),
-            };
-        }).ToList();
+                if (content.StartsWith('<'))
+                {
+                    logger.LogWarning("获取成绩数据失败，返回了HTML内容而非JSON，可能Cookie已过期");
+                    if (content.Contains("登入页面"))
+                    {
+                        throw new Exceptions.UnAuthenticationError();
+                    }
 
-        if (list.Count == 0) return list;
+                    return [];
+                }
 
-        // 缓存当前学期信息
-        var thisSemesterCache = await cacheService.GetAsync<string>(CacheKeys.ThisSemester);
-        if (string.IsNullOrEmpty(thisSemesterCache))
-        {
-            await examService.GetThisSemester(cookie, language).ConfigureAwait(false);
-        }
+                JObject json;
+                try
+                {
+                    json = JObject.Parse(content);
+                }
+                catch (JsonReaderException ex)
+                {
+                    logger.LogError(ex, "解析成绩JSON数据失败，原始内容: {Content}", content);
+                    return [];
+                }
 
-        return list;
+                var list = (json["semesterId2studentGrades"]?[semester]!).Select(item =>
+                {
+                    var gradeDetail = string.Join("; ",
+                        Regex.Matches(item["gradeDetail"]!.ToString(), @"<span[^>]*>([^<]+)<\/span>")
+                            .Select(m => m.Groups[1].Value.Trim()));
+
+                    return new ScoreResponse()
+                    {
+                        Name = Truncate(item["course"]!["nameZh"]!.ToString(), 256),
+                        Credit = item["course"]!["credits"]!.ToString(),
+                        LessonCode = item["lessonCode"]!.ToString(),
+                        LessonName = Truncate(item["lessonNameZh"]!.ToString(), 256),
+                        Grade = Truncate(item["gaGrade"]!.ToString(), 256),
+                        Gpa = item["gp"]!.ToString(),
+                        GradeDetail = Truncate(gradeDetail, 512),
+                    };
+                }).ToList();
+
+                if (list.Count == 0) return list;
+
+                var thisSemesterCache = await cacheService.GetAsync<string>(CacheKeys.ThisSemester);
+                if (string.IsNullOrEmpty(thisSemesterCache))
+                {
+                    await _rateLimitExecutor.ExecuteAsync([studentId], () => examService.GetThisSemester(cookie, language))
+                        .ConfigureAwait(false);
+                }
+
+                return list;
+            }));
     }
 
     private static string Truncate(string value, int maxLength)

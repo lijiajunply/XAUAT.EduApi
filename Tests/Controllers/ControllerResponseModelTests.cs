@@ -2,11 +2,13 @@ using System.Text.Json;
 using EduApi.Data.Models;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Newtonsoft.Json.Linq;
 using XAUAT.EduApi.Controllers;
 using XAUAT.EduApi.Exceptions;
+using XAUAT.EduApi.Extensions;
 using XAUAT.EduApi.Interfaces;
 using XAUAT.EduApi.Localization;
 using XAUAT.EduApi.Services;
@@ -106,6 +108,44 @@ public class ControllerResponseModelTests
         var payload = Assert.IsType<CourseErrorResponse>(unauthorized.Value);
         Assert.False(payload.Success);
         Assert.Equal("认证失败，请重新登录", payload.Message);
+    }
+
+    [Fact]
+    public async Task CourseController_ShouldReturnRateLimitResponse_WhenServiceThrowsRateLimitException()
+    {
+        var courseService = new Mock<ICourseService>();
+        courseService.Setup(x => x.GetCoursesAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()))
+            .ThrowsAsync(new RateLimitException());
+
+        var rateLimitState = new StudentRateLimitState();
+        rateLimitState.MarkRateLimited("20230001");
+
+        var services = new ServiceCollection()
+            .AddSingleton<IStudentRateLimitState>(rateLimitState)
+            .BuildServiceProvider();
+
+        var context = BuildControllerContext("test-cookie");
+        context.HttpContext.RequestServices = services;
+        context.HttpContext.SetResolvedStudentIds(["20230001"]);
+
+        var controller = new CourseController(
+            Mock.Of<ILogger<CourseController>>(),
+            courseService.Object,
+            LanguageResolver,
+            MessageLocalizer)
+        {
+            ControllerContext = context
+        };
+
+        var result = await controller.GetCourse("20230001");
+
+        var objectResult = Assert.IsType<ObjectResult>(result.Result);
+        Assert.Equal(StatusCodes.Status429TooManyRequests, objectResult.StatusCode);
+        var payload = Assert.IsType<RateLimitErrorResponse>(objectResult.Value);
+        Assert.Equal("rate_limited", payload.error);
+        Assert.Equal("教务系统当前限流，请稍后重试", payload.message);
+        Assert.True(payload.retryAfterSeconds >= 1);
+        Assert.True(context.HttpContext.Response.Headers.ContainsKey("Retry-After"));
     }
 
     [Fact]

@@ -1,5 +1,8 @@
 using EduApi.Data.Models;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.Mvc;
+using XAUAT.EduApi.Extensions;
+using XAUAT.EduApi.Filters;
 using XAUAT.EduApi.Localization;
 using XAUAT.EduApi.Services;
 
@@ -13,6 +16,8 @@ namespace XAUAT.EduApi.Controllers;
 [Route("[controller]")]
 [Produces("application/json")]
 [Consumes("application/json")]
+[ServiceFilter(typeof(EduCrawlerRateLimitFilter))]
+[EnableRateLimiting("EduCrawler")]
 public class ExamController(
     IExamService examService,
     ILogger<ExamController> logger,
@@ -46,18 +51,21 @@ public class ExamController(
     {
         try
         {
-            var cookie = Request.Headers.Cookie.ToString();
-            if (string.IsNullOrEmpty(cookie) || cookie.StartsWith("Rider") || !cookie.Contains("__pstsid__"))
-            {
-                cookie = Request.Headers["xauat"].ToString(); // 从请求中获取 cookie
-            }
+            var cookie = Request.GetEduAuthCookie();
 
-            var result = await examService.GetExamArrangementsAsync(cookie, studentId, Language);
+            var requestStudentIds = string.IsNullOrWhiteSpace(studentId)
+                ? HttpContext.GetResolvedStudentIds()
+                : HttpContextStudentExtensions.ParseStudentIds(studentId);
+            var result = await examService.GetExamArrangementsAsync(cookie, studentId, Language, requestStudentIds);
             return Ok(result);
         }
         catch (Exceptions.UnAuthenticationError)
         {
             return Unauthorized(Message(ApiMessageKey.AuthenticationFailed));
+        }
+        catch (Exceptions.RateLimitException)
+        {
+            return RateLimited(ApiMessageKey.EduSystemRateLimited);
         }
         catch (Exception ex)
         {

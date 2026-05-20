@@ -18,9 +18,13 @@ public class CourseService(
     ICacheService cacheService,
     IInfoService infoService,
     ITestAccountResolver? testAccountResolver = null,
-    ITestDataProvider? testDataProvider = null)
+    ITestDataProvider? testDataProvider = null,
+    IStudentRateLimitExecutor? rateLimitExecutor = null)
     : ICourseService
 {
+    private readonly IStudentRateLimitExecutor _rateLimitExecutor =
+        rateLimitExecutor ?? NoOpStudentRateLimitExecutor.Instance;
+
     public async Task<List<CourseActivity>> GetCoursesAsync(string studentId, string cookie, string language = "zh")
     {
         if (testAccountResolver?.IsTestAccount(cookie: cookie, studentId: studentId) == true)
@@ -52,7 +56,7 @@ public class CourseService(
 
         var split = studentId.Split(',');
 
-        var semester = await examService.GetThisSemester(cookie, language);
+        var semester = await _rateLimitExecutor.ExecuteAsync(split, () => examService.GetThisSemester(cookie, language));
 
         if (string.IsNullOrEmpty(semester.Value))
         {
@@ -92,24 +96,25 @@ public class CourseService(
             .Handle<Exceptions.RateLimitException>()
             .WaitAndRetryAsync(3, retryAttempt => TimeSpan.FromSeconds(6 * Math.Pow(2, retryAttempt - 1)));
 
-        return await retryPolicy.ExecuteAsync(async () =>
-        {
-            var response = await newClient.GetAsync(
-                $"https://swjw.xauat.edu.cn/student/for-std/course-table/semester/{semesterValue}/print-data/{studentId}");
-
-            if (!response.IsSuccessStatusCode)
+        return await _rateLimitExecutor.ExecuteAsync([studentId], () =>
+            retryPolicy.ExecuteAsync(async () =>
             {
-                throw new HttpRequestException($"获取课程数据失败，状态码: {response.StatusCode}");
-            }
+                var response = await newClient.GetAsync(
+                    $"https://swjw.xauat.edu.cn/student/for-std/course-table/semester/{semesterValue}/print-data/{studentId}");
 
-            var jsonString = await response.Content.ReadAsStringAsync();
-            jsonString.ThrowIfAuthOrRateLimited();
+                if (!response.IsSuccessStatusCode)
+                {
+                    throw new HttpRequestException($"获取课程数据失败，状态码: {response.StatusCode}");
+                }
 
-            var jsonResponse = JsonConvert.DeserializeObject<CourseResponse>(jsonString);
+                var jsonString = await response.Content.ReadAsStringAsync();
+                jsonString.ThrowIfAuthOrRateLimited();
 
-            return jsonResponse?.StudentTableVm == null
-                ? throw new InvalidOperationException("未找到课程数据")
-                : jsonResponse.StudentTableVm.Activities;
-        });
+                var jsonResponse = JsonConvert.DeserializeObject<CourseResponse>(jsonString);
+
+                return jsonResponse?.StudentTableVm == null
+                    ? throw new InvalidOperationException("未找到课程数据")
+                    : jsonResponse.StudentTableVm.Activities;
+            }));
     }
 }

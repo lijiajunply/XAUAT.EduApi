@@ -62,6 +62,10 @@ public class LoginController(
         {
             return Unauthorized(Message(ApiMessageKey.InvalidUsernameOrPassword));
         }
+        catch (RateLimitException)
+        {
+            return RateLimited(ApiMessageKey.EduSystemRateLimited);
+        }
         catch (Exception ex)
         {
             logger.LogError(ex, "用户 {Username} 登录失败", request.Username);

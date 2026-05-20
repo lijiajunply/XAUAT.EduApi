@@ -1,6 +1,9 @@
 using System.Text.Json.Serialization;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json;
+using XAUAT.EduApi.Filters;
 using XAUAT.EduApi.Extensions;
 using XAUAT.EduApi.Localization;
 using XAUAT.EduApi.Services;
@@ -48,16 +51,15 @@ public class InfoController(
     [ProducesResponseType(typeof(string), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(string), StatusCodes.Status500InternalServerError)]
     [ProducesResponseType(typeof(string), StatusCodes.Status502BadGateway)]
+    [ServiceFilter(typeof(EduCrawlerRateLimitFilter))]
+    [EnableRateLimiting("EduCrawler")]
     public async Task<IActionResult> GetCompletion()
     {
         try
         {
             logger.LogInformation("开始抓取学业进度");
-            var cookie = Request.Headers.Cookie.ToString();
-            if (string.IsNullOrEmpty(cookie) || cookie.StartsWith("Rider") || !cookie.Contains("__pstsid__"))
-            {
-                cookie = Request.Headers["xauat"].ToString(); // 从请求中获取 cookie
-            }
+            var cookie = Request.GetEduAuthCookie();
+            var studentIds = HttpContext.GetResolvedStudentIds();
 
             if (testAccountResolver?.IsTestAccount(cookie: cookie) == true)
             {
@@ -66,23 +68,36 @@ public class InfoController(
                 return Ok(testData);
             }
 
-            using var client = httpClientFactory.CreateClient();
-            client.SetRealisticHeaders();
-            client.Timeout = TimeSpan.FromSeconds(6); // 添加超时控制
-            client.DefaultRequestHeaders.Add("Cookie", cookie);
-            var response =
-                await client.GetAsync("https://swjw.xauat.edu.cn/student/ws/student/home-page/programCompletionPreview");
-            var content = await response.Content.ReadAsStringAsync();
+            var services = HttpContext.RequestServices;
+            var rateLimitExecutor = (services is null ? null : services.GetService<IStudentRateLimitExecutor>())
+                                    ?? NoOpStudentRateLimitExecutor.Instance;
 
-            content.ThrowIfAuthOrRateLimited();
+            var data = await rateLimitExecutor
+                .ExecuteAsync(studentIds, async () =>
+                {
+                    using var client = httpClientFactory.CreateClient();
+                    client.SetRealisticHeaders();
+                    client.Timeout = TimeSpan.FromSeconds(6);
+                    client.DefaultRequestHeaders.Add("Cookie", cookie);
+                    var response =
+                        await client.GetAsync(
+                            "https://swjw.xauat.edu.cn/student/ws/student/home-page/programCompletionPreview");
+                    var content = await response.Content.ReadAsStringAsync();
 
-            var data = JsonConvert.DeserializeObject<StudyModule[]>(content) ?? [];
+                    content.ThrowIfAuthOrRateLimited();
+
+                    return JsonConvert.DeserializeObject<StudyModule[]>(content) ?? [];
+                });
 
             return Ok(data);
         }
         catch (Exceptions.UnAuthenticationError)
         {
             return Unauthorized(Message(ApiMessageKey.AuthenticationFailed));
+        }
+        catch (Exceptions.RateLimitException)
+        {
+            return RateLimited(ApiMessageKey.EduSystemRateLimited);
         }
         catch (Exception ex)
         {

@@ -20,11 +20,14 @@ public class ProgramService(
     ICacheService cacheService,
     ILogger<ProgramService>? logger = null,
     ITestAccountResolver? testAccountResolver = null,
-    ITestDataProvider? testDataProvider = null)
+    ITestDataProvider? testDataProvider = null,
+    IStudentRateLimitExecutor? rateLimitExecutor = null)
     : IProgramService
 {
     private const string BaseUrl = "https://swjw.xauat.edu.cn";
     private readonly ILogger<ProgramService>? _logger = logger;
+    private readonly IStudentRateLimitExecutor _rateLimitExecutor =
+        rateLimitExecutor ?? NoOpStudentRateLimitExecutor.Instance;
 
     public async Task<List<PlanCourse>> GetAllTrainProgram(string cookie, string id, string language = "zh")
     {
@@ -53,25 +56,26 @@ public class ProgramService(
                     .Or<RateLimitException>()
                     .WaitAndRetryAsync(3, retryAttempt => TimeSpan.FromSeconds(6 * Math.Pow(2, retryAttempt - 1)));
 
-                return await retryPolicy.ExecuteAsync(async () =>
-                {
-                    var request =
-                        new HttpRequestMessage(HttpMethod.Get, $"{BaseUrl}/student/for-std/program/root-module-json/{id}")
-                            .WithCookie(cookie);
+                return await _rateLimitExecutor.ExecuteAsync([id], () =>
+                    retryPolicy.ExecuteAsync(async () =>
+                    {
+                        var request =
+                            new HttpRequestMessage(HttpMethod.Get, $"{BaseUrl}/student/for-std/program/root-module-json/{id}")
+                                .WithCookie(cookie);
 
-                    using var httpClient = httpClientFactory.CreateClient();
-                    httpClient.Timeout = TimeSpan.FromSeconds(5);
+                        using var httpClient = httpClientFactory.CreateClient();
+                        httpClient.Timeout = TimeSpan.FromSeconds(5);
 
-                    var response = await httpClient.SendAsync(request);
-                    if (!response.IsSuccessStatusCode) return [];
-                    var content = await response.Content.ReadAsStringAsync();
+                        var response = await httpClient.SendAsync(request);
+                        if (!response.IsSuccessStatusCode) return [];
+                        var content = await response.Content.ReadAsStringAsync();
 
-                    content.ThrowIfAuthOrRateLimited();
+                        content.ThrowIfAuthOrRateLimited();
 
-                    var result = JsonSerializer.Deserialize<ProgramModel>(content) ?? new ProgramModel();
+                        var result = JsonSerializer.Deserialize<ProgramModel>(content) ?? new ProgramModel();
 
-                    return GetPlanCourses(result);
-                });
+                        return GetPlanCourses(result);
+                    }));
             },
             TimeSpan.FromDays(1));
     }

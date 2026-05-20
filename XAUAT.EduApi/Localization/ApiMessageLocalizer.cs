@@ -104,6 +104,15 @@ public class ApiMessageLocalizer : IApiMessageLocalizer
                 french: "Service temporairement indisponible.",
                 japanese: "サービスは一時的に利用できません。",
                 korean: "서비스를 일시적으로 사용할 수 없습니다."),
+            [ApiMessageKey.EduSystemRateLimited] = CreateLocalizedMessage(
+                simplifiedChinese: "教务系统当前限流，请稍后重试",
+                traditionalChinese: "教務系統目前限流，請稍後再試",
+                english: "The academic system is rate limited. Please try again later.",
+                german: "Das akademische System ist derzeit limitiert. Bitte versuchen Sie es später erneut.",
+                russian: "Учебная система временно ограничивает запросы. Повторите попытку позже.",
+                french: "Le système académique applique actuellement une limitation. Veuillez réessayer plus tard.",
+                japanese: "教務システムで現在レート制限がかかっています。しばらくしてから再試行してください。",
+                korean: "학사 시스템이 현재 요청을 제한하고 있습니다. 잠시 후 다시 시도해 주세요."),
             [ApiMessageKey.PaymentLoginUnknownError] = CreateLocalizedMessage(
                 simplifiedChinese: "登录过程中发生未知错误",
                 traditionalChinese: "登入過程中發生未知錯誤",

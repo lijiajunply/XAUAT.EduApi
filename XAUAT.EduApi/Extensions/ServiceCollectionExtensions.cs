@@ -1,12 +1,15 @@
 using EduApi.Data;
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Options;
 using NpgsqlDataProtection;
 using StackExchange.Redis;
+using System.Threading.RateLimiting;
 using XAUAT.EduApi.Caching;
 using XAUAT.EduApi.Configuration;
+using XAUAT.EduApi.Filters;
 using XAUAT.EduApi.Interfaces;
 using XAUAT.EduApi.Localization;
 using XAUAT.EduApi.Queues;
@@ -121,11 +124,54 @@ public static class ServiceCollectionExtensions
             services.AddScoped<IElectricityService, ElectricityService>();
             services.AddScoped<IElectricitySubscriptionService, ElectricitySubscriptionService>();
             services.AddScoped<IElectricityNotificationEmailService, ElectricityNotificationEmailService>();
+            services.AddSingleton<IStudentRateLimitState, StudentRateLimitState>();
+            services.AddScoped<IStudentRateLimitExecutor, StudentRateLimitExecutor>();
+            services.AddScoped<EduCrawlerRateLimitFilter>();
             services.AddSingleton<IScorePersistenceQueue, ChannelScorePersistenceQueue>();
             services.AddHostedService<ScorePersistenceBackgroundService>();
             services.AddSingleton<IElectricityNotificationQueue, ChannelElectricityNotificationQueue>();
             services.AddHostedService<ElectricitySubscriptionMonitorBackgroundService>();
             services.AddHostedService<ElectricityNotificationBackgroundService>();
+
+            return services;
+        }
+
+        public IServiceCollection AddRateLimiterServices()
+        {
+            services.AddRateLimiter(options =>
+            {
+                options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+                options.OnRejected = async (context, cancellationToken) =>
+                {
+                    var httpContext = context.HttpContext;
+                    var languageResolver = httpContext.RequestServices.GetRequiredService<ILanguageResolver>();
+                    var messageLocalizer = httpContext.RequestServices.GetRequiredService<IApiMessageLocalizer>();
+                    var language = languageResolver.Resolve(httpContext);
+
+                    httpContext.Response.ContentType = "application/json";
+
+                    var response = new
+                    {
+                        error = "rate_limited",
+                        message = messageLocalizer.Get(language, ApiMessageKey.EduSystemRateLimited),
+                        retryAfterSeconds = 1
+                    };
+
+                    await httpContext.Response.WriteAsJsonAsync(response, cancellationToken);
+                };
+
+                options.AddPolicy("EduCrawler", httpContext =>
+                {
+                    var remoteIp = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+
+                    return RateLimitPartition.GetConcurrencyLimiter(remoteIp, _ => new ConcurrencyLimiterOptions
+                    {
+                        PermitLimit = 8,
+                        QueueLimit = 16,
+                        QueueProcessingOrder = QueueProcessingOrder.OldestFirst
+                    });
+                });
+            });
 
             return services;
         }
@@ -211,7 +257,8 @@ public static class ServiceCollectionExtensions
                 .AddCacheServices() // 添加缓存服务
                 .AddRepositoryServices()
                 .AddBusinessServices()
-                .AddHttpClientServices();
+                .AddHttpClientServices()
+                .AddRateLimiterServices();
 
             return serviceCollection;
         }
