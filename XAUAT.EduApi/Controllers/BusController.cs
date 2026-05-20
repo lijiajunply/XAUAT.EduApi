@@ -30,7 +30,7 @@ public class BusController(
     /// 示例请求：
     /// GET /Bus
     /// Header:
-    /// x-language: zh
+    /// x-language: zh-CN (also accepts legacy alias: zh)
     ///
     /// 获取指定日期的校车时刻表：
     /// GET /Bus/2024-12-01
@@ -64,7 +64,7 @@ public class BusController(
     /// 示例请求：
     /// GET /Bus/NewData
     /// Header:
-    /// x-language: zh
+    /// x-language: zh-CN (also accepts legacy alias: zh)
     ///
     /// 获取指定日期和校区的校车时刻表：
     /// GET /Bus/NewData/2024-12-01?loc=雁塔

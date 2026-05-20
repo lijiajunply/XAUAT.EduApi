@@ -32,7 +32,7 @@ namespace XAUAT.EduApi.Controllers
         /// 示例请求：
         /// GET /Score/Semester?studentId=123456
         /// Header:
-        /// x-language: zh
+        /// x-language: zh-CN (also accepts legacy alias: zh)
         /// </remarks>
         [HttpGet("Semester")]
         [ProducesResponseType(typeof(SemesterResult), StatusCodes.Status200OK)]
@@ -74,7 +74,7 @@ namespace XAUAT.EduApi.Controllers
         /// 示例请求：
         /// GET /Score/ThisSemester
         /// Header:
-        /// x-language: zh
+        /// x-language: zh-CN (also accepts legacy alias: zh)
         /// </remarks>
         [HttpGet("ThisSemester")]
         [ProducesResponseType(typeof(SemesterItem), StatusCodes.Status200OK)]
@@ -117,7 +117,7 @@ namespace XAUAT.EduApi.Controllers
         /// 示例请求：
         /// GET /Score?studentId=123456 & semester=2024-2025-2
         /// Header:
-        /// x-language: zh
+        /// x-language: zh-CN (also accepts legacy alias: zh)
         /// </remarks>
         [HttpGet]
         [ProducesResponseType(typeof(List<ScoreResponse>), StatusCodes.Status200OK)]

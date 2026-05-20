@@ -35,7 +35,7 @@ public class LoginController(
     /// 示例请求：
     /// POST /Login
     /// Header:
-    /// x-language: zh
+    /// x-language: zh-CN (also accepts legacy alias: zh)
     /// {
     ///   "username": "123456",
     ///   "password": "password123"

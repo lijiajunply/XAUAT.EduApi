@@ -35,7 +35,7 @@ public class InfoController(
     /// <remarks>
     /// 示例请求：
     /// GET /Info/Completion
-    /// x-language: zh
+    /// x-language: zh-CN (also accepts legacy alias: zh)
     /// Cookie: YOUR_AUTH_COOKIE
     /// 
     /// 或使用自定义请求头：

@@ -32,7 +32,7 @@ public class ProgramController(
     /// 示例请求：
     /// GET /Program?id=123456
     /// Header:
-    /// x-language: zh
+    /// x-language: zh-CN (also accepts legacy alias: zh)
     /// 
     /// 按名称过滤：
     /// GET /Program?id=123456& name=计算机
@@ -89,7 +89,7 @@ public class ProgramController(
     /// 示例请求：
     /// GET /Program/GetDic?id=123456
     /// Header:
-    /// x-language: zh
+    /// x-language: zh-CN (also accepts legacy alias: zh)
     /// 
     /// 请求头：
     /// Cookie: YOUR_AUTH_COOKIE

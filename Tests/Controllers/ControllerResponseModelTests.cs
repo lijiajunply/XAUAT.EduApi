@@ -22,7 +22,7 @@ public class ControllerResponseModelTests
     public async Task LoginController_ShouldReturnTypedSuccessResponse()
     {
         var loginService = new Mock<ILoginService>();
-        loginService.Setup(x => x.LoginAsync("20230001", "pwd"))
+        loginService.Setup(x => x.LoginAsync("20230001", "pwd", It.IsAny<string>()))
             .ReturnsAsync(new LoginResponse
             {
                 Success = true,
@@ -145,7 +145,7 @@ public class ControllerResponseModelTests
             LanguageResolver,
             MessageLocalizer)
         {
-            ControllerContext = BuildControllerContext("test-cookie", language: "fr")
+            ControllerContext = BuildControllerContext("test-cookie", language: "it")
         };
 
         var result = await controller.GetCourse("20230001");
@@ -153,6 +153,39 @@ public class ControllerResponseModelTests
         var unauthorized = Assert.IsType<UnauthorizedObjectResult>(result.Result);
         var payload = Assert.IsType<CourseErrorResponse>(unauthorized.Value);
         Assert.Equal("认证失败，请重新登录", payload.Message);
+    }
+
+    [Theory]
+    [InlineData("fr", "Échec de l'authentification. Veuillez vous reconnecter.")]
+    [InlineData("de", "Authentifizierung fehlgeschlagen. Bitte melden Sie sich erneut an.")]
+    [InlineData("ja", "認証に失敗しました。もう一度ログインしてください。")]
+    [InlineData("ko", "인증에 실패했습니다. 다시 로그인해 주세요.")]
+    [InlineData("ru", "Ошибка аутентификации. Пожалуйста, войдите снова.")]
+    [InlineData("zh-TW", "認證失敗，請重新登入")]
+    [InlineData("zh", "认证失败，请重新登录")]
+    public async Task CourseController_ShouldReturnLocalizedUnauthorizedError_WhenLanguageHeaderIsSupported(
+        string language,
+        string expectedMessage)
+    {
+        var courseService = new Mock<ICourseService>();
+        courseService.Setup(x => x.GetCoursesAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()))
+            .ThrowsAsync(new UnAuthenticationError());
+
+        var controller = new CourseController(
+            Mock.Of<ILogger<CourseController>>(),
+            courseService.Object,
+            LanguageResolver,
+            MessageLocalizer)
+        {
+            ControllerContext = BuildControllerContext("test-cookie", language: language)
+        };
+
+        var result = await controller.GetCourse("20230001");
+
+        var unauthorized = Assert.IsType<UnauthorizedObjectResult>(result.Result);
+        var payload = Assert.IsType<CourseErrorResponse>(unauthorized.Value);
+        Assert.False(payload.Success);
+        Assert.Equal(expectedMessage, payload.Message);
     }
 
     [Fact]
@@ -174,6 +207,34 @@ public class ControllerResponseModelTests
         Assert.Equal(StatusCodes.Status503ServiceUnavailable, objectResult.StatusCode);
         var payload = Assert.IsType<ErrorWithMessageResponse>(objectResult.Value);
         Assert.Equal("服务暂时不可用", payload.error);
+        Assert.Equal("远端失败", payload.message);
+    }
+
+    [Theory]
+    [InlineData("fr", "Service temporairement indisponible.")]
+    [InlineData("en", "Service temporarily unavailable.")]
+    [InlineData("zh-TW", "服務暫時無法使用")]
+    public async Task PaymentController_ShouldReturnLocalizedServiceUnavailableError(string language, string expectedError)
+    {
+        var paymentService = new Mock<IPaymentService>();
+        paymentService.Setup(x => x.Login("123456", It.IsAny<string>()))
+            .ThrowsAsync(new PaymentServiceException("远端失败"));
+
+        var controller = new PaymentController(
+            paymentService.Object,
+            Mock.Of<ILogger<PaymentController>>(),
+            LanguageResolver,
+            MessageLocalizer)
+        {
+            ControllerContext = BuildControllerContext("test-cookie", language: language)
+        };
+
+        var result = await controller.Login("123456");
+
+        var objectResult = Assert.IsType<ObjectResult>(result.Result);
+        Assert.Equal(StatusCodes.Status503ServiceUnavailable, objectResult.StatusCode);
+        var payload = Assert.IsType<ErrorWithMessageResponse>(objectResult.Value);
+        Assert.Equal(expectedError, payload.error);
         Assert.Equal("远端失败", payload.message);
     }
 

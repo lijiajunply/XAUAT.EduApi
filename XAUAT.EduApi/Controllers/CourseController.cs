@@ -35,7 +35,7 @@ public class CourseController(
     /// 示例请求：
     /// GET /Course?studentId=123456
     /// Header:
-    /// x-language: zh
+    /// x-language: zh-CN (also accepts legacy alias: zh)
     /// </remarks>
     [HttpGet]
     [ProducesResponseType(typeof(CourseResultResponse), StatusCodes.Status200OK)]

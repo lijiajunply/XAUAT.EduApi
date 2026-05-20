@@ -33,7 +33,7 @@ public class ExamController(
     /// GET /Exam?studentId=123456
     /// 
     /// Header:
-    /// x-language: zh
+    /// x-language: zh-CN (also accepts legacy alias: zh)
     /// 
     /// 注意：
     /// 需要在Headers中添加xauat的Cookie信息，或者直接使用Cookie头

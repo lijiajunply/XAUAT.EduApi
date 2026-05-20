@@ -1,11 +1,16 @@
 using Microsoft.AspNetCore.OpenApi;
 using Microsoft.OpenApi;
 using System.Text.Json.Nodes;
+using XAUAT.EduApi.Localization;
 
 namespace XAUAT.EduApi.OpenApi;
 
 public class LanguageHeaderOperationTransformer : IOpenApiOperationTransformer
 {
+    public const string DefaultLanguage = RequestLanguage.SimplifiedChinese;
+    public const string Description =
+        "Optional response language. Supported values: de, ru, fr, ja, ko, en, zh-CN, zh-TW. Legacy aliases: zh -> zh-CN, en -> en. Defaults to zh-CN.";
+
     private static readonly HashSet<string> SupportedTags =
     [
         "Login",
@@ -41,16 +46,14 @@ public class LanguageHeaderOperationTransformer : IOpenApiOperationTransformer
             Name = "x-language",
             In = ParameterLocation.Header,
             Required = false,
-            Description = "Optional response language. Supported values: zh, en. Defaults to zh.",
+            Description = Description,
             Schema = new OpenApiSchema
             {
                 Type = JsonSchemaType.String,
-                Default = JsonValue.Create("zh"),
-                Enum =
-                [
-                    JsonValue.Create("zh"),
-                    JsonValue.Create("en")
-                ]
+                Default = JsonValue.Create(DefaultLanguage),
+                Enum = RequestLanguage.SupportedLanguages
+                    .Select(language => (JsonNode)JsonValue.Create(language)!)
+                    .ToList()
             }
         });
 

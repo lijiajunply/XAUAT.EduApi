@@ -34,7 +34,7 @@ public class PaymentController(
     /// 示例请求：
     /// GET /Payment/123456789
     /// Header:
-    /// x-language: zh
+    /// x-language: zh-CN (also accepts legacy alias: zh)
     /// </remarks>
     [HttpGet("{id}")]
     [ProducesResponseType(typeof(string), StatusCodes.Status200OK)]
@@ -78,7 +78,7 @@ public class PaymentController(
     /// 示例请求：
     /// GET /Payment/123456789/turnover
     /// Header:
-    /// x-language: zh
+    /// x-language: zh-CN (also accepts legacy alias: zh)
     /// </remarks>
     [HttpGet("{id}/turnover")]
     [ProducesResponseType(typeof(PaymentData), StatusCodes.Status200OK)]
