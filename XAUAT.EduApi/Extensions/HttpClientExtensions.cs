@@ -1,3 +1,5 @@
+using XAUAT.EduApi.Exceptions;
+
 namespace XAUAT.EduApi.Extensions;
 
 /// <summary>
@@ -67,6 +69,66 @@ public static class HttpClientExtensions
                 request.Headers.Add(header.Key, header.Value);
             }
             return request;
+        }
+    }
+
+    /// <summary>
+    /// 检查响应内容是否为限流页面，如果是则抛出RateLimitException
+    /// </summary>
+    /// <param name="content">响应内容字符串</param>
+    public static void ThrowIfRateLimited(this string content)
+    {
+        if (content.Contains("系统限流中") || content.Contains("error-limit"))
+        {
+            throw new RateLimitException();
+        }
+    }
+
+    /// <summary>
+    /// 检查响应内容是否包含认证失败标识（登入页面或限流页面）
+    /// </summary>
+    /// <param name="content">响应内容字符串</param>
+    public static void ThrowIfAuthOrRateLimited(this string content)
+    {
+        content.ThrowIfRateLimited();
+
+        if (content.Contains("登入页面"))
+        {
+            throw new UnAuthenticationError();
+        }
+    }
+}
+
+/// <summary>
+/// 教务系统请求节流器，限制对 swjw.xauat.edu.cn 的并发请求数
+/// </summary>
+public static class EduSystemThrottler
+{
+    private static readonly SemaphoreSlim Semaphore = new(4, 4);
+
+    public static async Task<T> ThrottleAsync<T>(Func<Task<T>> action, CancellationToken ct = default)
+    {
+        await Semaphore.WaitAsync(ct);
+        try
+        {
+            return await action();
+        }
+        finally
+        {
+            Semaphore.Release();
+        }
+    }
+
+    public static async Task ThrottleAsync(Func<Task> action, CancellationToken ct = default)
+    {
+        await Semaphore.WaitAsync(ct);
+        try
+        {
+            await action();
+        }
+        finally
+        {
+            Semaphore.Release();
         }
     }
 }

@@ -3,6 +3,7 @@ using EduApi.Data.Models;
 using Newtonsoft.Json;
 using Polly;
 using XAUAT.EduApi.Caching;
+using XAUAT.EduApi.Exceptions;
 using XAUAT.EduApi.Extensions;
 
 namespace XAUAT.EduApi.Services;
@@ -76,7 +77,8 @@ public class ExamService(
                 var retryPolicy = Policy
                     .Handle<HttpRequestException>()
                     .Or<TaskCanceledException>()
-                    .WaitAndRetryAsync(3, retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)));
+                    .Or<RateLimitException>()
+                    .WaitAndRetryAsync(3, retryAttempt => TimeSpan.FromSeconds(6 * Math.Pow(2, retryAttempt - 1)));
 
                 return await retryPolicy.ExecuteAsync(async () =>
                 {
@@ -87,10 +89,7 @@ public class ExamService(
 
                     var html = await client.GetStringAsync("https://swjw.xauat.edu.cn/student/for-std/course-table");
 
-                    if (html.Contains("登入页面"))
-                    {
-                        throw new Exceptions.UnAuthenticationError();
-                    }
+                    html.ThrowIfAuthOrRateLimited();
 
                     return html.ParseNow(info);
                 });
@@ -115,7 +114,7 @@ public class ExamService(
         return await cacheService.GetOrCreateAsync(
             CacheKeys.ExamArrangement(id),
             async () => await FetchExamArrangementAsync(cookie, id, language),
-            TimeSpan.FromHours(1));
+            TimeSpan.FromHours(1), isUse: false);
     }
 
     private async Task<ExamResponse> FetchExamArrangementAsync(string cookie, string? id, string language)
@@ -137,8 +136,9 @@ public class ExamService(
             var retryPolicy = Policy
                 .Handle<HttpRequestException>()
                 .Or<TaskCanceledException>()
+                .Or<RateLimitException>()
                 .WaitAndRetryAsync(3, retryAttempt =>
-                    TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)));
+                    TimeSpan.FromSeconds(6 * Math.Pow(2, retryAttempt - 1)));
 
             var response = await retryPolicy.ExecuteAsync(async ct =>
             {
@@ -148,10 +148,7 @@ public class ExamService(
 
             var content = await response.Content.ReadAsStringAsync(cts.Token);
 
-            if (content.Contains("登入页面"))
-            {
-                throw new Exceptions.UnAuthenticationError();
-            }
+            content.ThrowIfAuthOrRateLimited();
 
             var match = Regex.Match(content, @"var studentExamInfoVms = (.*?)\];", RegexOptions.Singleline);
             if (!match.Success)

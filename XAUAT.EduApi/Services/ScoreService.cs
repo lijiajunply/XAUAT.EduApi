@@ -108,10 +108,7 @@ public class ScoreService(
 
                 var html = await client.GetStringAsync(url).ConfigureAwait(false);
 
-                if (html.Contains("登入页面"))
-                {
-                    throw new Exceptions.UnAuthenticationError();
-                }
+                html.ThrowIfAuthOrRateLimited();
 
                 var result = new SemesterResult();
                 result.Parse(html);
@@ -201,6 +198,9 @@ public class ScoreService(
         }
 
         var content = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+
+        // 先检查是否为限流页面
+        content.ThrowIfRateLimited();
 
         // 检查返回的内容是否为HTML（表示可能需要重新登录）
         if (content.StartsWith('<'))

@@ -1,6 +1,7 @@
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json;
+using XAUAT.EduApi.Extensions;
 using XAUAT.EduApi.Localization;
 using XAUAT.EduApi.Services;
 
@@ -73,10 +74,7 @@ public class InfoController(
                 await client.GetAsync("https://swjw.xauat.edu.cn/student/ws/student/home-page/programCompletionPreview");
             var content = await response.Content.ReadAsStringAsync();
 
-            if (content.Contains("登入页面"))
-            {
-                throw new Exceptions.UnAuthenticationError();
-            }
+            content.ThrowIfAuthOrRateLimited();
 
             var data = JsonConvert.DeserializeObject<StudyModule[]>(content) ?? [];
 

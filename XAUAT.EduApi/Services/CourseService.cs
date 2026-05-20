@@ -1,5 +1,6 @@
 using EduApi.Data.Models;
 using Newtonsoft.Json;
+using Polly;
 using XAUAT.EduApi.Caching;
 using XAUAT.EduApi.Extensions;
 
@@ -58,8 +59,9 @@ public class CourseService(
             throw new InvalidOperationException("无法获取当前学期信息");
         }
 
-        // 使用 Task.WhenAll 并行获取所有学生的课程，解决 N+1 问题
-        var tasks = split.Select(a => FetchCourseForStudent(semester.Value, a, cookie, language)).ToArray();
+        // 使用 Task.WhenAll 并行获取所有学生的课程，通过节流器控制并发数
+        var tasks = split.Select(a => EduSystemThrottler.ThrottleAsync(
+            () => FetchCourseForStudent(semester.Value, a, cookie, language))).ToArray();
         var allResults = await Task.WhenAll(tasks).ConfigureAwait(false);
 
         // 合并结果
@@ -86,24 +88,28 @@ public class CourseService(
         newClient.DefaultRequestHeaders.Add("Cookie", cookie);
         newClient.Timeout = HttpTimeouts.EduSystem;
 
-        var response = await newClient.GetAsync(
-            $"https://swjw.xauat.edu.cn/student/for-std/course-table/semester/{semesterValue}/print-data/{studentId}");
+        var retryPolicy = Policy
+            .Handle<Exceptions.RateLimitException>()
+            .WaitAndRetryAsync(3, retryAttempt => TimeSpan.FromSeconds(6 * Math.Pow(2, retryAttempt - 1)));
 
-        if (!response.IsSuccessStatusCode)
+        return await retryPolicy.ExecuteAsync(async () =>
         {
-            throw new HttpRequestException($"获取课程数据失败，状态码: {response.StatusCode}");
-        }
+            var response = await newClient.GetAsync(
+                $"https://swjw.xauat.edu.cn/student/for-std/course-table/semester/{semesterValue}/print-data/{studentId}");
 
-        var jsonString = await response.Content.ReadAsStringAsync();
-        if (jsonString.Contains("登入页面"))
-        {
-            throw new Exceptions.UnAuthenticationError();
-        }
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new HttpRequestException($"获取课程数据失败，状态码: {response.StatusCode}");
+            }
 
-        var jsonResponse = JsonConvert.DeserializeObject<CourseResponse>(jsonString);
+            var jsonString = await response.Content.ReadAsStringAsync();
+            jsonString.ThrowIfAuthOrRateLimited();
 
-        return jsonResponse?.StudentTableVm == null
-            ? throw new InvalidOperationException("未找到课程数据")
-            : jsonResponse.StudentTableVm.Activities;
+            var jsonResponse = JsonConvert.DeserializeObject<CourseResponse>(jsonString);
+
+            return jsonResponse?.StudentTableVm == null
+                ? throw new InvalidOperationException("未找到课程数据")
+                : jsonResponse.StudentTableVm.Activities;
+        });
     }
 }

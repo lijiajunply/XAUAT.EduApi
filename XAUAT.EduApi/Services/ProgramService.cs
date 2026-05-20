@@ -1,9 +1,10 @@
 using System.Text;
 using System.Text.Json.Serialization;
+using Polly;
 using XAUAT.EduApi.Caching;
+using XAUAT.EduApi.Exceptions;
 using XAUAT.EduApi.Extensions;
 using JsonSerializer = System.Text.Json.JsonSerializer;
-using Polly;
 
 namespace XAUAT.EduApi.Services;
 
@@ -49,7 +50,8 @@ public class ProgramService(
                 var retryPolicy = Policy
                     .Handle<HttpRequestException>()
                     .Or<TaskCanceledException>()
-                    .WaitAndRetryAsync(3, retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)));
+                    .Or<RateLimitException>()
+                    .WaitAndRetryAsync(3, retryAttempt => TimeSpan.FromSeconds(6 * Math.Pow(2, retryAttempt - 1)));
 
                 return await retryPolicy.ExecuteAsync(async () =>
                 {
@@ -64,10 +66,7 @@ public class ProgramService(
                     if (!response.IsSuccessStatusCode) return [];
                     var content = await response.Content.ReadAsStringAsync();
 
-                    if (content.Contains("登入页面"))
-                    {
-                        throw new Exceptions.UnAuthenticationError();
-                    }
+                    content.ThrowIfAuthOrRateLimited();
 
                     var result = JsonSerializer.Deserialize<ProgramModel>(content) ?? new ProgramModel();
 

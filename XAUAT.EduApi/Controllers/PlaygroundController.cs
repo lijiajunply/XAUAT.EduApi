@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json.Linq;
+using XAUAT.EduApi.Extensions;
 using XAUAT.EduApi.Services;
 
 namespace XAUAT.EduApi.Controllers;
@@ -26,6 +27,7 @@ public class PlaygroundController(IHttpClientFactory httpClientFactory) : Contro
         client.DefaultRequestHeaders.Add("Cookie", cookie);
         var response = await client.GetAsync("https://swjw.xauat.edu.cn/student/for-std/credit-certification-apply/other_apply/get-all-course-module?programId=3241");
         var content = await response.Content.ReadAsStringAsync();
+        content.ThrowIfRateLimited();
         return Ok(JObject.Parse(content));
     }
 }
