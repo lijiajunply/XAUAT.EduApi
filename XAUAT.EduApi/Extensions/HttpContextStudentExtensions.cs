@@ -7,6 +7,7 @@ namespace XAUAT.EduApi.Extensions;
 public static class HttpContextStudentExtensions
 {
     private const string ResolvedStudentIdsKey = "__ResolvedStudentIds";
+    private const string ResolvedRateLimitKeys = "__ResolvedRateLimitKeys";
 
     public static void SetResolvedStudentIds(this HttpContext context, IReadOnlyCollection<string> studentIds)
     {
@@ -21,11 +22,30 @@ public static class HttpContextStudentExtensions
             : [];
     }
 
+    public static void SetResolvedRateLimitKeys(this HttpContext context, IReadOnlyCollection<string> keys)
+    {
+        context.Items[ResolvedRateLimitKeys] = keys;
+    }
+
+    public static IReadOnlyCollection<string> GetResolvedRateLimitKeys(this HttpContext context)
+    {
+        return context.Items.TryGetValue(ResolvedRateLimitKeys, out var value) &&
+               value is IReadOnlyCollection<string> keys
+            ? keys
+            : [];
+    }
+
     public static int? GetRetryAfterSeconds(this HttpContext context, IStudentRateLimitState rateLimitState)
     {
-        var blockedUntil = context.GetResolvedStudentIds()
-            .Select(studentId =>
-                rateLimitState.TryGetBlockedUntil(studentId, out var currentBlockedUntil)
+        var keys = context.GetResolvedRateLimitKeys();
+        if (keys.Count == 0)
+        {
+            keys = context.GetResolvedStudentIds();
+        }
+
+        var blockedUntil = keys
+            .Select(key =>
+                rateLimitState.TryGetBlockedUntil(key, out var currentBlockedUntil)
                     ? currentBlockedUntil
                     : (DateTimeOffset?)null)
             .Where(value => value.HasValue)
@@ -64,5 +84,99 @@ public static class HttpContextStudentExtensions
 
         var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(cookie.Trim()));
         return $"cookie:{Convert.ToHexString(bytes)}";
+    }
+
+    public static string GetRateLimitPath(this HttpRequest request)
+    {
+        var path = request.Path.Value;
+        return string.IsNullOrWhiteSpace(path)
+            ? "/"
+            : path.Trim().ToLowerInvariant();
+    }
+
+    public static string[] GetRequestStudentIds(this HttpRequest request)
+    {
+        var identities = new List<string>();
+
+        if (request.Query.TryGetValue("studentId", out var studentIds))
+        {
+            foreach (var studentId in studentIds)
+            {
+                identities.AddRange(ParseStudentIds(studentId));
+            }
+        }
+
+        if (request.Query.TryGetValue("id", out var ids))
+        {
+            foreach (var id in ids)
+            {
+                identities.AddRange(ParseStudentIds(id));
+            }
+        }
+
+        return identities
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+    }
+
+    public static string CreateRequestRateLimitPartitionKey(this HttpRequest request)
+    {
+        var path = request.GetRateLimitPath();
+        var cookieIdentity = CreateCookieRateLimitIdentity(request.GetEduAuthCookie()) ?? "cookie:none";
+        var studentIds = request.GetRequestStudentIds();
+        var studentSegment = studentIds.Length == 0
+            ? "student:none"
+            : $"student:{string.Join(",", studentIds.OrderBy(x => x, StringComparer.Ordinal))}";
+
+        return $"{path}|{studentSegment}|{cookieIdentity}";
+    }
+
+    public static string[] CreateRateLimitStateKeys(
+        IEnumerable<string?>? studentIds,
+        string? cookie,
+        string? path)
+    {
+        var normalizedStudentIds = (studentIds ?? [])
+            .Where(studentId => !string.IsNullOrWhiteSpace(studentId))
+            .Select(studentId => studentId!.Trim())
+            .Where(studentId => !studentId.StartsWith("cookie:", StringComparison.Ordinal))
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+        var fallbackCookieIdentity = (studentIds ?? [])
+            .Where(studentId => !string.IsNullOrWhiteSpace(studentId))
+            .Select(studentId => studentId!.Trim())
+            .FirstOrDefault(studentId => studentId.StartsWith("cookie:", StringComparison.Ordinal));
+
+        var normalizedPath = string.IsNullOrWhiteSpace(path)
+            ? "/"
+            : path.Trim().ToLowerInvariant();
+        var cookieIdentity = CreateCookieRateLimitIdentity(cookie) ?? fallbackCookieIdentity;
+
+        var keys = new List<string>();
+        foreach (var studentId in normalizedStudentIds)
+        {
+            keys.Add(CreateRateLimitStateKey(studentId, cookieIdentity, normalizedPath));
+        }
+
+        if (keys.Count == 0 && !string.IsNullOrWhiteSpace(cookieIdentity))
+        {
+            keys.Add(CreateRateLimitStateKey(null, cookieIdentity, normalizedPath));
+        }
+
+        if (keys.Count == 0)
+        {
+            keys.Add(CreateRateLimitStateKey(null, null, normalizedPath));
+        }
+
+        return keys
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+    }
+
+    private static string CreateRateLimitStateKey(string? studentId, string? cookieIdentity, string path)
+    {
+        var studentSegment = string.IsNullOrWhiteSpace(studentId) ? "student:none" : $"student:{studentId}";
+        var cookieSegment = string.IsNullOrWhiteSpace(cookieIdentity) ? "cookie:none" : cookieIdentity;
+        return $"{path}|{studentSegment}|{cookieSegment}";
     }
 }

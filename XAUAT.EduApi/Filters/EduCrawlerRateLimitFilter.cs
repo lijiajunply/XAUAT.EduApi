@@ -13,16 +13,22 @@ public class EduCrawlerRateLimitFilter(
     public async Task OnActionExecutionAsync(ActionExecutingContext context, ActionExecutionDelegate next)
     {
         var studentIds = await ResolveStudentIdsAsync(context);
-        context.HttpContext.SetResolvedStudentIds(studentIds);
+        var rateLimitKeys = HttpContextStudentExtensions.CreateRateLimitStateKeys(
+            studentIds,
+            context.HttpContext.Request.GetEduAuthCookie(),
+            context.HttpContext.Request.GetRateLimitPath());
 
-        foreach (var studentId in studentIds)
+        context.HttpContext.SetResolvedStudentIds(studentIds);
+        context.HttpContext.SetResolvedRateLimitKeys(rateLimitKeys);
+
+        foreach (var rateLimitKey in rateLimitKeys)
         {
-            if (!rateLimitState.TryGetBlockedUntil(studentId, out var blockedUntil))
+            if (!rateLimitState.TryGetBlockedUntil(rateLimitKey, out var blockedUntil))
             {
                 continue;
             }
 
-            throw new StudentCooldownException(studentId, blockedUntil);
+            throw new StudentCooldownException(rateLimitKey, blockedUntil);
         }
 
         await next();

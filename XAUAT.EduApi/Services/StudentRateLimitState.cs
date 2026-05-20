@@ -13,16 +13,16 @@ public class StudentRateLimitState : IStudentRateLimitState
 
     private readonly ConcurrentDictionary<string, StudentRateLimitEntry> _states = new();
 
-    public bool TryGetBlockedUntil(string studentId, out DateTimeOffset blockedUntil)
+    public bool TryGetBlockedUntil(string identityKey, out DateTimeOffset blockedUntil)
     {
         blockedUntil = default;
 
-        if (string.IsNullOrWhiteSpace(studentId))
+        if (string.IsNullOrWhiteSpace(identityKey))
         {
             return false;
         }
 
-        if (!_states.TryGetValue(studentId, out var entry))
+        if (!_states.TryGetValue(identityKey, out var entry))
         {
             return false;
         }
@@ -36,16 +36,16 @@ public class StudentRateLimitState : IStudentRateLimitState
         return true;
     }
 
-    public TimeSpan MarkRateLimited(string studentId)
+    public TimeSpan MarkRateLimited(string identityKey)
     {
-        if (string.IsNullOrWhiteSpace(studentId))
+        if (string.IsNullOrWhiteSpace(identityKey))
         {
             return TimeSpan.Zero;
         }
 
         var now = DateTimeOffset.UtcNow;
         var entry = _states.AddOrUpdate(
-            studentId,
+            identityKey,
             _ => new StudentRateLimitEntry
             {
                 HitCount = 1,
@@ -68,14 +68,14 @@ public class StudentRateLimitState : IStudentRateLimitState
         return entry.BlockedUntil - now;
     }
 
-    public void MarkSuccess(string studentId)
+    public void MarkSuccess(string identityKey)
     {
-        if (string.IsNullOrWhiteSpace(studentId))
+        if (string.IsNullOrWhiteSpace(identityKey))
         {
             return;
         }
 
-        _states.TryRemove(studentId, out _);
+        _states.TryRemove(identityKey, out _);
     }
 
     private sealed class StudentRateLimitEntry

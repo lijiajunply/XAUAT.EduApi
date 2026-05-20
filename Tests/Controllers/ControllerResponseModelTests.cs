@@ -118,15 +118,18 @@ public class ControllerResponseModelTests
             .ThrowsAsync(new RateLimitException());
 
         var rateLimitState = new StudentRateLimitState();
-        rateLimitState.MarkRateLimited("20230001");
+        var rateLimitKey = HttpContextStudentExtensions.CreateRateLimitStateKeys(["20230001"], "test-cookie", "/Course").Single();
+        rateLimitState.MarkRateLimited(rateLimitKey);
 
         var services = new ServiceCollection()
             .AddSingleton<IStudentRateLimitState>(rateLimitState)
             .BuildServiceProvider();
 
         var context = BuildControllerContext("test-cookie");
+        context.HttpContext.Request.Path = "/Course";
         context.HttpContext.RequestServices = services;
         context.HttpContext.SetResolvedStudentIds(["20230001"]);
+        context.HttpContext.SetResolvedRateLimitKeys([rateLimitKey]);
 
         var controller = new CourseController(
             Mock.Of<ILogger<CourseController>>(),
@@ -160,15 +163,18 @@ public class ControllerResponseModelTests
             .ThrowsAsync(new RateLimitException());
 
         var rateLimitState = new StudentRateLimitState();
-        rateLimitState.MarkRateLimited("20230001");
+        var rateLimitKey = HttpContextStudentExtensions.CreateRateLimitStateKeys(["20230001"], "test-cookie", "/Exam").Single();
+        rateLimitState.MarkRateLimited(rateLimitKey);
 
         var services = new ServiceCollection()
             .AddSingleton<IStudentRateLimitState>(rateLimitState)
             .BuildServiceProvider();
 
         var context = BuildControllerContext("test-cookie");
+        context.HttpContext.Request.Path = "/Exam";
         context.HttpContext.RequestServices = services;
         context.HttpContext.SetResolvedStudentIds(["20230001"]);
+        context.HttpContext.SetResolvedRateLimitKeys([rateLimitKey]);
 
         var controller = new ExamController(
             examService.Object,

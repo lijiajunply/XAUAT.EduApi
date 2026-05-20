@@ -1,18 +1,21 @@
 using XAUAT.EduApi.Exceptions;
+using XAUAT.EduApi.Extensions;
 
 namespace XAUAT.EduApi.Services;
 
-public class StudentRateLimitExecutor(IStudentRateLimitState rateLimitState) : IStudentRateLimitExecutor
+public class StudentRateLimitExecutor(
+    IStudentRateLimitState rateLimitState,
+    IHttpContextAccessor httpContextAccessor) : IStudentRateLimitExecutor
 {
     public async Task<T> ExecuteAsync<T>(IEnumerable<string?> studentIds, Func<Task<T>> action)
     {
-        var normalizedIds = NormalizeStudentIds(studentIds);
+        var normalizedKeys = NormalizeRateLimitKeys(studentIds);
 
-        foreach (var studentId in normalizedIds)
+        foreach (var rateLimitKey in normalizedKeys)
         {
-            if (rateLimitState.TryGetBlockedUntil(studentId, out var blockedUntil))
+            if (rateLimitState.TryGetBlockedUntil(rateLimitKey, out var blockedUntil))
             {
-                throw new StudentCooldownException(studentId, blockedUntil);
+                throw new StudentCooldownException(rateLimitKey, blockedUntil);
             }
         }
 
@@ -20,18 +23,18 @@ public class StudentRateLimitExecutor(IStudentRateLimitState rateLimitState) : I
         {
             var result = await action();
 
-            foreach (var studentId in normalizedIds)
+            foreach (var rateLimitKey in normalizedKeys)
             {
-                rateLimitState.MarkSuccess(studentId);
+                rateLimitState.MarkSuccess(rateLimitKey);
             }
 
             return result;
         }
         catch (RateLimitException)
         {
-            foreach (var studentId in normalizedIds)
+            foreach (var rateLimitKey in normalizedKeys)
             {
-                rateLimitState.MarkRateLimited(studentId);
+                rateLimitState.MarkRateLimited(rateLimitKey);
             }
 
             throw;
@@ -47,12 +50,12 @@ public class StudentRateLimitExecutor(IStudentRateLimitState rateLimitState) : I
         });
     }
 
-    private static string[] NormalizeStudentIds(IEnumerable<string?> studentIds)
+    private string[] NormalizeRateLimitKeys(IEnumerable<string?> studentIds)
     {
-        return studentIds
-            .Where(studentId => !string.IsNullOrWhiteSpace(studentId))
-            .Select(studentId => studentId!.Trim())
-            .Distinct(StringComparer.Ordinal)
-            .ToArray();
+        var context = httpContextAccessor.HttpContext;
+        var path = context?.Request.GetRateLimitPath();
+        var cookie = context?.Request.GetEduAuthCookie();
+
+        return HttpContextStudentExtensions.CreateRateLimitStateKeys(studentIds, cookie, path);
     }
 }

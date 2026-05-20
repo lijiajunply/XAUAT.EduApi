@@ -162,9 +162,9 @@ public static class ServiceCollectionExtensions
 
                 options.AddPolicy("EduCrawler", httpContext =>
                 {
-                    var remoteIp = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+                    var partitionKey = httpContext.Request.CreateRequestRateLimitPartitionKey();
 
-                    return RateLimitPartition.GetConcurrencyLimiter(remoteIp, _ => new ConcurrencyLimiterOptions
+                    return RateLimitPartition.GetConcurrencyLimiter(partitionKey, _ => new ConcurrencyLimiterOptions
                     {
                         PermitLimit = 8,
                         QueueLimit = 16,
