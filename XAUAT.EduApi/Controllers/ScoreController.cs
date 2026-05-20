@@ -44,7 +44,7 @@ namespace XAUAT.EduApi.Controllers
             {
                 logger.LogInformation("开始解析学期数据");
                 var cookie = Request.Headers.Cookie.ToString();
-                if (string.IsNullOrEmpty(cookie) || cookie.StartsWith("Rider"))
+                if (string.IsNullOrEmpty(cookie) || cookie.StartsWith("Rider") || !cookie.Contains("__pstsid__"))
                 {
                     cookie = Request.Headers["xauat"].ToString();
                 }
@@ -85,7 +85,7 @@ namespace XAUAT.EduApi.Controllers
             try
             {
                 var cookie = Request.Headers.Cookie.ToString();
-                if (string.IsNullOrEmpty(cookie) || cookie.StartsWith("Rider"))
+                if (string.IsNullOrEmpty(cookie) || cookie.StartsWith("Rider") || !cookie.Contains("__pstsid__"))
                 {
                     cookie = Request.Headers["xauat"].ToString();
                 }
@@ -130,7 +130,7 @@ namespace XAUAT.EduApi.Controllers
             {
                 logger.LogInformation("开始获取考试分数");
                 var cookie = Request.Headers.Cookie.ToString();
-                if (string.IsNullOrEmpty(cookie) || cookie.StartsWith("Rider"))
+                if (string.IsNullOrEmpty(cookie) || cookie.StartsWith("Rider") || !cookie.Contains("__pstsid__"))
                 {
                     cookie = Request.Headers["xauat"].ToString();
                 }

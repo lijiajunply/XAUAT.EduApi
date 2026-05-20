@@ -53,7 +53,7 @@ public class InfoController(
         {
             logger.LogInformation("开始抓取学业进度");
             var cookie = Request.Headers.Cookie.ToString();
-            if (string.IsNullOrEmpty(cookie) || cookie.StartsWith("Rider") || !cookie.StartsWith("__pstsid__"))
+            if (string.IsNullOrEmpty(cookie) || cookie.StartsWith("Rider") || !cookie.Contains("__pstsid__"))
             {
                 cookie = Request.Headers["xauat"].ToString(); // 从请求中获取 cookie
             }

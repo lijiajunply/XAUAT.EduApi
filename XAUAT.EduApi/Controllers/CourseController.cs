@@ -50,7 +50,7 @@ public class CourseController(
         {
             logger.LogInformation("开始获取课程信息");
             var cookie = Request.Headers.Cookie.ToString();
-            if (string.IsNullOrEmpty(cookie) || cookie.StartsWith("Rider"))
+            if (string.IsNullOrEmpty(cookie) || cookie.StartsWith("Rider") || !cookie.Contains("__pstsid__"))
             {
                 cookie = Request.Headers["xauat"].ToString(); // 从请求中获取 cookie
             }
