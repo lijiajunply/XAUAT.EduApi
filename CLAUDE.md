@@ -64,7 +64,6 @@ dotnet run -c Release --project Tests/XAUAT.EduApi.Tests.csproj -- --filter "*Pe
 | `MapController` | Campus map POI (CRUD, search by category/campus/keyword) |
 | `SchoolNavController` | Campus navigation categories |
 | `AppController` | App version check |
-| `PlaygroundController` | Playground/sports field info |
 
 ### Background Services
 

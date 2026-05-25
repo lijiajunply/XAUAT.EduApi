@@ -461,30 +461,6 @@ public class ControllerResponseModelTests
         Assert.Equal("主修", payload[0].Type);
     }
 
-    [Fact]
-    public async Task PlaygroundController_ShouldReturnTypedJObject()
-    {
-        var handler = new StubHttpMessageHandler(_ => new HttpResponseMessage
-        {
-            StatusCode = System.Net.HttpStatusCode.OK,
-            Content = new StringContent("{\"ok\":true}")
-        });
-        var client = new HttpClient(handler);
-        var factory = new Mock<IHttpClientFactory>();
-        factory.Setup(x => x.CreateClient(It.IsAny<string>())).Returns(client);
-
-        var controller = new PlaygroundController(factory.Object)
-        {
-            ControllerContext = BuildControllerContext("test-cookie")
-        };
-
-        var result = await controller.Get();
-
-        var ok = Assert.IsType<OkObjectResult>(result.Result);
-        var payload = Assert.IsType<JObject>(ok.Value);
-        Assert.True(payload.Value<bool>("ok"));
-    }
-
     private static ControllerContext BuildControllerContext(string cookie, string? language = null)
     {
         var httpContext = new DefaultHttpContext();
