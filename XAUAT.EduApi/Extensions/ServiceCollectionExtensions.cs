@@ -15,7 +15,6 @@ using XAUAT.EduApi.Localization;
 using XAUAT.EduApi.Queues;
 using XAUAT.EduApi.Repos;
 using XAUAT.EduApi.Services;
-using CampusMapAPI.Services;
 
 namespace XAUAT.EduApi.Extensions;
 
@@ -84,6 +83,7 @@ public static class ServiceCollectionExtensions
         {
             services.AddScoped<IScoreRepository, ScoreRepository>();
             services.AddScoped<IElectricitySubscriptionRepository, ElectricitySubscriptionRepository>();
+            services.AddScoped<IMapPoiRepository, MapPoiRepository>();
 
             return services;
         }
@@ -228,21 +228,6 @@ public static class ServiceCollectionExtensions
                 .AddPolicyHandler(PollyExtensions.GetRetryPolicy());
 
             return services;
-        }
-
-        /// <summary>
-        /// 注册所有服务
-        /// </summary>
-        /// <param name="sqlConnectionString">SQL连接字符串</param>
-        /// <param name="redisConnectionString">Redis连接字符串</param>
-        /// <returns>服务集合</returns>
-        public IServiceCollection AddAllServices(string? sqlConnectionString, string? redisConnectionString)
-        {
-            return services.AddAllServices(new ServiceConfiguration
-            {
-                SqlConnectionString = sqlConnectionString,
-                RedisConnectionString = redisConnectionString
-            });
         }
 
         /// <summary>

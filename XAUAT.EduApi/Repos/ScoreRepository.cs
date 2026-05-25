@@ -4,7 +4,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace XAUAT.EduApi.Repos;
 
-public class ScoreRepository(IDbContextFactory<EduContext> contextFactory) : RepositoryBase<ScoreResponse>(contextFactory), IScoreRepository
+public class ScoreRepository(IDbContextFactory<EduContext> contextFactory)
+    : RepositoryBase<ScoreResponse>(contextFactory), IScoreRepository
 {
     public async Task<IEnumerable<ScoreResponse>> GetByUserIdAsync(string userId)
     {
@@ -23,13 +24,14 @@ public class ScoreRepository(IDbContextFactory<EduContext> contextFactory) : Rep
 
     public async Task AddRangeAsync(IEnumerable<ScoreResponse> scores)
     {
-        foreach (var score in scores)
+        var scoreResponses = scores as ScoreResponse[] ?? scores.ToArray();
+        foreach (var score in scoreResponses)
         {
             TruncateIfNeeded(score);
         }
 
         await using var context = CreateContext();
-        await context.Scores.AddRangeAsync(scores);
+        await context.Scores.AddRangeAsync(scoreResponses);
         await context.SaveChangesAsync();
     }
 

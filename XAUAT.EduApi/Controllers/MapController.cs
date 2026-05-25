@@ -1,20 +1,19 @@
 using CampusMapAPI.Models;
-using CampusMapAPI.Services;
-using EduApi.Data;
 using Microsoft.AspNetCore.Mvc;
-using XAUAT.EduApi.Caching;
-using XAUAT.EduApi.Extensions;
+using XAUAT.EduApi.Services;
 
-namespace CampusMapAPI.Controllers;
+namespace XAUAT.EduApi.Controllers;
 
 /// <summary>
 /// 校园地图POI控制器
 /// 提供校园地理坐标查询接口，支持按分类、校区筛选和关键词搜索
 /// </summary>
 [ApiController]
-[Route("api/[controller]")]
+[Route("[controller]")]
 [Produces("application/json")]
-public class MapController(IMapService mapService, EduContext dbContext, ICacheService cacheService, ILogger<MapController> logger) : ControllerBase
+public class MapController(
+    IMapService mapService,
+    ILogger<MapController> logger) : ControllerBase
 {
     /// <summary>
     /// 获取所有POI点位
@@ -47,10 +46,11 @@ public class MapController(IMapService mapService, EduContext dbContext, ICacheS
         try
         {
             var pois = await mapService.GetPoisByCategoryAsync(category);
-            if (!pois.Any())
+            if (pois.Count == 0)
             {
                 return NotFound($"未找到分类为 '{category}' 的POI");
             }
+
             return Ok(pois);
         }
         catch (Exception ex)
@@ -71,10 +71,11 @@ public class MapController(IMapService mapService, EduContext dbContext, ICacheS
         try
         {
             var pois = await mapService.GetPoisByCampusAsync(campus);
-            if (!pois.Any())
+            if (pois.Count == 0)
             {
                 return NotFound($"未找到校区 '{campus}' 的POI");
             }
+
             return Ok(pois);
         }
         catch (Exception ex)
@@ -100,6 +101,7 @@ public class MapController(IMapService mapService, EduContext dbContext, ICacheS
             {
                 return NotFound($"未找到ID为 {id} 的POI");
             }
+
             return Ok(poi);
         }
         catch (Exception ex)
@@ -192,16 +194,7 @@ public class MapController(IMapService mapService, EduContext dbContext, ICacheS
 
         try
         {
-            poi.IsActive = true;
-            poi.CreatedAt = DateTime.UtcNow;
-            poi.UpdatedAt = DateTime.UtcNow;
-
-            dbContext.MapPois.Add(poi);
-            await dbContext.SaveChangesAsync();
-
-            await cacheService.RemoveAsync(CacheKeys.MapPois());
-            await cacheService.RemoveAsync(CacheKeys.MapCategories());
-            await cacheService.RemoveAsync(CacheKeys.MapCampuses());
+            await mapService.AddPoiAsync(poi);
 
             logger.LogInformation("成功导入POI: {Name} ({Latitude}, {Longitude})", poi.Name, poi.Latitude, poi.Longitude);
 
@@ -221,55 +214,42 @@ public class MapController(IMapService mapService, EduContext dbContext, ICacheS
     [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
     public async Task<ActionResult> ImportPoisBatch([FromBody] List<MapPoiModel> pois)
     {
-        if (pois == null || !pois.Any())
+        if (pois == null! || pois.Count == 0)
         {
             return BadRequest("POI列表不能为空");
         }
 
-        var successCount = 0;
+        var validPois = new List<MapPoiModel>();
         var errorCount = 0;
         var errors = new List<string>();
 
         foreach (var poi in pois)
         {
-            try
-            {
-                if (string.IsNullOrWhiteSpace(poi.Name) || string.IsNullOrWhiteSpace(poi.Category))
-                {
-                    errorCount++;
-                    errors.Add($"{poi.Name}: 名称或分类为空");
-                    continue;
-                }
-
-                if (poi.Latitude == 0 || poi.Longitude == 0)
-                {
-                    errorCount++;
-                    errors.Add($"{poi.Name}: 经纬度无效");
-                    continue;
-                }
-
-                poi.IsActive = true;
-                poi.CreatedAt = DateTime.UtcNow;
-                poi.UpdatedAt = DateTime.UtcNow;
-
-                dbContext.MapPois.Add(poi);
-                successCount++;
-            }
-            catch (Exception ex)
+            if (string.IsNullOrWhiteSpace(poi.Name) || string.IsNullOrWhiteSpace(poi.Category))
             {
                 errorCount++;
-                errors.Add($"{poi.Name}: {ex.Message}");
+                errors.Add($"{poi.Name}: 名称或分类为空");
+                continue;
             }
+
+            if (poi.Latitude == 0 || poi.Longitude == 0)
+            {
+                errorCount++;
+                errors.Add($"{poi.Name}: 经纬度无效");
+                continue;
+            }
+
+            poi.IsActive = true;
+            poi.CreatedAt = DateTime.UtcNow;
+            poi.UpdatedAt = DateTime.UtcNow;
+            validPois.Add(poi);
         }
+
+        var successCount = validPois.Count;
 
         if (successCount > 0)
         {
-            await dbContext.SaveChangesAsync();
-
-            await cacheService.RemoveAsync(CacheKeys.MapPois());
-            await cacheService.RemoveAsync(CacheKeys.MapCategories());
-            await cacheService.RemoveAsync(CacheKeys.MapCampuses());
-
+            await mapService.AddPoisBatchAsync(validPois);
             logger.LogInformation("批量导入完成: 成功 {Success} 条, 失败 {Error} 条", successCount, errorCount);
         }
 
@@ -291,13 +271,7 @@ public class MapController(IMapService mapService, EduContext dbContext, ICacheS
     {
         try
         {
-            var count = dbContext.MapPois.Count();
-            dbContext.MapPois.RemoveRange(dbContext.MapPois);
-            await dbContext.SaveChangesAsync();
-
-            await cacheService.RemoveAsync(CacheKeys.MapPois());
-            await cacheService.RemoveAsync(CacheKeys.MapCategories());
-            await cacheService.RemoveAsync(CacheKeys.MapCampuses());
+            var count = await mapService.ClearAllPoisAsync();
 
             logger.LogWarning("已清空所有POI数据，共 {Count} 条", count);
 

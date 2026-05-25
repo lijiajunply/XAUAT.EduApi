@@ -1,26 +1,31 @@
-using System.Linq.Expressions;
 using CampusMapAPI.Models;
-using EduApi.Data;
-using Microsoft.EntityFrameworkCore;
 using XAUAT.EduApi.Caching;
 using XAUAT.EduApi.Extensions;
+using XAUAT.EduApi.Repos;
 
-namespace CampusMapAPI.Services;
+namespace XAUAT.EduApi.Services;
 
-public class MapService(EduContext dbContext, ICacheService cacheService) : IMapService
+public interface IMapService
+{
+    Task<List<MapPoiModel>> GetAllPoisAsync();
+    Task<List<MapPoiModel>> GetPoisByCategoryAsync(string category);
+    Task<List<MapPoiModel>> GetPoisByCampusAsync(string campus);
+    Task<MapPoiModel?> GetPoiByIdAsync(int id);
+    Task<List<MapPoiModel>> SearchPoisAsync(string keyword);
+    Task<List<string>> GetCategoriesAsync();
+    Task<List<string>> GetCampusesAsync();
+    Task AddPoiAsync(MapPoiModel poi);
+    Task AddPoisBatchAsync(IEnumerable<MapPoiModel> pois);
+    Task<int> ClearAllPoisAsync();
+}
+
+public class MapService(IMapPoiRepository repository, ICacheService cacheService) : IMapService
 {
     public async Task<List<MapPoiModel>> GetAllPoisAsync()
     {
         return await cacheService.GetOrCreateAsync(
             CacheKeys.MapPois(),
-            async () =>
-            {
-                return await dbContext.MapPois
-                    .Where(p => p.IsActive)
-                    .OrderBy(p => p.SortOrder)
-                    .ThenBy(p => p.Name)
-                    .ToListAsync();
-            },
+            async () => await repository.GetAllActiveAsync(),
             TimeSpan.FromHours(24));
     }
 
@@ -28,14 +33,7 @@ public class MapService(EduContext dbContext, ICacheService cacheService) : IMap
     {
         return await cacheService.GetOrCreateAsync(
             CacheKeys.MapPoiCategory(category),
-            async () =>
-            {
-                return await dbContext.MapPois
-                    .Where(p => p.IsActive && p.Category == category)
-                    .OrderBy(p => p.SortOrder)
-                    .ThenBy(p => p.Name)
-                    .ToListAsync();
-            },
+            async () => await repository.GetByCategoryAsync(category),
             TimeSpan.FromHours(24));
     }
 
@@ -43,14 +41,7 @@ public class MapService(EduContext dbContext, ICacheService cacheService) : IMap
     {
         return await cacheService.GetOrCreateAsync(
             CacheKeys.MapPoiCampus(campus),
-            async () =>
-            {
-                return await dbContext.MapPois
-                    .Where(p => p.IsActive && p.Campus == campus)
-                    .OrderBy(p => p.SortOrder)
-                    .ThenBy(p => p.Name)
-                    .ToListAsync();
-            },
+            async () => await repository.GetByCampusAsync(campus),
             TimeSpan.FromHours(24));
     }
 
@@ -58,42 +49,21 @@ public class MapService(EduContext dbContext, ICacheService cacheService) : IMap
     {
         return await cacheService.GetOrCreateAsync(
             CacheKeys.MapPoiDetail(id),
-            async () =>
-            {
-                return await dbContext.MapPois.FindAsync(id);
-            },
+            async () => await repository.GetByIdAsync(id),
             TimeSpan.FromHours(24));
     }
 
     public async Task<List<MapPoiModel>> SearchPoisAsync(string keyword)
     {
         keyword = keyword.ToLower().Trim();
-
-        return await dbContext.MapPois
-            .Where(p => p.IsActive &&
-                (p.Name.ToLower().Contains(keyword) ||
-                 (p.Description != null && p.Description.ToLower().Contains(keyword)) ||
-                 (p.Address != null && p.Address.ToLower().Contains(keyword)) ||
-                 p.Category.ToLower().Contains(keyword)))
-            .OrderBy(p => p.SortOrder)
-            .ThenBy(p => p.Name)
-            .Take(50)
-            .ToListAsync();
+        return await repository.SearchAsync(keyword);
     }
 
     public async Task<List<string>> GetCategoriesAsync()
     {
         return await cacheService.GetOrCreateAsync(
             CacheKeys.MapCategories(),
-            async () =>
-            {
-                return await dbContext.MapPois
-                    .Where(p => p.IsActive)
-                    .Select(p => p.Category)
-                    .Distinct()
-                    .OrderBy(c => c)
-                    .ToListAsync();
-            },
+            async () => await repository.GetCategoriesAsync(),
             TimeSpan.FromHours(24));
     }
 
@@ -101,15 +71,37 @@ public class MapService(EduContext dbContext, ICacheService cacheService) : IMap
     {
         return await cacheService.GetOrCreateAsync(
             CacheKeys.MapCampuses(),
-            async () =>
-            {
-                return await dbContext.MapPois
-                    .Where(p => p.IsActive && p.Campus != null)
-                    .Select(p => p.Campus!)
-                    .Distinct()
-                    .OrderBy(c => c)
-                    .ToListAsync();
-            },
+            async () => await repository.GetCampusesAsync(),
             TimeSpan.FromHours(24));
+    }
+
+    public async Task AddPoiAsync(MapPoiModel poi)
+    {
+        poi.IsActive = true;
+        poi.CreatedAt = DateTime.UtcNow;
+        poi.UpdatedAt = DateTime.UtcNow;
+
+        await repository.AddAsync(poi);
+        await InvalidateCacheAsync();
+    }
+
+    public async Task AddPoisBatchAsync(IEnumerable<MapPoiModel> pois)
+    {
+        await repository.AddRangeAsync(pois);
+        await InvalidateCacheAsync();
+    }
+
+    public async Task<int> ClearAllPoisAsync()
+    {
+        var count = await repository.RemoveAllAsync();
+        await InvalidateCacheAsync();
+        return count;
+    }
+
+    private async Task InvalidateCacheAsync()
+    {
+        await cacheService.RemoveAsync(CacheKeys.MapPois());
+        await cacheService.RemoveAsync(CacheKeys.MapCategories());
+        await cacheService.RemoveAsync(CacheKeys.MapCampuses());
     }
 }
