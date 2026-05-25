@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text.Json;
 using EduApi.Data.Models;
+using XAUAT.EduApi.Controllers.V1;
 using XAUAT.EduApi.Exceptions;
 using XAUAT.EduApi.Extensions;
 using XAUAT.EduApi.Localization;
@@ -78,14 +79,27 @@ public class ErrorHandlingMiddleware
         context.Response.ContentType = "application/json";
 
         // 构建错误响应
-        var errorResponse = new
+        object errorResponse;
+        if (context.Request.Path.StartsWithSegments("/v1", StringComparison.OrdinalIgnoreCase))
         {
-            context.Response.StatusCode,
-            Message = "服务器内部错误，请联系管理员",
-            Details = exception.Message,
-            context.Request.Path,
-            Timestamp = DateTime.UtcNow
-        };
+            errorResponse = new ApiResponse<object>
+            {
+                Data = null,
+                Code = ApiCodes.InternalError,
+                Message = "服务器内部错误，请联系管理员"
+            };
+        }
+        else
+        {
+            errorResponse = new
+            {
+                context.Response.StatusCode,
+                Message = "服务器内部错误，请联系管理员",
+                Details = exception.Message,
+                context.Request.Path,
+                Timestamp = DateTime.UtcNow
+            };
+        }
 
         // 序列化错误响应
         var jsonResponse = JsonSerializer.Serialize(errorResponse, new JsonSerializerOptions
@@ -115,12 +129,25 @@ public class ErrorHandlingMiddleware
         context.Response.ContentType = "application/json";
         context.Response.Headers.RetryAfter = retryAfterSeconds.ToString();
 
-        var response = new RateLimitErrorResponse
+        object response;
+        if (context.Request.Path.StartsWithSegments("/v1", StringComparison.OrdinalIgnoreCase))
         {
-            error = "rate_limited",
-            message = _messageLocalizer.Get(language, ApiMessageKey.EduSystemRateLimited),
-            retryAfterSeconds = retryAfterSeconds
-        };
+            response = new ApiResponse<object>
+            {
+                Data = null,
+                Code = ApiCodes.RateLimited,
+                Message = _messageLocalizer.Get(language, ApiMessageKey.EduSystemRateLimited)
+            };
+        }
+        else
+        {
+            response = new RateLimitErrorResponse
+            {
+                error = "rate_limited",
+                message = _messageLocalizer.Get(language, ApiMessageKey.EduSystemRateLimited),
+                retryAfterSeconds = retryAfterSeconds
+            };
+        }
 
         var jsonResponse = JsonSerializer.Serialize(response, new JsonSerializerOptions
         {
