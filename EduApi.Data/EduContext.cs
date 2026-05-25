@@ -2,6 +2,7 @@ using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
 using EduApi.Data.Models;
+using CampusMapAPI.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 
@@ -12,6 +13,7 @@ public class EduContext(DbContextOptions<EduContext> options) : DbContext(option
     public DbSet<ScoreResponse> Scores { get; set; }
     public DbSet<ElectricitySubscription> ElectricitySubscriptions { get; set; }
     public DbSet<ElectricityNotificationLog> ElectricityNotificationLogs { get; set; }
+    public DbSet<MapPoiModel> MapPois { get; set; }
     
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -39,7 +41,17 @@ public class EduContext(DbContextOptions<EduContext> options) : DbContext(option
                 .HasForeignKey(e => e.SubscriptionId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
-        
+
+        modelBuilder.Entity<MapPoiModel>(entity =>
+        {
+            entity.HasIndex(e => e.Category);
+            entity.HasIndex(e => e.Campus);
+            entity.HasIndex(e => e.IsActive);
+            entity.HasIndex(e => new { e.Latitude, e.Longitude });
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+            entity.Property(e => e.UpdatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+        });
+
         base.OnModelCreating(modelBuilder);
     }
 }

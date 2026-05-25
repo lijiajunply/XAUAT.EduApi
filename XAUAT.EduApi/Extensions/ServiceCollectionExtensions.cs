@@ -15,6 +15,7 @@ using XAUAT.EduApi.Localization;
 using XAUAT.EduApi.Queues;
 using XAUAT.EduApi.Repos;
 using XAUAT.EduApi.Services;
+using CampusMapAPI.Services;
 
 namespace XAUAT.EduApi.Extensions;
 
@@ -121,6 +122,7 @@ public static class ServiceCollectionExtensions
             services.AddScoped<IRedisService, RedisService>();
             services.AddScoped<ICookieCodeService, CookieCodeService>();
             services.AddScoped<ISchoolNavService, SchoolNavService>();
+            services.AddScoped<IMapService, MapService>();
             services.AddScoped<IElectricityService, ElectricityService>();
             services.AddScoped<IElectricitySubscriptionService, ElectricitySubscriptionService>();
             services.AddScoped<IElectricityNotificationEmailService, ElectricityNotificationEmailService>();

@@ -332,4 +332,40 @@ public static class CacheKeys
 
     public static string Categories()
         => $"{Prefix}:categories";
+
+    /// <summary>
+    /// 生成地图POI缓存键
+    /// </summary>
+    public static string MapPois()
+        => $"{Prefix}:map:pois:all";
+
+    /// <summary>
+    /// 生成地图POI分类缓存键
+    /// </summary>
+    public static string MapPoiCategory(string category)
+        => $"{Prefix}:map:pois:category:{SafeEncode(category)}";
+
+    /// <summary>
+    /// 生成地图POI校区缓存键
+    /// </summary>
+    public static string MapPoiCampus(string campus)
+        => $"{Prefix}:map:pois:campus:{SafeEncode(campus)}";
+
+    /// <summary>
+    /// 生成地图POI详情缓存键
+    /// </summary>
+    public static string MapPoiDetail(int id)
+        => $"{Prefix}:map:pois:detail:{id}";
+
+    /// <summary>
+    /// 生成地图分类列表缓存键
+    /// </summary>
+    public static string MapCategories()
+        => $"{Prefix}:map:categories";
+
+    /// <summary>
+    /// 生成地图校区列表缓存键
+    /// </summary>
+    public static string MapCampuses()
+        => $"{Prefix}:map:campuses";
 }
