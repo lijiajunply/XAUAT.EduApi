@@ -1,0 +1,662 @@
+[
+  {
+    "name": "西安建筑科技大学草堂校区东门",
+    "category": "entrance",
+    "latitude": 34.0149234,
+    "longitude": 108.7608242,
+    "description": "草堂校区的东大门",
+    "icon": null,
+    "is_active": true,
+    "sort_order": 0
+  },
+  {
+    "name": "信控楼",
+    "category": "academic",
+    "latitude": 34.0194668,
+    "longitude": 108.7580102,
+    "description": "信控学院的楼，相关的老师实验室在这里",
+    "icon": null,
+    "is_active": true,
+    "sort_order": 0
+  },
+  {
+    "name": "机电楼",
+    "category": "academic",
+    "latitude": 34.0192288,
+    "longitude": 108.7586675,
+    "description": "机电学院的楼，相关的实验教学老师办公室在这儿",
+    "icon": null,
+    "is_active": true,
+    "sort_order": 0
+  },
+  {
+    "name": "工训楼",
+    "category": "academic",
+    "latitude": 34.018644,
+    "longitude": 108.758265,
+    "description": "工训中心，相关的课程，金工实习在这里",
+    "icon": null,
+    "is_active": true,
+    "sort_order": 0
+  },
+  {
+    "name": "草堂校区图书馆",
+    "category": "academic",
+    "latitude": 34.0148996,
+    "longitude": 108.7550796,
+    "description": "图书馆",
+    "icon": null,
+    "is_active": true,
+    "sort_order": 0
+  },
+  {
+    "name": "学府城1栋",
+    "category": "academic",
+    "latitude": 34.0143502,
+    "longitude": 108.757398,
+    "description": "教学区1#楼，南区",
+    "icon": null,
+    "is_active": true,
+    "sort_order": 0
+  },
+  {
+    "name": "学府城2栋",
+    "category": "academic",
+    "latitude": 34.0140812,
+    "longitude": 108.7568157,
+    "description": "教学区2#楼，南区",
+    "icon": null,
+    "is_active": true,
+    "sort_order": 0
+  },
+  {
+    "name": "学府城3栋",
+    "category": "academic",
+    "latitude": 34.0140767,
+    "longitude": 108.7577387,
+    "description": "教学区3#楼，南区",
+    "icon": null,
+    "is_active": true,
+    "sort_order": 0
+  },
+  {
+    "name": "学府城4栋",
+    "category": "academic",
+    "latitude": 34.0137732,
+    "longitude": 108.7569794,
+    "description": "教学区4#楼，南区",
+    "icon": null,
+    "is_active": true,
+    "sort_order": 0
+  },
+  {
+    "name": "学府城5栋",
+    "category": "academic",
+    "latitude": 34.0135853,
+    "longitude": 108.7566573,
+    "description": "教学区5#楼，南区",
+    "icon": null,
+    "is_active": true,
+    "sort_order": 0
+  },
+  {
+    "name": "学府城6栋",
+    "category": "academic",
+    "latitude": 34.0135652,
+    "longitude": 108.7574677,
+    "description": "教学区6#楼，南区",
+    "icon": null,
+    "is_active": true,
+    "sort_order": 0
+  },
+  {
+    "name": "学府城7栋",
+    "category": "academic",
+    "latitude": 34.0132895,
+    "longitude": 108.7570008,
+    "description": "教学区7#楼，南区",
+    "icon": null,
+    "is_active": true,
+    "sort_order": 0
+  },
+  {
+    "name": "学府城8栋",
+    "category": "academic",
+    "latitude": 34.0138922,
+    "longitude": 108.7559195,
+    "description": "教学区8#楼，南区",
+    "icon": null,
+    "is_active": true,
+    "sort_order": 0
+  },
+  {
+    "name": "学府城9栋",
+    "category": "academic",
+    "latitude": 34.0133474,
+    "longitude": 108.7559731,
+    "description": "教学区9#楼，南区",
+    "icon": null,
+    "is_active": true,
+    "sort_order": 0
+  },
+  {
+    "name": "学府城10栋",
+    "category": "academic",
+    "latitude": 34.0141301,
+    "longitude": 108.7545053,
+    "description": "教学区10#楼，南区",
+    "icon": null,
+    "is_active": true,
+    "sort_order": 0
+  },
+  {
+    "name": "学府城11栋",
+    "category": "academic",
+    "latitude": 34.0139645,
+    "longitude": 108.7542101,
+    "description": "教学区11#楼，南区",
+    "icon": null,
+    "is_active": true,
+    "sort_order": 0
+  },
+  {
+    "name": "学府城12栋",
+    "category": "academic",
+    "latitude": 34.0139434,
+    "longitude": 108.754881,
+    "description": "教学区12#楼，南区",
+    "icon": null,
+    "is_active": true,
+    "sort_order": 0
+  },
+  {
+    "name": "学府城13栋",
+    "category": "academic",
+    "latitude": 34.0137855,
+    "longitude": 108.7546448,
+    "description": "教学区13#楼，南区",
+    "icon": null,
+    "is_active": true,
+    "sort_order": 0
+  },
+  {
+    "name": "学府城14栋",
+    "category": "academic",
+    "latitude": 34.0135764,
+    "longitude": 108.7542288,
+    "description": "教学区14#楼，南区",
+    "icon": null,
+    "is_active": true,
+    "sort_order": 0
+  },
+  {
+    "name": "学府城15栋",
+    "category": "academic",
+    "latitude": 34.0135653,
+    "longitude": 108.7550473,
+    "description": "教学区15#楼，南区",
+    "icon": null,
+    "is_active": true,
+    "sort_order": 0
+  },
+  {
+    "name": "学府城16栋",
+    "category": "academic",
+    "latitude": 34.0133207,
+    "longitude": 108.754677,
+    "description": "教学区16#楼，南区",
+    "icon": null,
+    "is_active": true,
+    "sort_order": 0
+  },
+  {
+    "name": "紫阁1栋",
+    "category": "dormitory",
+    "latitude": 34.01234,
+    "longitude": 108.7548084,
+    "description": "紫阁学生宿舍，1#楼",
+    "icon": null,
+    "is_active": true,
+    "sort_order": 0
+  },
+  {
+    "name": "紫阁2栋",
+    "category": "dormitory",
+    "latitude": 34.0120287,
+    "longitude": 108.7543683,
+    "description": "紫阁学生宿舍，2#楼",
+    "icon": null,
+    "is_active": true,
+    "sort_order": 0
+  },
+  {
+    "name": "紫阁3栋",
+    "category": "dormitory",
+    "latitude": 34.0116462,
+    "longitude": 108.7548513,
+    "description": "紫阁学生宿舍，3#楼",
+    "icon": null,
+    "is_active": true,
+    "sort_order": 0
+  },
+  {
+    "name": "紫阁4栋",
+    "category": "dormitory",
+    "latitude": 34.0112281,
+    "longitude": 108.7543038,
+    "description": "紫阁学生宿舍，4#楼",
+    "icon": null,
+    "is_active": true,
+    "sort_order": 0
+  },
+  {
+    "name": "紫阁5栋",
+    "category": "dormitory",
+    "latitude": 34.0109123,
+    "longitude": 108.7548029,
+    "description": "紫阁学生宿舍，5#楼",
+    "icon": null,
+    "is_active": true,
+    "sort_order": 0
+  },
+  {
+    "name": "紫阁6栋",
+    "category": "dormitory",
+    "latitude": 34.0103564,
+    "longitude": 108.7545077,
+    "description": "紫阁学生宿舍，6#楼",
+    "icon": null,
+    "is_active": true,
+    "sort_order": 0
+  },
+  {
+    "name": "紫阁7栋",
+    "category": "dormitory",
+    "latitude": 34.010134,
+    "longitude": 108.7548028,
+    "description": "紫阁学生宿舍，7#楼",
+    "icon": null,
+    "is_active": true,
+    "sort_order": 0
+  },
+  {
+    "name": "紫阁8栋",
+    "category": "dormitory",
+    "latitude": 34.0123177,
+    "longitude": 108.7569122,
+    "description": "紫阁学生宿舍，8#楼",
+    "icon": null,
+    "is_active": true,
+    "sort_order": 0
+  },
+  {
+    "name": "紫阁9栋",
+    "category": "dormitory",
+    "latitude": 34.0120064,
+    "longitude": 108.7574756,
+    "description": "紫阁学生宿舍，9#楼",
+    "icon": null,
+    "is_active": true,
+    "sort_order": 0
+  },
+  {
+    "name": "紫阁10栋",
+    "category": "dormitory",
+    "latitude": 34.0116372,
+    "longitude": 108.7570033,
+    "description": "紫阁学生宿舍，10#楼",
+    "icon": null,
+    "is_active": true,
+    "sort_order": 0
+  },
+  {
+    "name": "紫阁11栋",
+    "category": "dormitory",
+    "latitude": 34.0112414,
+    "longitude": 108.7575024,
+    "description": "紫阁学生宿舍，11#楼",
+    "icon": null,
+    "is_active": true,
+    "sort_order": 0
+  },
+  {
+    "name": "紫阁12栋",
+    "category": "dormitory",
+    "latitude": 34.0109212,
+    "longitude": 108.7570087,
+    "description": "紫阁学生宿舍，12#楼",
+    "icon": null,
+    "is_active": true,
+    "sort_order": 0
+  },
+  {
+    "name": "紫阁13栋",
+    "category": "dormitory",
+    "latitude": 34.0106009,
+    "longitude": 108.7574272,
+    "description": "紫阁学生宿舍，13#楼",
+    "icon": null,
+    "is_active": true,
+    "sort_order": 0
+  },
+  {
+    "name": "紫阁14栋",
+    "category": "dormitory",
+    "latitude": 34.0101339,
+    "longitude": 108.7570569,
+    "description": "紫阁学生宿舍，14#楼",
+    "icon": null,
+    "is_active": true,
+    "sort_order": 0
+  },
+  {
+    "name": "南山1栋",
+    "category": "dormitory",
+    "latitude": 34.0161667,
+    "longitude": 108.7505039,
+    "description": "南山学生宿舍，1#楼",
+    "icon": null,
+    "is_active": true,
+    "sort_order": 0
+  },
+  {
+    "name": "南山2栋",
+    "category": "dormitory",
+    "latitude": 34.0156686,
+    "longitude": 108.7505817,
+    "description": "南山学生宿舍，2#楼",
+    "icon": null,
+    "is_active": true,
+    "sort_order": 0
+  },
+  {
+    "name": "南山3栋",
+    "category": "dormitory",
+    "latitude": 34.0151927,
+    "longitude": 108.7505575,
+    "description": "南山学生宿舍，3#楼",
+    "icon": null,
+    "is_active": true,
+    "sort_order": 0
+  },
+  {
+    "name": "南山4栋",
+    "category": "dormitory",
+    "latitude": 34.0146301,
+    "longitude": 108.7505306,
+    "description": "南山学生宿舍，4#楼",
+    "icon": null,
+    "is_active": true,
+    "sort_order": 0
+  },
+  {
+    "name": "南山5栋",
+    "category": "dormitory",
+    "latitude": 34.0142232,
+    "longitude": 108.7508098,
+    "description": "南山学生宿舍，5#楼",
+    "icon": null,
+    "is_active": true,
+    "sort_order": 0
+  },
+  {
+    "name": "南山6栋",
+    "category": "dormitory",
+    "latitude": 34.0137428,
+    "longitude": 108.7504957,
+    "description": "南山学生宿舍，6#楼",
+    "icon": null,
+    "is_active": true,
+    "sort_order": 0
+  },
+  {
+    "name": "南山7栋",
+    "category": "dormitory",
+    "latitude": 34.0137224,
+    "longitude": 108.7485013,
+    "description": "南山学生宿舍，7#楼",
+    "icon": null,
+    "is_active": true,
+    "sort_order": 0
+  },
+  {
+    "name": "南山8栋",
+    "category": "dormitory",
+    "latitude": 34.0141848,
+    "longitude": 108.7481793,
+    "description": "南山学生宿舍，8#楼",
+    "icon": null,
+    "is_active": true,
+    "sort_order": 0
+  },
+  {
+    "name": "南山9栋",
+    "category": "dormitory",
+    "latitude": 34.0146252,
+    "longitude": 108.7485014,
+    "description": "南山学生宿舍，9#楼",
+    "icon": null,
+    "is_active": true,
+    "sort_order": 0
+  },
+  {
+    "name": "南山10栋",
+    "category": "dormitory",
+    "latitude": 34.014952,
+    "longitude": 108.7479888,
+    "description": "南山学生宿舍，10#楼",
+    "icon": null,
+    "is_active": true,
+    "sort_order": 0
+  },
+  {
+    "name": "南山11栋",
+    "category": "dormitory",
+    "latitude": 34.0152278,
+    "longitude": 108.7484532,
+    "description": "南山学生宿舍，11#楼",
+    "icon": null,
+    "is_active": true,
+    "sort_order": 0
+  },
+  {
+    "name": "南山12栋",
+    "category": "dormitory",
+    "latitude": 34.0156591,
+    "longitude": 108.7481821,
+    "description": "南山学生宿舍，12#楼",
+    "icon": null,
+    "is_active": true,
+    "sort_order": 0
+  },
+  {
+    "name": "南山13栋",
+    "category": "dormitory",
+    "latitude": 34.0161595,
+    "longitude": 108.7483351,
+    "description": "南山学生宿舍，13#楼",
+    "icon": null,
+    "is_active": true,
+    "sort_order": 0
+  },
+  {
+    "name": "南山14栋",
+    "category": "dormitory",
+    "latitude": 0.0,
+    "longitude": 0.0,
+    "description": "南山学生宿舍，14#楼",
+    "icon": null,
+    "is_active": true,
+    "sort_order": 0
+  },
+  {
+    "name": "南山15栋",
+    "category": "dormitory",
+    "latitude": 0.0,
+    "longitude": 0.0,
+    "description": "南山学生宿舍，15#楼",
+    "icon": null,
+    "is_active": true,
+    "sort_order": 0
+  },
+  {
+    "name": "瓦座博物馆",
+    "category": "other",
+    "latitude": 34.0155237,
+    "longitude": 108.7488075,
+    "description": "介绍瓦座的博物馆",
+    "icon": null,
+    "is_active": true,
+    "sort_order": 0
+  },
+  {
+    "name": "草堂校区校史馆",
+    "category": "other",
+    "latitude": 34.0143251,
+    "longitude": 108.7488128,
+    "description": "相关的校史馆",
+    "icon": null,
+    "is_active": true,
+    "sort_order": 0
+  },
+  {
+    "name": "草堂校区西门",
+    "category": "entrance",
+    "latitude": 34.0149559,
+    "longitude": 108.7463969,
+    "description": "草堂校区的西大门",
+    "icon": null,
+    "is_active": true,
+    "sort_order": 0
+  },
+  {
+    "name": "南山小礼堂",
+    "category": "service",
+    "latitude": 34.0159463,
+    "longitude": 108.7495349,
+    "description": "有电影院，自习室，部分老师办公室再此",
+    "icon": null,
+    "is_active": true,
+    "sort_order": 0
+  },
+  {
+    "name": "南山浴室",
+    "category": "service",
+    "latitude": 34.015544,
+    "longitude": 108.7501711,
+    "description": "南山洗澡的地方",
+    "icon": null,
+    "is_active": true,
+    "sort_order": 0
+  },
+  {
+    "name": "南山快递中心",
+    "category": "service",
+    "latitude": 34.0133803,
+    "longitude": 108.7502138,
+    "description": "快递驿站",
+    "icon": null,
+    "is_active": true,
+    "sort_order": 0
+  },
+  {
+    "name": "南山生活服务中心",
+    "category": "service",
+    "latitude": 34.0143721,
+    "longitude": 108.7501629,
+    "description": "小超市，打印店银行",
+    "icon": null,
+    "is_active": true,
+    "sort_order": 0
+  },
+  {
+    "name": "紫阁浴室",
+    "category": "service",
+    "latitude": 34.0112904,
+    "longitude": 108.7551196,
+    "description": "紫阁洗澡的地方",
+    "icon": null,
+    "is_active": true,
+    "sort_order": 0
+  },
+  {
+    "name": "紫阁大礼堂",
+    "category": "service",
+    "latitude": 34.0120331,
+    "longitude": 108.7558334,
+    "description": "大型活动表演的地方，部分学院的办公地点",
+    "icon": null,
+    "is_active": true,
+    "sort_order": 0
+  },
+  {
+    "name": "紫阁学子之家",
+    "category": "service",
+    "latitude": 34.0119798,
+    "longitude": 108.755168,
+    "description": "紫阁",
+    "icon": null,
+    "is_active": true,
+    "sort_order": 0
+  },
+  {
+    "name": "南山操场",
+    "category": "sports",
+    "latitude": 34.017523,
+    "longitude": 108.7502007,
+    "description": "南山操场",
+    "icon": null,
+    "is_active": true,
+    "sort_order": 0
+  },
+  {
+    "name": "紫阁操场",
+    "category": "sports",
+    "latitude": 34.0090576,
+    "longitude": 108.754266,
+    "description": "紫阁操场",
+    "icon": null,
+    "is_active": true,
+    "sort_order": 0
+  },
+  {
+    "name": "紫阁餐厅",
+    "category": "canteen",
+    "latitude": 34.0106143,
+    "longitude": 108.7559192,
+    "description": "学生食堂",
+    "icon": null,
+    "is_active": true,
+    "sort_order": 0
+  },
+  {
+    "name": "南山餐厅",
+    "category": "canteen",
+    "latitude": 34.0141696,
+    "longitude": 108.7494731,
+    "description": "学生食堂",
+    "icon": null,
+    "is_active": true,
+    "sort_order": 0
+  },
+  {
+    "name": "体育馆",
+    "category": "sports",
+    "latitude": 34.0176207,
+    "longitude": 108.7492425,
+    "description": "有室内的篮球场地，羽毛球场地，舞蹈场地",
+    "icon": null,
+    "is_active": true,
+    "sort_order": 0
+  },
+  {
+    "name": "校医院",
+    "category": "service",
+    "latitude": 34.0135707,
+    "longitude": 108.7469981,
+    "description": "提供医疗服务",
+    "icon": null,
+    "is_active": true,
+    "sort_order": 0
+  }
+]

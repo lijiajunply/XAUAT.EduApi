@@ -1,4 +1,4 @@
-using CampusMapAPI.Models;
+using EduApi.Data.Models;
 
 namespace XAUAT.EduApi.Repos;
 

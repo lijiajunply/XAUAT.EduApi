@@ -13,52 +13,32 @@ LoadDotEnvIfPresent();
 // 先创建builder对象
 var builder = WebApplication.CreateBuilder(args);
 
-// 启用顶级语句异步支持
-// 使用Serilog作为日志提供程序
-// builder.Host.UseSerilog((_, _, loggerConfiguration) =>
-// {
-//     loggerConfiguration
-//         .MinimumLevel.Is(EnvironmentVariableHelper.GetLogEventLevelOrDefault(
-//             LogEventLevel.Information,
-//             "SERILOG_MINIMUM_LEVEL_DEFAULT",
-//             "Serilog__MinimumLevel__Default"))
-//         .MinimumLevel.Override(
-//             "Microsoft",
-//             EnvironmentVariableHelper.GetLogEventLevelOrDefault(
-//                 LogEventLevel.Warning,
-//                 "SERILOG_MINIMUM_LEVEL_MICROSOFT",
-//                 "Serilog__MinimumLevel__Override__Microsoft"))
-//         .MinimumLevel.Override(
-//             "System",
-//             EnvironmentVariableHelper.GetLogEventLevelOrDefault(
-//                 LogEventLevel.Warning,
-//                 "SERILOG_MINIMUM_LEVEL_SYSTEM",
-//                 "Serilog__MinimumLevel__Override__System"))
-//         .WriteTo.Console(
-//             outputTemplate:
-//             "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} {Level:u3}] {Message:lj} {Properties:j}{NewLine}{Exception}")
-//         .WriteTo.File(
-//             EnvironmentVariableHelper.GetStringOrDefault(
-//                 "./logs/log-.txt",
-//                 "SERILOG_FILE_PATH",
-//                 "Serilog__WriteTo__0__Args__path"),
-//             rollingInterval: RollingInterval.Day,
-//             retainedFileCountLimit: EnvironmentVariableHelper.GetIntOrDefault(
-//                 7,
-//                 "SERILOG_RETAINED_FILE_COUNT_LIMIT",
-//                 "Serilog__WriteTo__0__Args__retainedFileCountLimit"),
-//             outputTemplate:
-//             "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} {Level:u3}] {Message:lj} {Properties:j}{NewLine}{Exception}")
-//         .Enrich.FromLogContext();
-// });
+if (builder.Environment.IsDevelopment())
+{
+    builder.Logging.AddConsole();
+}
+else
+{
+    // 统一日志配置，适用于所有环境
+    var logger = new LoggerConfiguration()
+        .MinimumLevel.Information()
+        .Enrich.FromLogContext()
+        .WriteTo.Console(
+            outputTemplate: "{Timestamp:HH:mm:ss} [{Level:u3}] {Message:lj} {Properties:j}{NewLine}{Exception}")
+        .CreateLogger();
+
+    builder.Logging
+        .ClearProviders()
+        .AddConsole()
+        .AddDebug()
+        .SetMinimumLevel(LogLevel.Information)
+        .AddSerilog(logger);
+}
 
 // 基础服务配置
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddOpenApi(options =>
-{
-    options.AddOperationTransformer<LanguageHeaderOperationTransformer>();
-});
+builder.Services.AddOpenApi(options => { options.AddOperationTransformer<LanguageHeaderOperationTransformer>(); });
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddSingleton(
     Options.Create(EnvironmentVariableHelper.BuildElectricitySubscriptionOptions()));

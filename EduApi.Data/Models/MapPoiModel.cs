@@ -2,10 +2,10 @@ using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Text.Json.Serialization;
 
-namespace CampusMapAPI.Models;
+namespace EduApi.Data.Models;
 
 [Table("map_pois")]
-public class MapPoiModel : EduApi.Data.DataModel
+public class MapPoiModel : DataModel
 {
     [Key]
     [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
@@ -47,11 +47,9 @@ public class MapPoiModel : EduApi.Data.DataModel
     [JsonPropertyName("icon")]
     public string? Icon { get; set; }
 
-    [JsonPropertyName("is_active")]
-    public bool IsActive { get; set; } = true;
+    [JsonPropertyName("is_active")] public bool IsActive { get; set; } = true;
 
-    [JsonPropertyName("sort_order")]
-    public int SortOrder { get; set; } = 0;
+    [JsonPropertyName("sort_order")] public int SortOrder { get; set; }
 
     [DatabaseGenerated(DatabaseGeneratedOption.Computed)]
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

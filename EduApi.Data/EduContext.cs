@@ -2,7 +2,6 @@ using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
 using EduApi.Data.Models;
-using CampusMapAPI.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 

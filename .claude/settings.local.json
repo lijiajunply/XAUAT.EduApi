@@ -5,7 +5,9 @@
       "Bash(dotnet test:*)",
       "Bash(wc:*)",
       "Bash(git stash *)",
-      "Bash(dotnet ef migrations *)"
+      "Bash(dotnet ef migrations *)",
+      "Bash(pip3 list *)",
+      "Bash(python3 *)"
     ]
   }
 }

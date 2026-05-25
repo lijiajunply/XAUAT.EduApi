@@ -1,5 +1,5 @@
-using CampusMapAPI.Models;
 using EduApi.Data;
+using EduApi.Data.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace XAUAT.EduApi.Repos;
