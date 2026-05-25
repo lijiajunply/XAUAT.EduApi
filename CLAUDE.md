@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-XAUAT EduApi is an ASP.NET Core Web API that provides data access interfaces for Xi'an University of Architecture and Technology's educational administration system. It scrapes and proxies data from the university's systems, providing standardized RESTful APIs for mobile apps and other clients.
+XAUAT EduApi is an ASP.NET Core (.NET 10.0) Web API that proxies and scrapes data from Xi'an University of Architecture and Technology's educational administration system, providing standardized RESTful APIs for mobile apps and other clients.
 
 ## Build and Run Commands
 
@@ -29,7 +29,7 @@ dotnet test --filter "FullyQualifiedName~CourseServiceTests.GetCourses_ShouldRet
 # Run tests with coverage
 dotnet test --collect:"XPlat Code Coverage"
 
-# Run performance benchmarks (from Tests directory)
+# Run performance benchmarks
 dotnet run -c Release --project Tests/XAUAT.EduApi.Tests.csproj -- --filter "*PerformanceTests*"
 ```
 
@@ -38,56 +38,125 @@ dotnet run -c Release --project Tests/XAUAT.EduApi.Tests.csproj -- --filter "*Pe
 ### Solution Structure
 
 - **XAUAT.EduApi/** - Main ASP.NET Core Web API project
-- **EduApi.Data/** - Data access layer with Entity Framework Core
+- **EduApi.Data/** - Data access layer (EF Core models, DbContext, migrations)
 - **Tests/** - xUnit tests (unit, integration, performance)
 
 ### Layered Architecture
 
-1. **Controllers** (`XAUAT.EduApi/Controllers/`) - REST endpoints for login, courses, scores, exams, payments, etc.
-2. **Services** (`XAUAT.EduApi/Services/`) - Business logic; services call external educational system via HTTP
+1. **Controllers** (`XAUAT.EduApi/Controllers/`) - REST endpoints
+2. **Services** (`XAUAT.EduApi/Services/`) - Business logic; call external edu system via HTTP
 3. **Repositories** (`XAUAT.EduApi/Repos/`) - Data access with generic repository pattern
-4. **Caching** (`XAUAT.EduApi/Caching/`) - Three-tier cache: local MemoryCache → Redis → database
+4. **Caching** (`XAUAT.EduApi/Caching/`) - Three-tier: local MemoryCache → Redis → database
 
-### Authentication Flow
+### Controllers and Their Responsibilities
 
-The system uses SSO with the external educational administration system:
-1. `LoginController` receives credentials
-2. `SSOLoginService` calls external SSO endpoint at `https://schedule.xauat.site/login/{username}/{password}`
-3. `CookieCodeService` extracts student ID from returned cookies
-4. Subsequent requests pass cookies via `Cookie` or `xauat` header
+| Controller | Purpose |
+|------------|---------|
+| `LoginController` | SSO login, returns cookies for subsequent requests |
+| `CourseController` | Course schedules |
+| `ScoreController` | Exam scores |
+| `ExamController` | Exam arrangements |
+| `ProgramController` | Training programs / degree plans |
+| `InfoController` | Academic progress |
+| `PaymentController` | Campus card transactions |
+| `BusController` | Shuttle bus schedules (old + new data platforms) |
+| `ElectricityController` | Electricity balance, weekly usage, recharge URL, subscriptions |
+| `MapController` | Campus map POI (CRUD, search by category/campus/keyword) |
+| `SchoolNavController` | Campus navigation categories |
+| `AppController` | App version check |
+| `PlaygroundController` | Playground/sports field info |
 
-### Database Configuration
+### Background Services
 
-- **Development**: SQLite (`Data.db` file)
-- **Production**: PostgreSQL (connection string via `SQL` environment variable)
-- **DbContext**: `EduApi.Data/EduContext.cs`
+The app runs several `BackgroundService` instances registered in `ServiceCollectionExtensions`:
+
+- **ScorePersistenceBackgroundService** - persists crawled scores to DB via `ChannelScorePersistenceQueue`
+- **ElectricitySubscriptionMonitorBackgroundService** - periodically scans active electricity subscriptions
+- **ElectricityNotificationBackgroundService** - sends low-balance email alerts via `ChannelElectricityNotificationQueue`
+
+### Rate Limiting
+
+A `ConcurrencyLimiter` policy named `"EduCrawler"` (permit limit 8, queue limit 16) protects the external edu system from overload. The `EduCrawlerRateLimitFilter` action filter applies it to relevant endpoints.
+
+## Configuration
+
+The project uses **DotNetEnv** to load configuration from a `.env` file at the solution root (auto-discovered by walking up from the working directory). There is no `appsettings.json` dependency.
+
+`ServiceConfiguration.FromEnvironment()` reads all config from env vars. `EnvironmentVariableHelper` supports fallback names (e.g., `SQL` or `Sql__ConnectionString`).
 
 ### Key Environment Variables
 
 | Variable | Purpose |
 |----------|---------|
-| `SQL` | PostgreSQL connection string (production) |
-| `REDIS` | Redis connection string |
+| `SQL` | PostgreSQL connection string; if empty, SQLite is used |
+| `REDIS` | Redis connection string; if empty, Redis is skipped |
+| `ELECTRICITY_SUBSCRIPTION_SCAN_INTERVAL_MINUTES` | Subscription scan interval (default 15) |
+| `ELECTRICITY_SUBSCRIPTION_NOTIFICATION_COOLDOWN_MINUTES` | Notification cooldown (default 720) |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM_ADDRESS` | SMTP config for email notifications |
+| `TEST_ACCOUNT_ENABLED` | Enable test account bypass (default false) |
+| `PROMETHEUS_ENABLED` | Enable Prometheus metrics (default true) |
 
-### Caching Strategy
+### Database
 
-Multi-level caching with TTL + LRU/LFU hybrid eviction:
-- L1: Local MemoryCache (sub-millisecond)
-- L2: Redis distributed cache
-- Automatic fallback when Redis unavailable
-- Cache key format: `{Prefix}:{BusinessModule}:{EntityType}:{Id}`
+- **Development**: SQLite (`Data.db`, auto-created) with file-based data protection keys
+- **Production**: PostgreSQL with NpgsqlDataProtection
+- **DbContext**: `EduApi.Data/EduContext` — registered via `DbContextFactory`, so inject `IDbContextFactory<EduContext>`
+- Migrations are **auto-applied at startup** (`Program.cs`)
 
-See `CACHE_STRATEGY.md` for detailed caching documentation.
+### CORS
+
+Allowed origins: `*.zeabur.app`, `*.xauat.site`, `http://localhost:*`. Credentials are permitted.
+
+### Startup Flow
+
+1. Load `.env` via DotNetEnv
+2. Build `ServiceConfiguration` from env vars
+3. Register all services (DB, Redis, repos, business services, HTTP clients, rate limiter, cache)
+4. Auto-apply pending EF Core migrations
+5. Fire-and-forget cache warmup (semesters key)
+6. Start listening
+
+## Caching
+
+Cache key format: `eduapi:{module}:{entity}:{identifier}`. All keys are defined in `CacheKeys` (in `RedisExtensions.cs`).
+
+- **ICacheService** (`GetOrCreateAsync`) coordinates L1 (MemoryCache) → L2 (Redis) → data source
+- Redis failure auto-degrades to local cache
+- Map POI data uses 24h TTL
+
+See `CACHE_STRATEGY.md` for full details.
+
+## Authentication Flow
+
+1. `LoginController` receives credentials
+2. `SSOLoginService` calls `https://schedule.xauat.site/login/{username}/{password}`
+3. `CookieCodeService` extracts student ID from returned cookies
+4. Subsequent requests pass cookies via `Cookie` or `xauat` header
+
+## New POI Data Import
+
+When adding campus map POI data:
+- Source data lives in `map_data/campus_map.xlsx`
+- Convert to JSON via Python: `python3 -c "import openpyxl, json; ..."`
+- Import into DB via `POST /Map/import/batch` with the JSON array
+- POI model schema: `EduApi.Data/Models/MapPoiModel.cs`
 
 ## Testing
 
-- **Framework**: xUnit with Moq for mocking
-- **Unit tests**: `Tests/Services/` - mock-based service tests
-- **Integration tests**: `Tests/Integration/` - use in-memory EF Core database
-- **Performance tests**: `Tests/Performance/` - BenchmarkDotNet benchmarks
+- **Framework**: xUnit with Moq
+- **Unit tests**: `Tests/Services/` — mock-based
+- **Integration tests**: `Tests/Integration/` — in-memory EF Core
+- **Performance tests**: `Tests/Performance/` — BenchmarkDotNet
 
 ## API Documentation
 
 - OpenAPI spec: `/openapi/v1.json`
 - Scalar UI: `/scalar/v1`
 - Prometheus metrics: `/metrics`
+
+## Key Dependencies
+
+- .NET 10.0, EF Core 10.0, Npgsql, SQLite
+- StackExchange.Redis, Scalar.AspNetCore, Serilog
+- Flurl.Http, HtmlAgilityPack (HTML parsing), MailKit (email notifications)
+- DotNetEnv, Polly (HTTP retry), Newtonsoft.Json
