@@ -22,17 +22,18 @@ public class ScoreController(
     : V1ControllerBase(languageResolver, messageLocalizer)
 {
     [HttpGet("Semester")]
-    [ProducesResponseType(typeof(ApiResponse<SemesterResult>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<List<SemesterItem>>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status500InternalServerError)]
-    public async Task<ActionResult<ApiResponse<SemesterResult>>> ParseSemester(string? studentId)
+    public async Task<ActionResult<ApiResponse<List<SemesterItem>>>> ParseSemester(string? studentId)
     {
         try
         {
             logger.LogInformation("开始解析学期数据");
             var cookie = Request.GetEduAuthCookie();
             var result = await scoreService.ParseSemesterAsync(studentId, cookie, Language);
-            return Ok(SuccessResponse(result));
+            var items = result.Data.OfType<SemesterItem>().ToList();
+            return Ok(SuccessListResponse(items));
         }
         catch (Exceptions.StudentCooldownException)
         {

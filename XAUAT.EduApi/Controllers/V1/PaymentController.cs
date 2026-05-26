@@ -45,17 +45,21 @@ public class PaymentController(
     }
 
     [HttpGet("{id}/turnover")]
-    [ProducesResponseType(typeof(ApiResponse<PaymentData>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<PaymentTurnoverResult>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status500InternalServerError)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status503ServiceUnavailable)]
-    public async Task<ActionResult<ApiResponse<PaymentData>>> GetTurnover(string id)
+    public async Task<ActionResult<ApiResponse<PaymentTurnoverResult>>> GetTurnover(string id)
     {
         try
         {
             logger.LogInformation("Get turnover with card number {id}", id);
             var result = await paymentService.GetTurnoverAsync(id, Language);
             logger.LogInformation("Get turnover result: {result}", result);
-            return Ok(SuccessResponse(result));
+            return Ok(SuccessResponse(new PaymentTurnoverResult
+            {
+                Records = result.Records,
+                Balance = result.Total
+            }));
         }
         catch (PaymentServiceException ex)
         {

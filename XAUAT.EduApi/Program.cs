@@ -41,7 +41,6 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddOpenApi(options =>
 {
     options.AddOperationTransformer<LanguageHeaderOperationTransformer>();
-    options.AddDocumentTransformer<CookieSecurityDocumentTransformer>();
 });
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddSingleton(

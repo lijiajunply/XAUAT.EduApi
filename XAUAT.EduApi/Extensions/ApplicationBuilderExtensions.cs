@@ -44,14 +44,7 @@ public static class ApplicationBuilderExtensions
         {
             app.MapOpenApi();
             app.MapControllers();
-            app.MapScalarApiReference(options =>
-            {
-                // 允许在 Scalar UI 中设置 Cookie，方便测试需要认证的接口
-                options.Authentication = new ScalarAuthenticationOptions
-                {
-                    PreferredSecuritySchemes = ["cookie"]
-                };
-            });
+            app.MapScalarApiReference();
             return app;
         }
 
