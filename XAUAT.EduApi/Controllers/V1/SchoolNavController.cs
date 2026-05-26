@@ -8,7 +8,7 @@ namespace XAUAT.EduApi.Controllers.V1;
 [ApiController]
 [Route("v1/schoolnav")]
 [Produces("application/json")]
-public class SchoolNavV1Controller(
+public class SchoolNavController(
     ISchoolNavService service,
     ILanguageResolver languageResolver,
     IApiMessageLocalizer messageLocalizer) : V1ControllerBase(languageResolver, messageLocalizer)

@@ -108,6 +108,13 @@ public class MapPoiRepository(IDbContextFactory<EduContext> contextFactory) : IM
         await context.SaveChangesAsync().ConfigureAwait(false);
     }
 
+    public async Task UpdateAsync(MapPoiModel poi)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync().ConfigureAwait(false);
+        context.MapPois.Update(poi);
+        await context.SaveChangesAsync().ConfigureAwait(false);
+    }
+
     public async Task<int> RemoveAllAsync()
     {
         await using var context = await contextFactory.CreateDbContextAsync().ConfigureAwait(false);

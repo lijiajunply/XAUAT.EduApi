@@ -8,9 +8,9 @@ namespace XAUAT.EduApi.Controllers.V1;
 [ApiController]
 [Route("v1/map")]
 [Produces("application/json")]
-public class MapV1Controller(
+public class MapController(
     IMapService mapService,
-    ILogger<MapV1Controller> logger,
+    ILogger<MapController> logger,
     ILanguageResolver languageResolver,
     IApiMessageLocalizer messageLocalizer) : V1ControllerBase(languageResolver, messageLocalizer)
 {
@@ -233,6 +233,45 @@ public class MapV1Controller(
             errors = errors.Take(10),
             message = $"导入完成: 成功 {successCount} 条, 失败 {errorCount} 条"
         }));
+    }
+
+    [HttpPut("{id:int}")]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<ApiResponse<object>>> UpdatePoi(int id, [FromBody] MapPoiModel poi)
+    {
+        if (id != poi.Id)
+        {
+            return BadRequest(ErrorResponse(ApiCodes.ParamError, "路径ID与请求体中的ID不匹配"));
+        }
+
+        if (string.IsNullOrWhiteSpace(poi.Name) || string.IsNullOrWhiteSpace(poi.Category))
+        {
+            return BadRequest(ErrorResponse(ApiCodes.ParamError, "名称和分类不能为空"));
+        }
+
+        if (poi.Latitude == 0 || poi.Longitude == 0)
+        {
+            return BadRequest(ErrorResponse(ApiCodes.ParamError, "经纬度不能为0"));
+        }
+
+        try
+        {
+            await mapService.UpdatePoiAsync(poi);
+            logger.LogInformation("成功更新POI: {Name} (ID: {Id})", poi.Name, id);
+            return Ok(SuccessResponse<object>(new { success = true, message = $"成功更新: {poi.Name}", id = poi.Id }));
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound(ErrorResponse(ApiCodes.NotFound, $"未找到ID为 {id} 的POI"));
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "更新POI失败: {Id}", id);
+            return StatusCode(StatusCodes.Status500InternalServerError,
+                ErrorResponse(ApiCodes.InternalError, $"更新失败: {ex.Message}"));
+        }
     }
 
     [HttpDelete("clear")]

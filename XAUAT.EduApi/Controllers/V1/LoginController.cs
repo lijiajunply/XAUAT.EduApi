@@ -10,9 +10,9 @@ namespace XAUAT.EduApi.Controllers.V1;
 [Route("v1/login")]
 [Produces("application/json")]
 [Consumes("application/json")]
-public class LoginV1Controller(
+public class LoginController(
     ILoginService loginService,
-    ILogger<LoginV1Controller> logger,
+    ILogger<LoginController> logger,
     ILanguageResolver languageResolver,
     IApiMessageLocalizer messageLocalizer)
     : V1ControllerBase(languageResolver, messageLocalizer)

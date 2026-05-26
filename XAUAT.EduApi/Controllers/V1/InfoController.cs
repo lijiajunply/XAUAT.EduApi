@@ -13,9 +13,9 @@ namespace XAUAT.EduApi.Controllers.V1;
 [ApiController]
 [Route("v1/info")]
 [Produces("application/json")]
-public class InfoV1Controller(
+public class InfoController(
     IHttpClientFactory httpClientFactory,
-    ILogger<CourseController> logger,
+    ILogger<InfoController> logger,
     IInfoService info,
     ILanguageResolver languageResolver,
     IApiMessageLocalizer messageLocalizer,

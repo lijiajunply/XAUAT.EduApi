@@ -13,5 +13,6 @@ public interface IMapPoiRepository
     Task<List<string>> GetCampusesAsync();
     Task AddAsync(MapPoiModel poi);
     Task AddRangeAsync(IEnumerable<MapPoiModel> pois);
+    Task UpdateAsync(MapPoiModel poi);
     Task<int> RemoveAllAsync();
 }

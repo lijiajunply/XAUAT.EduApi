@@ -16,6 +16,7 @@ public interface IMapService
     Task<List<string>> GetCampusesAsync();
     Task AddPoiAsync(MapPoiModel poi);
     Task AddPoisBatchAsync(IEnumerable<MapPoiModel> pois);
+    Task UpdatePoiAsync(MapPoiModel poi);
     Task<int> ClearAllPoisAsync();
 }
 
@@ -88,6 +89,19 @@ public class MapService(IMapPoiRepository repository, ICacheService cacheService
     public async Task AddPoisBatchAsync(IEnumerable<MapPoiModel> pois)
     {
         await repository.AddRangeAsync(pois);
+        await InvalidateCacheAsync();
+    }
+
+    public async Task UpdatePoiAsync(MapPoiModel poi)
+    {
+        var existing = await repository.GetByIdAsync(poi.Id);
+        if (existing == null)
+        {
+            throw new KeyNotFoundException($"POI with ID {poi.Id} not found");
+        }
+
+        poi.UpdatedAt = DateTime.UtcNow;
+        await repository.UpdateAsync(poi);
         await InvalidateCacheAsync();
     }
 

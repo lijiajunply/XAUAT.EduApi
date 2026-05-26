@@ -14,8 +14,8 @@ namespace XAUAT.EduApi.Controllers.V1;
 [Consumes("application/json")]
 [ServiceFilter(typeof(EduCrawlerRateLimitFilter))]
 [EnableRateLimiting("EduCrawler")]
-public class CourseV1Controller(
-    ILogger<CourseV1Controller> logger,
+public class CourseController(
+    ILogger<CourseController> logger,
     ICourseService courseService,
     ILanguageResolver languageResolver,
     IApiMessageLocalizer messageLocalizer)

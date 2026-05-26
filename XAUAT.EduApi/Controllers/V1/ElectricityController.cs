@@ -9,10 +9,10 @@ namespace XAUAT.EduApi.Controllers.V1;
 [ApiController]
 [Route("v1/electricity")]
 [Produces("application/json")]
-public class ElectricityV1Controller(
+public class ElectricityController(
     IElectricityService service,
     IElectricitySubscriptionService subscriptionService,
-    ILogger<ElectricityV1Controller> logger,
+    ILogger<ElectricityController> logger,
     ILanguageResolver languageResolver,
     IApiMessageLocalizer messageLocalizer) : V1ControllerBase(languageResolver, messageLocalizer)
 {

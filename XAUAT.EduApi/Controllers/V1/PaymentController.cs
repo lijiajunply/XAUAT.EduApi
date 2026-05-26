@@ -10,9 +10,9 @@ namespace XAUAT.EduApi.Controllers.V1;
 [Route("v1/payment")]
 [Produces("application/json")]
 [Consumes("application/json")]
-public class PaymentV1Controller(
+public class PaymentController(
     IPaymentService paymentService,
-    ILogger<PaymentV1Controller> logger,
+    ILogger<PaymentController> logger,
     ILanguageResolver languageResolver,
     IApiMessageLocalizer messageLocalizer)
     : V1ControllerBase(languageResolver, messageLocalizer)

@@ -8,9 +8,9 @@ namespace XAUAT.EduApi.Controllers.V1;
 [ApiController]
 [Route("v1/bus")]
 [Produces("application/json")]
-public class BusV1Controller(
+public class BusController(
     IBusService busService,
-    ILogger<BusV1Controller> logger,
+    ILogger<BusController> logger,
     ILanguageResolver languageResolver,
     IApiMessageLocalizer messageLocalizer) : V1ControllerBase(languageResolver, messageLocalizer)
 {
