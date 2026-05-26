@@ -38,7 +38,11 @@ else
 // 基础服务配置
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddOpenApi(options => { options.AddOperationTransformer<LanguageHeaderOperationTransformer>(); });
+builder.Services.AddOpenApi(options =>
+{
+    options.AddOperationTransformer<LanguageHeaderOperationTransformer>();
+    options.AddDocumentTransformer<CookieSecurityDocumentTransformer>();
+});
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddSingleton(
     Options.Create(EnvironmentVariableHelper.BuildElectricitySubscriptionOptions()));

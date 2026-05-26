@@ -14,17 +14,17 @@ public static class HttpTimeouts
     /// <summary>
     /// 快速请求超时时间（用于简单查询）
     /// </summary>
-    public static readonly TimeSpan Fast = TimeSpan.FromSeconds(5);
+    public static readonly TimeSpan Fast = TimeSpan.FromSeconds(10);
 
     /// <summary>
     /// 慢速请求超时时间（用于复杂操作，如登录、支付）
     /// </summary>
-    public static readonly TimeSpan Slow = TimeSpan.FromSeconds(15);
+    public static readonly TimeSpan Slow = TimeSpan.FromSeconds(20);
 
     /// <summary>
     /// 教务系统请求超时时间
     /// </summary>
-    public static readonly TimeSpan EduSystem = TimeSpan.FromSeconds(15);
+    public static readonly TimeSpan EduSystem = TimeSpan.FromSeconds(30);
 
     /// <summary>
     /// 外部API请求超时时间

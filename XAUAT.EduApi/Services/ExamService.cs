@@ -1,5 +1,6 @@
 using System.Text.RegularExpressions;
 using EduApi.Data.Models;
+using HtmlAgilityPack;
 using Newtonsoft.Json;
 using Polly;
 using XAUAT.EduApi.Caching;
@@ -30,6 +31,7 @@ public class ExamService(
     : IExamService
 {
     private const string BaseUrl = "https://swjw.xauat.edu.cn";
+
     private readonly IStudentRateLimitExecutor _rateLimitExecutor =
         rateLimitExecutor ?? NoOpStudentRateLimitExecutor.Instance;
 
@@ -145,7 +147,7 @@ public class ExamService(
                 url += $"info/{id}?";
             }
 
-            using var httpClient = httpClientFactory.CreateClient();
+            var httpClient = httpClientFactory.CreateClient();
             httpClient.SetRealisticHeaders();
             httpClient.Timeout = HttpTimeouts.EduSystem;
 
@@ -168,44 +170,21 @@ public class ExamService(
                     // 限流页识别必须放在执行器内部，这样第一次命中才能真正写入冷却状态
                     content.ThrowIfAuthOrRateLimited();
 
-                    var match = Regex.Match(content, @"var studentExamInfoVms = (.*?)\];", RegexOptions.Singleline);
-                    if (!match.Success)
+                    var examData = ParseNow(content);
+                    if (examData != null)
                     {
-                        logger.LogWarning("Failed to match exam data pattern");
                         return new ExamResponse
                         {
-                            Exams = [],
-                            CanClick = false,
-                            Error = "Failed to match exam data pattern"
+                            Exams = examData,
                         };
                     }
 
-                    var jsonData = match.Groups[1].Value + "]";
-                    jsonData = jsonData.Replace("'", "\"");
-                    jsonData = Regex.Replace(jsonData, @"\\x[0-9A-Fa-f]{2}", "");
-
-                    var examData = JsonConvert.DeserializeObject<List<ExamDataRaw>>(jsonData);
-                    if (examData == null)
-                    {
-                        logger.LogWarning("Failed to deserialize exam data");
-                        return new ExamResponse
-                        {
-                            Exams = [],
-                            CanClick = false,
-                            Error = "Failed to deserialize exam data"
-                        };
-                    }
-
+                    logger.LogWarning("Failed to deserialize exam data");
                     return new ExamResponse
                     {
-                        Exams = examData.Select(d => new ExamInfo
-                        {
-                            Name = d.Course.NameZh,
-                            Time = d.ExamTime,
-                            Location = d.Room,
-                            Seat = d.SeatNo
-                        }).ToList(),
-                        CanClick = examData.Count != 0
+                        Exams = [],
+                        CanClick = false,
+                        Error = "Failed to deserialize exam data"
                     };
                 }, cts.Token));
         }
@@ -227,6 +206,40 @@ public class ExamService(
                 Error = ex.Message
             };
         }
+    }
+
+    private List<ExamInfo>? ParseNow(string html)
+    {
+        var doc = new HtmlDocument();
+        doc.LoadHtml(html);
+
+        var examList = new List<ExamInfo>();
+
+        // 使用 XPath 定位到 id 为 exams 的表格下的 tbody 中的所有 tr 行
+        var rows = doc.DocumentNode.SelectNodes("//table[@id='exams']/tbody/tr");
+
+        if (rows != null!)
+        {
+            foreach (var cells in rows.Select(row => row.SelectNodes("td")))
+            {
+                // 确保单元格数量与表头一致（6列）
+                if (cells is not { Count: >= 6 }) continue;
+                var exam = new ExamInfo
+                {
+                    Name = cells[0].InnerText.Trim(),
+                    Time = cells[1].InnerText.Trim(),
+                    Location = cells[2].InnerText.Trim(),
+                    Seat = cells[3].InnerText.Trim(),
+                };
+                examList.Add(exam);
+            }
+        }
+        else
+        {
+            Console.WriteLine("⚠️ 提示：未在 <tbody> 中找到任何考试数据行（当前表格为空）。");
+        }
+
+        return examList;
     }
 }
 
