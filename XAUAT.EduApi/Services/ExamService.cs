@@ -72,6 +72,7 @@ public class ExamService(
     /// 获取本学期
     /// </summary>
     /// <param name="cookie"></param>
+    /// <param name="language"></param>
     /// <returns></returns>
     public async Task<SemesterItem> GetThisSemester(string cookie, string language = "zh")
     {
@@ -114,6 +115,8 @@ public class ExamService(
     /// </summary>
     /// <param name="cookie"></param>
     /// <param name="id"></param>
+    /// <param name="language"></param>
+    /// <param name="requestStudentIds"></param>
     /// <returns></returns>
     private async Task<ExamResponse> GetExamArrangementAsync(
         string cookie,

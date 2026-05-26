@@ -31,10 +31,12 @@ public class ScoreService(
 {
     private readonly IScorePersistenceQueue _scorePersistenceQueue =
         scorePersistenceQueue ?? NullScorePersistenceQueue.Instance;
+
     private readonly IStudentRateLimitExecutor _rateLimitExecutor =
         rateLimitExecutor ?? NoOpStudentRateLimitExecutor.Instance;
 
-    public async Task<List<ScoreResponse>> GetScoresAsync(string studentId, string semester, string cookie, string language = "zh")
+    public async Task<List<ScoreResponse>> GetScoresAsync(string studentId, string semester, string cookie,
+        string language = "zh")
     {
         if (testAccountResolver?.IsTestAccount(cookie: cookie, studentId: studentId) == true)
         {
@@ -56,7 +58,8 @@ public class ScoreService(
                 var split = HttpContextStudentExtensions.ParseStudentIds(studentId);
 
                 // 使用 Task.WhenAll 并行获取所有学生的成绩，解决 N+1 问题
-                var tasks = split.Select((s, index) => GetScoreResponseWithIndex(s, semester, cookie, language, index)).ToArray();
+                var tasks = split.Select((s, index) => GetScoreResponseWithIndex(s, semester, cookie, language, index))
+                    .ToArray();
                 var allResults = await Task.WhenAll(tasks).ConfigureAwait(false);
 
                 // 合并结果
@@ -68,7 +71,8 @@ public class ScoreService(
     /// <summary>
     /// 获取成绩并标记是否为辅修
     /// </summary>
-    private async Task<List<ScoreResponse>> GetScoreResponseWithIndex(string studentId, string semester, string cookie, string language, int index)
+    private async Task<List<ScoreResponse>> GetScoreResponseWithIndex(string studentId, string semester, string cookie,
+        string language, int index)
     {
         var scoreResponse = await GetScoreResponse(studentId, semester, cookie, language).ConfigureAwait(false);
         var scoreResponses = scoreResponse.ToList();
@@ -126,14 +130,16 @@ public class ScoreService(
             TimeSpan.FromHours(1));
     }
 
-    public async Task<SemesterItem> GetThisSemesterAsync(string cookie, string language = "zh", string? studentId = null)
+    public async Task<SemesterItem> GetThisSemesterAsync(string cookie, string language = "zh",
+        string? studentId = null)
     {
         return await _rateLimitExecutor.ExecuteAsync(
             HttpContextStudentExtensions.ParseStudentIds(studentId),
             () => examService.GetThisSemester(cookie, language));
     }
 
-    private async Task<IEnumerable<ScoreResponse>> GetScoreResponse(string studentId, string semester, string cookie, string language)
+    private async Task<IEnumerable<ScoreResponse>> GetScoreResponse(string studentId, string semester, string cookie,
+        string language)
     {
         // 判断是否为当前学期
         var thisSemester = await _rateLimitExecutor.ExecuteAsync(
@@ -143,7 +149,8 @@ public class ScoreService(
 
         if (!isCurrentSemester && thisSemester != null)
         {
-            if (int.TryParse(semester, out var theSemesterInt) && int.TryParse(thisSemester.Value, out var thisSemesterInt))
+            if (int.TryParse(semester, out var theSemesterInt) &&
+                int.TryParse(thisSemester.Value, out var thisSemesterInt))
             {
                 isCurrentSemester = Math.Abs(thisSemesterInt - theSemesterInt) <= 60;
             }
@@ -195,9 +202,10 @@ public class ScoreService(
         return crawledScores;
     }
 
-    private async Task<List<ScoreResponse>> CrawlScores(string studentId, string semester, string cookie, string language)
+    private async Task<List<ScoreResponse>> CrawlScores(string studentId, string semester, string cookie,
+        string language)
     {
-        using var client = httpClientFactory.CreateClient();
+        var client = httpClientFactory.CreateClient();
         client.ConfigureForEduSystem(cookie, HttpTimeouts.EduSystem);
 
         var retryPolicy = Policy
@@ -224,12 +232,7 @@ public class ScoreService(
                 if (content.StartsWith('<'))
                 {
                     logger.LogWarning("获取成绩数据失败，返回了HTML内容而非JSON，可能Cookie已过期");
-                    if (content.Contains("登入页面"))
-                    {
-                        throw new Exceptions.UnAuthenticationError();
-                    }
-
-                    return [];
+                    return content.Contains("登入页面") ? throw new Exceptions.UnAuthenticationError() : [];
                 }
 
                 JObject json;
@@ -266,7 +269,8 @@ public class ScoreService(
                 var thisSemesterCache = await cacheService.GetAsync<string>(CacheKeys.ThisSemester);
                 if (string.IsNullOrEmpty(thisSemesterCache))
                 {
-                    await _rateLimitExecutor.ExecuteAsync([studentId], () => examService.GetThisSemester(cookie, language))
+                    await _rateLimitExecutor
+                        .ExecuteAsync([studentId], () => examService.GetThisSemester(cookie, language))
                         .ConfigureAwait(false);
                 }
 
