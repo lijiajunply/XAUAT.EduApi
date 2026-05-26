@@ -22,17 +22,19 @@ public class ExamController(
     : V1ControllerBase(languageResolver, messageLocalizer)
 {
     [HttpGet]
-    [ProducesResponseType(typeof(ApiResponse<ExamResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<List<ExamInfo>>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status500InternalServerError)]
-    public async Task<ActionResult<ApiResponse<ExamResponse>>> GetExamArrangements(string? studentId)
+    public async Task<ActionResult<ApiResponse<List<ExamInfo>>>> GetExamArrangements(string? studentId)
     {
         try
         {
             var cookie = Request.GetEduAuthCookie();
             var requestStudentIds = HttpContext.GetResolvedStudentIds();
             var result = await examService.GetExamArrangementsAsync(cookie, studentId, Language, requestStudentIds);
-            return Ok(SuccessResponse(result));
+            if (result.Error != null)
+                return Ok(ErrorResponse(ApiCodes.DataFetchFailed, result.Error));
+            return Ok(SuccessListResponse(result.Exams));
         }
         catch (Exceptions.StudentCooldownException)
         {

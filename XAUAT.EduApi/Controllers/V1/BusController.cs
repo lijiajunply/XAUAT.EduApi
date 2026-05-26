@@ -15,14 +15,14 @@ public class BusController(
     IApiMessageLocalizer messageLocalizer) : V1ControllerBase(languageResolver, messageLocalizer)
 {
     [HttpGet("{time?}")]
-    [ProducesResponseType(typeof(ApiResponse<BusModel>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<List<BusItem>>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status500InternalServerError)]
-    public async Task<ActionResult<ApiResponse<BusModel>>> GetBus(string? time)
+    public async Task<ActionResult<ApiResponse<List<BusItem>>>> GetBus(string? time)
     {
         try
         {
             var result = await busService.GetBusFromOldDataAsync(time, Language);
-            return Ok(SuccessResponse(result));
+            return Ok(SuccessListResponse(result.Records));
         }
         catch (Exception ex)
         {
@@ -33,14 +33,14 @@ public class BusController(
     }
 
     [HttpGet("NewData/{time?}")]
-    [ProducesResponseType(typeof(ApiResponse<BusModel>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<List<BusItem>>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status500InternalServerError)]
-    public async Task<ActionResult<ApiResponse<BusModel>>> GetBusFromNewData(string? time, string loc = "ALL")
+    public async Task<ActionResult<ApiResponse<List<BusItem>>>> GetBusFromNewData(string? time, string loc = "ALL")
     {
         try
         {
             var result = await busService.GetBusFromNewDataAsync(time, loc, Language);
-            return Ok(SuccessResponse(result));
+            return Ok(SuccessListResponse(result.Records));
         }
         catch (Exception ex)
         {
@@ -51,14 +51,14 @@ public class BusController(
     }
 
     [HttpGet("OldData/{time?}")]
-    [ProducesResponseType(typeof(ApiResponse<BusModel>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<List<BusItem>>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status500InternalServerError)]
-    public async Task<ActionResult<ApiResponse<BusModel>>> GetBusFromOldData(string? time, bool isShow = false)
+    public async Task<ActionResult<ApiResponse<List<BusItem>>>> GetBusFromOldData(string? time, bool isShow = false)
     {
         try
         {
             var result = await busService.GetBusFromOldDataAsync(time, Language, isShow);
-            return Ok(SuccessResponse(result));
+            return Ok(SuccessListResponse(result.Records));
         }
         catch (Exception ex)
         {

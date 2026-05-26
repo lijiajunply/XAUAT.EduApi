@@ -91,18 +91,29 @@ public class ScoreController(
     }
 
     [HttpGet]
-    [ProducesResponseType(typeof(ApiResponse<List<ScoreResponse>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<List<ScoreItem>>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status500InternalServerError)]
-    public async Task<ActionResult<ApiResponse<List<ScoreResponse>>>> GetScore(string studentId, string semester)
+    public async Task<ActionResult<ApiResponse<List<ScoreItem>>>> GetScore(string studentId, string semester)
     {
         try
         {
             logger.LogInformation("开始获取考试分数");
             var cookie = Request.GetEduAuthCookie();
             var scores = await scoreService.GetScoresAsync(studentId, semester, cookie, Language);
-            return Ok(SuccessListResponse(scores));
+            var items = scores.Select(s => new ScoreItem
+            {
+                Name = s.Name,
+                LessonCode = s.LessonCode,
+                LessonName = s.LessonName,
+                Grade = s.Grade,
+                Gpa = s.Gpa,
+                GradeDetail = s.GradeDetail,
+                Credit = s.Credit,
+                IsMinor = s.IsMinor
+            }).ToList();
+            return Ok(SuccessListResponse(items));
         }
         catch (Exceptions.StudentCooldownException)
         {
