@@ -1,6 +1,5 @@
 using EduApi.Data;
 using Microsoft.AspNetCore.DataProtection;
-using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Options;
@@ -82,6 +81,7 @@ public static class ServiceCollectionExtensions
         public IServiceCollection AddRepositoryServices()
         {
             services.AddScoped<IScoreRepository, ScoreRepository>();
+            services.AddScoped<IExamRepository, ExamRepository>();
             services.AddScoped<IElectricitySubscriptionRepository, ElectricitySubscriptionRepository>();
             services.AddScoped<IMapPoiRepository, MapPoiRepository>();
 
@@ -131,6 +131,7 @@ public static class ServiceCollectionExtensions
             services.AddScoped<EduCrawlerRateLimitFilter>();
             services.AddSingleton<IScorePersistenceQueue, ChannelScorePersistenceQueue>();
             services.AddHostedService<ScorePersistenceBackgroundService>();
+            services.AddHostedService<ExamCleanupBackgroundService>();
             services.AddSingleton<IElectricityNotificationQueue, ChannelElectricityNotificationQueue>();
             services.AddHostedService<ElectricitySubscriptionMonitorBackgroundService>();
             services.AddHostedService<ElectricityNotificationBackgroundService>();

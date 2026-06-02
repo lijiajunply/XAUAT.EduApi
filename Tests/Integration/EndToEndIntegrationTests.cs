@@ -66,6 +66,7 @@ public class EndToEndIntegrationTests : IDisposable
 
         // 配置仓库
         services.AddScoped<IScoreRepository, ScoreRepository>();
+        services.AddScoped<IExamRepository, ExamRepository>();
 
         // 配置服务
         services.AddScoped<IInfoService, InfoService>();

@@ -2,7 +2,6 @@ using MailKit.Net.Smtp;
 using MailKit.Security;
 using Microsoft.Extensions.Options;
 using MimeKit;
-using MimeKit.Text;
 using XAUAT.EduApi.Configuration;
 using XAUAT.EduApi.Queues;
 

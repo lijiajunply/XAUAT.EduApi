@@ -1,6 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
 using EduApi.Data.Models;
-using Microsoft.Extensions.DependencyInjection;
 using XAUAT.EduApi.Extensions;
 using XAUAT.EduApi.Services;
 

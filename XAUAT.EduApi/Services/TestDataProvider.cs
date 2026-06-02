@@ -1,6 +1,5 @@
 using System.Text.Json;
 using EduApi.Data.Models;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using XAUAT.EduApi.Configuration;
 using XAUAT.EduApi.Controllers;

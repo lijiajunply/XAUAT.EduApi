@@ -13,6 +13,7 @@ public class EduContext(DbContextOptions<EduContext> options) : DbContext(option
     public DbSet<ElectricitySubscription> ElectricitySubscriptions { get; set; }
     public DbSet<ElectricityNotificationLog> ElectricityNotificationLogs { get; set; }
     public DbSet<MapPoiModel> MapPois { get; set; }
+    public DbSet<ExamRecord> ExamRecords { get; set; }
     
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -49,6 +50,13 @@ public class EduContext(DbContextOptions<EduContext> options) : DbContext(option
             entity.HasIndex(e => new { e.Latitude, e.Longitude });
             entity.Property(e => e.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
             entity.Property(e => e.UpdatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+        });
+
+        modelBuilder.Entity<ExamRecord>(entity =>
+        {
+            entity.HasIndex(e => e.StudentId);
+            entity.HasIndex(e => e.ExamTime);
+            entity.HasIndex(e => new { e.StudentId, e.ExamTime });
         });
 
         base.OnModelCreating(modelBuilder);

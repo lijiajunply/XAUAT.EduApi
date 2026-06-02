@@ -3,6 +3,7 @@ using Moq.Protected;
 using Microsoft.Extensions.Logging;
 using XAUAT.EduApi.Services;
 using XAUAT.EduApi.Caching;
+using XAUAT.EduApi.Repos;
 using EduApi.Data.Models;
 using System.Net;
 using Newtonsoft.Json;
@@ -18,6 +19,7 @@ public class ExamServiceTests
     private readonly Mock<ILogger<ExamService>> _loggerMock;
     private readonly Mock<IInfoService> _infoServiceMock;
     private readonly Mock<ICacheService> _cacheServiceMock;
+    private readonly Mock<IExamRepository> _examRepositoryMock;
     private readonly ExamService _examService;
 
     /// <summary>
@@ -29,6 +31,7 @@ public class ExamServiceTests
         _loggerMock = new Mock<ILogger<ExamService>>();
         _infoServiceMock = new Mock<IInfoService>();
         _cacheServiceMock = new Mock<ICacheService>();
+        _examRepositoryMock = new Mock<IExamRepository>();
 
         // 默认配置GetOrCreateAsync：缓存未命中时调用工厂方法
         SetupGetOrCreatePassThrough<SemesterItem>();
@@ -39,7 +42,8 @@ public class ExamServiceTests
             _httpClientFactoryMock.Object,
             _loggerMock.Object,
             _infoServiceMock.Object,
-            _cacheServiceMock.Object);
+            _cacheServiceMock.Object,
+            _examRepositoryMock.Object);
     }
 
     private void SetupGetOrCreatePassThrough<T>()
@@ -66,7 +70,8 @@ public class ExamServiceTests
                 It.IsAny<TimeSpan?>(),
                 It.IsAny<CacheLevel>(),
                 It.IsAny<int>(),
-                It.IsAny<CancellationToken>()))
+                It.IsAny<CancellationToken>(),
+                It.IsAny<bool>()))
             .ReturnsAsync(value);
     }
 
@@ -396,6 +401,7 @@ public class ExamServiceTests
             _loggerMock.Object,
             _infoServiceMock.Object,
             _cacheServiceMock.Object,
+            _examRepositoryMock.Object,
             resolver.Object,
             provider.Object);
 
@@ -408,7 +414,8 @@ public class ExamServiceTests
             It.IsAny<TimeSpan?>(),
             It.IsAny<CacheLevel>(),
             It.IsAny<int>(),
-            It.IsAny<CancellationToken>()), Times.Never);
+            It.IsAny<CancellationToken>(),
+            It.IsAny<bool>()), Times.Never);
         _httpClientFactoryMock.Verify(x => x.CreateClient(It.IsAny<string>()), Times.Never);
     }
 

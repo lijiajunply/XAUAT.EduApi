@@ -3,7 +3,6 @@ using EduApi.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Serilog;
-using Serilog.Events;
 using XAUAT.EduApi.Caching;
 using XAUAT.EduApi.Extensions;
 using XAUAT.EduApi.OpenApi;

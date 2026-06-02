@@ -1,11 +1,13 @@
+using System.Globalization;
 using System.Text.RegularExpressions;
+using EduApi.Data;
 using EduApi.Data.Models;
 using HtmlAgilityPack;
-using Newtonsoft.Json;
 using Polly;
 using XAUAT.EduApi.Caching;
 using XAUAT.EduApi.Exceptions;
 using XAUAT.EduApi.Extensions;
+using XAUAT.EduApi.Repos;
 
 namespace XAUAT.EduApi.Services;
 
@@ -25,6 +27,7 @@ public class ExamService(
     ILogger<ExamService> logger,
     IInfoService info,
     ICacheService cacheService,
+    IExamRepository examRepository,
     ITestAccountResolver? testAccountResolver = null,
     ITestDataProvider? testDataProvider = null,
     IStudentRateLimitExecutor? rateLimitExecutor = null)
@@ -133,7 +136,7 @@ public class ExamService(
         return await cacheService.GetOrCreateAsync(
             CacheKeys.ExamArrangement(id),
             async () => await FetchExamArrangementAsync(cookie, id, language, requestStudentIds ?? [id]),
-            TimeSpan.FromHours(1), isUse: false);
+            TimeSpan.FromHours(1));
     }
 
     private async Task<ExamResponse> FetchExamArrangementAsync(
@@ -176,6 +179,24 @@ public class ExamService(
                     var examData = ParseNow(content);
                     if (examData != null)
                     {
+                        if (string.IsNullOrEmpty(id) || examData.Count <= 0)
+                        {
+                            return new ExamResponse
+                            {
+                                Exams = examData,
+                            };
+                        }
+
+                        try
+                        {
+                            var records = examData.Select(i => ExamInfoToRecord(id, i)).ToList();
+                            await examRepository.MergeStudentExamsAsync(id, records);
+                        }
+                        catch (Exception ex)
+                        {
+                            logger.LogWarning(ex, "合并考试数据到数据库时出错，studentId: {StudentId}", id);
+                        }
+
                         return new ExamResponse
                         {
                             Exams = examData,
@@ -243,6 +264,43 @@ public class ExamService(
         }
 
         return examList;
+    }
+
+    private static ExamRecord ExamInfoToRecord(string studentId, ExamInfo info)
+    {
+        var timeRaw = info.Time;
+        var examTime = ParseExamTime(timeRaw);
+        var rawKey = $"{studentId}_{info.Name}_{timeRaw}";
+        return new ExamRecord
+        {
+            Key = rawKey.ToHash(),
+            StudentId = studentId,
+            Name = info.Name,
+            Time = timeRaw,
+            ExamTime = examTime,
+            Location = info.Location,
+            Seat = info.Seat
+        };
+    }
+
+    private static DateTime ParseExamTime(string timeRaw)
+    {
+        if (string.IsNullOrWhiteSpace(timeRaw))
+            return DateTime.MinValue;
+
+        var dashIndex = timeRaw.IndexOf('-');
+        var startPart = dashIndex > 0 ? timeRaw[..dashIndex].Trim() : timeRaw.Trim();
+
+        if (DateTime.TryParseExact(startPart, "yyyy-MM-dd HH:mm", null, DateTimeStyles.AssumeUniversal, out var result))
+            return result;
+
+        if (DateTime.TryParseExact(startPart, "yyyy/MM/dd HH:mm", null, DateTimeStyles.AssumeUniversal, out result))
+            return result;
+
+        if (DateTime.TryParse(startPart, null, DateTimeStyles.AssumeUniversal, out result))
+            return result;
+
+        return DateTime.MinValue;
     }
 }
 
