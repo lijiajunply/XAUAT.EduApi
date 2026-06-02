@@ -4,8 +4,7 @@ using XAUAT.EduApi.Extensions;
 namespace XAUAT.EduApi.Services;
 
 public class StudentRateLimitExecutor(
-    IStudentRateLimitState rateLimitState,
-    IHttpContextAccessor httpContextAccessor) : IStudentRateLimitExecutor
+    IStudentRateLimitState rateLimitState) : IStudentRateLimitExecutor
 {
     public async Task<T> ExecuteAsync<T>(IEnumerable<string?> studentIds, Func<Task<T>> action)
     {
@@ -50,12 +49,8 @@ public class StudentRateLimitExecutor(
         });
     }
 
-    private string[] NormalizeRateLimitKeys(IEnumerable<string?> studentIds)
+    private static string[] NormalizeRateLimitKeys(IEnumerable<string?> studentIds)
     {
-        var context = httpContextAccessor.HttpContext;
-        var path = context?.Request.GetRateLimitPath();
-        var cookie = context?.Request.GetEduAuthCookie();
-
-        return HttpContextStudentExtensions.CreateRateLimitStateKeys(studentIds, cookie, path);
+        return HttpContextStudentExtensions.CreateRateLimitStateKeys(studentIds);
     }
 }

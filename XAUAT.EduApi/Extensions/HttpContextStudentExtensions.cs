@@ -131,52 +131,16 @@ public static class HttpContextStudentExtensions
         return $"{path}|{studentSegment}|{cookieIdentity}";
     }
 
-    public static string[] CreateRateLimitStateKeys(
-        IEnumerable<string?>? studentIds,
-        string? cookie,
-        string? path)
+    private const string RateLimitKeyPrefix = "rate_limit";
+
+    public static string[] CreateRateLimitStateKeys(IEnumerable<string?>? studentIds)
     {
-        var normalizedStudentIds = (studentIds ?? [])
+        return (studentIds ?? [])
             .Where(studentId => !string.IsNullOrWhiteSpace(studentId))
             .Select(studentId => studentId!.Trim())
             .Where(studentId => !studentId.StartsWith("cookie:", StringComparison.Ordinal))
             .Distinct(StringComparer.Ordinal)
+            .Select(studentId => $"{RateLimitKeyPrefix}:{studentId}")
             .ToArray();
-        var fallbackCookieIdentity = (studentIds ?? [])
-            .Where(studentId => !string.IsNullOrWhiteSpace(studentId))
-            .Select(studentId => studentId!.Trim())
-            .FirstOrDefault(studentId => studentId.StartsWith("cookie:", StringComparison.Ordinal));
-
-        var normalizedPath = string.IsNullOrWhiteSpace(path)
-            ? "/"
-            : path.Trim().ToLowerInvariant();
-        var cookieIdentity = CreateCookieRateLimitIdentity(cookie) ?? fallbackCookieIdentity;
-
-        var keys = new List<string>();
-        foreach (var studentId in normalizedStudentIds)
-        {
-            keys.Add(CreateRateLimitStateKey(studentId, cookieIdentity, normalizedPath));
-        }
-
-        if (keys.Count == 0 && !string.IsNullOrWhiteSpace(cookieIdentity))
-        {
-            keys.Add(CreateRateLimitStateKey(null, cookieIdentity, normalizedPath));
-        }
-
-        if (keys.Count == 0)
-        {
-            keys.Add(CreateRateLimitStateKey(null, null, normalizedPath));
-        }
-
-        return keys
-            .Distinct(StringComparer.Ordinal)
-            .ToArray();
-    }
-
-    private static string CreateRateLimitStateKey(string? studentId, string? cookieIdentity, string path)
-    {
-        var studentSegment = string.IsNullOrWhiteSpace(studentId) ? "student:none" : $"student:{studentId}";
-        var cookieSegment = string.IsNullOrWhiteSpace(cookieIdentity) ? "cookie:none" : cookieIdentity;
-        return $"{path}|{studentSegment}|{cookieSegment}";
     }
 }

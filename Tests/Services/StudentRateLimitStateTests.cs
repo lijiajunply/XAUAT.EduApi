@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.Http;
 using XAUAT.EduApi.Extensions;
 using XAUAT.EduApi.Services;
 
@@ -6,8 +5,8 @@ namespace XAUAT.EduApi.Tests.Services;
 
 public class StudentRateLimitStateTests
 {
-    private const string KeyA = "/score|student:A|cookie:none";
-    private const string KeyB = "/course|student:B|cookie:none";
+    private const string KeyA = "rate_limit:A";
+    private const string KeyB = "rate_limit:B";
 
     [Fact]
     public void MarkRateLimited_ShouldEscalateCooldown_AndCapAtFourMinutes()
@@ -54,13 +53,9 @@ public class StudentRateLimitStateTests
     public async Task StudentRateLimitExecutor_ShouldShortCircuit_WhenStudentIsBlocked()
     {
         var state = new StudentRateLimitState();
-        var httpContextAccessor = new HttpContextAccessor
-        {
-            HttpContext = BuildHttpContext("/score", "test-cookie")
-        };
-        var blockedKey = HttpContextStudentExtensions.CreateRateLimitStateKeys(["A"], "test-cookie", "/score").Single();
+        var blockedKey = HttpContextStudentExtensions.CreateRateLimitStateKeys(["A"]).Single();
         state.MarkRateLimited(blockedKey);
-        var executor = new StudentRateLimitExecutor(state, httpContextAccessor);
+        var executor = new StudentRateLimitExecutor(state);
         var invoked = false;
 
         await Assert.ThrowsAsync<XAUAT.EduApi.Exceptions.StudentCooldownException>(() =>
@@ -74,19 +69,13 @@ public class StudentRateLimitStateTests
     }
 
     [Fact]
-    public void RateLimitKeys_ShouldBeScopedByPath()
+    public void RateLimitKeys_ShouldBePerStudentId()
     {
-        var scoreKey = HttpContextStudentExtensions.CreateRateLimitStateKeys(["20230001"], "test-cookie", "/score").Single();
-        var courseKey = HttpContextStudentExtensions.CreateRateLimitStateKeys(["20230001"], "test-cookie", "/course").Single();
+        var key1 = HttpContextStudentExtensions.CreateRateLimitStateKeys(["20230001"]).Single();
+        var key2 = HttpContextStudentExtensions.CreateRateLimitStateKeys(["20230002"]).Single();
 
-        Assert.NotEqual(scoreKey, courseKey);
-    }
-
-    private static DefaultHttpContext BuildHttpContext(string path, string cookie)
-    {
-        var context = new DefaultHttpContext();
-        context.Request.Path = path;
-        context.Request.Headers["xauat"] = cookie;
-        return context;
+        Assert.NotEqual(key1, key2);
+        Assert.Equal("rate_limit:20230001", key1);
+        Assert.Equal("rate_limit:20230002", key2);
     }
 }

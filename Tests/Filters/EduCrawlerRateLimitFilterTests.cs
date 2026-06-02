@@ -18,7 +18,7 @@ public class EduCrawlerRateLimitFilterTests
     public async Task OnActionExecutionAsync_ShouldThrowCooldownException_WhenStudentIdIsBlocked()
     {
         var state = new StudentRateLimitState();
-        state.MarkRateLimited(HttpContextStudentExtensions.CreateRateLimitStateKeys(["20230001"], null, "/score").Single());
+        state.MarkRateLimited(HttpContextStudentExtensions.CreateRateLimitStateKeys(["20230001"]).Single());
         var filter = new EduCrawlerRateLimitFilter(state, Mock.Of<ICookieCodeService>());
         var context = BuildContext(
             controller: new object(),
@@ -33,7 +33,7 @@ public class EduCrawlerRateLimitFilterTests
     public async Task OnActionExecutionAsync_ShouldResolveStudentIdFromCookie_WhenActionHasNoStudentId()
     {
         var state = new StudentRateLimitState();
-        state.MarkRateLimited(HttpContextStudentExtensions.CreateRateLimitStateKeys(["20230001"], "test-cookie", "/score").Single());
+        state.MarkRateLimited(HttpContextStudentExtensions.CreateRateLimitStateKeys(["20230001"]).Single());
         var cookieCodeService = new Mock<ICookieCodeService>();
         cookieCodeService.Setup(x => x.GetCode("test-cookie")).ReturnsAsync("20230001");
         var filter = new EduCrawlerRateLimitFilter(state, cookieCodeService.Object);
@@ -69,17 +69,14 @@ public class EduCrawlerRateLimitFilterTests
         var rateLimitKeys = context.HttpContext.GetResolvedRateLimitKeys();
         Assert.Single(identities);
         Assert.StartsWith("cookie:", identities.Single());
-        Assert.Single(rateLimitKeys);
-        Assert.Contains("/score|student:none|cookie:", rateLimitKeys.Single());
+        Assert.Empty(rateLimitKeys);
     }
 
     [Fact]
-    public async Task OnActionExecutionAsync_ShouldBlockByCookieIdentity_WhenStudentIdCannotBeResolved()
+    public async Task OnActionExecutionAsync_ShouldNotBlock_WhenStudentIdCannotBeResolved()
     {
         var cookie = "test-cookie";
         var state = new StudentRateLimitState();
-        var rateLimitKey = HttpContextStudentExtensions.CreateRateLimitStateKeys([], cookie, "/score").Single();
-        state.MarkRateLimited(rateLimitKey);
 
         var cookieCodeService = new Mock<ICookieCodeService>();
         cookieCodeService.Setup(x => x.GetCode(cookie))
@@ -88,25 +85,6 @@ public class EduCrawlerRateLimitFilterTests
         var filter = new EduCrawlerRateLimitFilter(state, cookieCodeService.Object);
         var context = BuildContext(controller: new object());
         context.HttpContext.Request.Path = "/score";
-        context.HttpContext.Request.Headers["xauat"] = cookie;
-
-        await Assert.ThrowsAsync<StudentCooldownException>(() =>
-            filter.OnActionExecutionAsync(context, () => throw new NotImplementedException()));
-    }
-
-    [Fact]
-    public async Task OnActionExecutionAsync_ShouldNotBlockDifferentPath()
-    {
-        var cookie = "test-cookie";
-        var state = new StudentRateLimitState();
-        state.MarkRateLimited(HttpContextStudentExtensions.CreateRateLimitStateKeys(["20230001"], cookie, "/score").Single());
-
-        var cookieCodeService = new Mock<ICookieCodeService>();
-        cookieCodeService.Setup(x => x.GetCode(cookie)).ReturnsAsync("20230001");
-
-        var filter = new EduCrawlerRateLimitFilter(state, cookieCodeService.Object);
-        var context = BuildContext(controller: new object());
-        context.HttpContext.Request.Path = "/course";
         context.HttpContext.Request.Headers["xauat"] = cookie;
         var executed = false;
 
@@ -118,6 +96,25 @@ public class EduCrawlerRateLimitFilterTests
         });
 
         Assert.True(executed);
+    }
+
+    [Fact]
+    public async Task OnActionExecutionAsync_ShouldBlockCrossPath()
+    {
+        var cookie = "test-cookie";
+        var state = new StudentRateLimitState();
+        state.MarkRateLimited(HttpContextStudentExtensions.CreateRateLimitStateKeys(["20230001"]).Single());
+
+        var cookieCodeService = new Mock<ICookieCodeService>();
+        cookieCodeService.Setup(x => x.GetCode(cookie)).ReturnsAsync("20230001");
+
+        var filter = new EduCrawlerRateLimitFilter(state, cookieCodeService.Object);
+        var context = BuildContext(controller: new object());
+        context.HttpContext.Request.Path = "/course";
+        context.HttpContext.Request.Headers["xauat"] = cookie;
+
+        await Assert.ThrowsAsync<StudentCooldownException>(() =>
+            filter.OnActionExecutionAsync(context, () => throw new NotImplementedException()));
     }
 
     private static ActionExecutingContext BuildContext(object controller, Dictionary<string, object?>? arguments = null)

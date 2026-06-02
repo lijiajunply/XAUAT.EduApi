@@ -35,7 +35,7 @@ public class CacheService : ICacheService, IDisposable
     /// <summary>
     /// 构造函数
     /// </summary>
-    /// <param name="connectionMultiplexer">Redis连接多路复用器</param>
+    /// <param name="multiplexers">Redis连接多路复用器</param>
     /// <param name="options">缓存配置选项</param>
     /// <param name="logger">日志记录器</param>
     /// <param name="monitoringService">监控服务</param>

@@ -13,10 +13,7 @@ public class EduCrawlerRateLimitFilter(
     public async Task OnActionExecutionAsync(ActionExecutingContext context, ActionExecutionDelegate next)
     {
         var studentIds = await ResolveStudentIdsAsync(context);
-        var rateLimitKeys = HttpContextStudentExtensions.CreateRateLimitStateKeys(
-            studentIds,
-            context.HttpContext.Request.GetEduAuthCookie(),
-            context.HttpContext.Request.GetRateLimitPath());
+        var rateLimitKeys = HttpContextStudentExtensions.CreateRateLimitStateKeys(studentIds);
 
         context.HttpContext.SetResolvedStudentIds(studentIds);
         context.HttpContext.SetResolvedRateLimitKeys(rateLimitKeys);

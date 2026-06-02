@@ -118,7 +118,7 @@ public class ControllerResponseModelTests
             .ThrowsAsync(new RateLimitException());
 
         var rateLimitState = new StudentRateLimitState();
-        var rateLimitKey = HttpContextStudentExtensions.CreateRateLimitStateKeys(["20230001"], "test-cookie", "/Course").Single();
+        var rateLimitKey = HttpContextStudentExtensions.CreateRateLimitStateKeys(["20230001"]).Single();
         rateLimitState.MarkRateLimited(rateLimitKey);
 
         var services = new ServiceCollection()
@@ -163,7 +163,7 @@ public class ControllerResponseModelTests
             .ThrowsAsync(new RateLimitException());
 
         var rateLimitState = new StudentRateLimitState();
-        var rateLimitKey = HttpContextStudentExtensions.CreateRateLimitStateKeys(["20230001"], "test-cookie", "/Exam").Single();
+        var rateLimitKey = HttpContextStudentExtensions.CreateRateLimitStateKeys(["20230001"]).Single();
         rateLimitState.MarkRateLimited(rateLimitKey);
 
         var services = new ServiceCollection()
