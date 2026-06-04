@@ -123,6 +123,7 @@ public static class ServiceCollectionExtensions
             services.AddScoped<ICookieCodeService, CookieCodeService>();
             services.AddScoped<ISchoolNavService, SchoolNavService>();
             services.AddScoped<IMapService, MapService>();
+            services.AddScoped<IMapAdminTokenService, MapAdminTokenService>();
             services.AddScoped<IElectricityService, ElectricityService>();
             services.AddScoped<IElectricitySubscriptionService, ElectricitySubscriptionService>();
             services.AddScoped<IElectricityNotificationEmailService, ElectricityNotificationEmailService>();

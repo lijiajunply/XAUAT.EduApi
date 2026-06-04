@@ -13,6 +13,7 @@ namespace XAUAT.EduApi.Controllers;
 [Produces("application/json")]
 public class MapController(
     IMapService mapService,
+    IMapAdminTokenService mapAdminTokenService,
     ILogger<MapController> logger) : ControllerBase
 {
     /// <summary>
@@ -182,6 +183,12 @@ public class MapController(
     [ProducesResponseType(typeof(string), StatusCodes.Status400BadRequest)]
     public async Task<ActionResult> ImportPoi([FromBody] MapPoiModel poi)
     {
+        var unauthorized = EnsureMapAdminAuthorized();
+        if (unauthorized is not null)
+        {
+            return unauthorized;
+        }
+
         if (string.IsNullOrWhiteSpace(poi.Name) || string.IsNullOrWhiteSpace(poi.Category))
         {
             return BadRequest("名称和分类不能为空");
@@ -214,6 +221,12 @@ public class MapController(
     [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
     public async Task<ActionResult> ImportPoisBatch([FromBody] List<MapPoiModel> pois)
     {
+        var unauthorized = EnsureMapAdminAuthorized();
+        if (unauthorized is not null)
+        {
+            return unauthorized;
+        }
+
         if (pois == null! || pois.Count == 0)
         {
             return BadRequest("POI列表不能为空");
@@ -269,6 +282,12 @@ public class MapController(
     [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
     public async Task<ActionResult> ClearAllPois()
     {
+        var unauthorized = EnsureMapAdminAuthorized();
+        if (unauthorized is not null)
+        {
+            return unauthorized;
+        }
+
         try
         {
             var count = await mapService.ClearAllPoisAsync();
@@ -282,5 +301,15 @@ public class MapController(
             logger.LogError(ex, "清空POI数据失败");
             return StatusCode(500, $"清空失败: {ex.Message}");
         }
+    }
+
+    private ActionResult? EnsureMapAdminAuthorized()
+    {
+        if (mapAdminTokenService.IsAuthorized(Request))
+        {
+            return null;
+        }
+
+        return Unauthorized("Map 管理操作需要有效的 Token");
     }
 }

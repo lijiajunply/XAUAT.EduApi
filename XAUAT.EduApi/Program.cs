@@ -46,6 +46,8 @@ builder.Services.AddSingleton(
     Options.Create(EnvironmentVariableHelper.BuildElectricitySubscriptionOptions()));
 builder.Services.AddSingleton(
     Options.Create(EnvironmentVariableHelper.BuildSmtpOptions()));
+builder.Services.AddSingleton(
+    Options.Create(EnvironmentVariableHelper.BuildMapAdminOptions()));
 
 builder.Services.AddCors(options =>
 {

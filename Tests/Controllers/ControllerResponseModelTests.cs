@@ -4,9 +4,11 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Moq;
 using Newtonsoft.Json.Linq;
 using XAUAT.EduApi.Controllers;
+using XAUAT.EduApi.Configuration;
 using XAUAT.EduApi.Exceptions;
 using XAUAT.EduApi.Extensions;
 using XAUAT.EduApi.Interfaces;
@@ -461,10 +463,70 @@ public class ControllerResponseModelTests
         Assert.Equal("主修", payload[0].Type);
     }
 
-    private static ControllerContext BuildControllerContext(string cookie, string? language = null)
+    [Fact]
+    public async Task V1MapController_ShouldReturnUnauthorized_WhenImportWithoutToken()
+    {
+        var controller = new XAUAT.EduApi.Controllers.V1.MapController(
+            Mock.Of<IMapService>(),
+            Mock.Of<ILogger<XAUAT.EduApi.Controllers.V1.MapController>>(),
+            CreateMapAdminTokenService("test-token"),
+            LanguageResolver,
+            MessageLocalizer)
+        {
+            ControllerContext = BuildControllerContext("test-cookie")
+        };
+
+        var result = await controller.ImportPoi(new MapPoiModel
+        {
+            Name = "图书馆",
+            Category = "学习",
+            Latitude = 34.1m,
+            Longitude = 108.9m
+        });
+
+        var unauthorized = Assert.IsType<UnauthorizedObjectResult>(result.Result);
+        var payload = Assert.IsType<ApiResponse<object>>(unauthorized.Value);
+        Assert.Equal(StatusCodes.Status401Unauthorized, payload.Code);
+        Assert.Equal("Map 管理操作需要有效的 Token", payload.Message);
+    }
+
+    [Fact]
+    public async Task V1MapController_ShouldAllowImport_WhenTokenMatches()
+    {
+        var mapService = new Mock<IMapService>();
+        var controller = new XAUAT.EduApi.Controllers.V1.MapController(
+            mapService.Object,
+            Mock.Of<ILogger<XAUAT.EduApi.Controllers.V1.MapController>>(),
+            CreateMapAdminTokenService("test-token"),
+            LanguageResolver,
+            MessageLocalizer)
+        {
+            ControllerContext = BuildControllerContext("test-cookie", token: "test-token")
+        };
+
+        var result = await controller.ImportPoi(new MapPoiModel
+        {
+            Name = "图书馆",
+            Category = "学习",
+            Latitude = 34.1m,
+            Longitude = 108.9m
+        });
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var payload = Assert.IsType<ApiResponse<object>>(ok.Value);
+        Assert.Equal(XAUAT.EduApi.Controllers.V1.ApiCodes.Success, payload.Code);
+        mapService.Verify(x => x.AddPoiAsync(It.IsAny<MapPoiModel>()), Times.Once);
+    }
+
+    private static ControllerContext BuildControllerContext(string cookie, string? language = null, string? token = null)
     {
         var httpContext = new DefaultHttpContext();
         httpContext.Request.Headers["xauat"] = cookie;
+        if (!string.IsNullOrWhiteSpace(token))
+        {
+            httpContext.Request.Headers["Token"] = token;
+        }
+
         if (!string.IsNullOrWhiteSpace(language))
         {
             httpContext.Request.Headers[RequestLanguage.HeaderName] = language;
@@ -474,6 +536,14 @@ public class ControllerResponseModelTests
         {
             HttpContext = httpContext
         };
+    }
+
+    private static IMapAdminTokenService CreateMapAdminTokenService(string token)
+    {
+        return new MapAdminTokenService(Options.Create(new MapAdminOptions
+        {
+            Token = token
+        }));
     }
 
     private sealed class StubHttpMessageHandler(Func<HttpRequestMessage, HttpResponseMessage> handler)

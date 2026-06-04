@@ -81,4 +81,12 @@ public static class EnvironmentVariableHelper
             FixturePath = GetStringOrDefault("TestFixtures", "TEST_ACCOUNT_FIXTURE_PATH", "TestAccount__FixturePath")
         };
     }
+
+    public static MapAdminOptions BuildMapAdminOptions()
+    {
+        return new MapAdminOptions
+        {
+            Token = GetStringOrDefault("", "MAP_ADMIN_TOKEN", "MapAdmin__Token")
+        };
+    }
 }

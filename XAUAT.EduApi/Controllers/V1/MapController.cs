@@ -11,6 +11,7 @@ namespace XAUAT.EduApi.Controllers.V1;
 public class MapController(
     IMapService mapService,
     ILogger<MapController> logger,
+    IMapAdminTokenService mapAdminTokenService,
     ILanguageResolver languageResolver,
     IApiMessageLocalizer messageLocalizer) : V1ControllerBase(languageResolver, messageLocalizer)
 {
@@ -159,6 +160,12 @@ public class MapController(
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<ApiResponse<object>>> ImportPoi([FromBody] MapPoiModel poi)
     {
+        var unauthorized = EnsureMapAdminAuthorized();
+        if (unauthorized is not null)
+        {
+            return unauthorized;
+        }
+
         if (string.IsNullOrWhiteSpace(poi.Name) || string.IsNullOrWhiteSpace(poi.Category))
         {
             return BadRequest(ErrorResponse(ApiCodes.ParamError, "名称和分类不能为空"));
@@ -187,6 +194,12 @@ public class MapController(
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<ActionResult<ApiResponse<object>>> ImportPoisBatch([FromBody] List<MapPoiModel> pois)
     {
+        var unauthorized = EnsureMapAdminAuthorized();
+        if (unauthorized is not null)
+        {
+            return unauthorized;
+        }
+
         if (pois == null! || pois.Count == 0)
         {
             return BadRequest(ErrorResponse(ApiCodes.ParamError, "POI列表不能为空"));
@@ -241,6 +254,12 @@ public class MapController(
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<ApiResponse<object>>> UpdatePoi(int id, [FromBody] MapPoiModel poi)
     {
+        var unauthorized = EnsureMapAdminAuthorized();
+        if (unauthorized is not null)
+        {
+            return unauthorized;
+        }
+
         if (id != poi.Id)
         {
             return BadRequest(ErrorResponse(ApiCodes.ParamError, "路径ID与请求体中的ID不匹配"));
@@ -278,6 +297,12 @@ public class MapController(
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<ActionResult<ApiResponse<object>>> ClearAllPois()
     {
+        var unauthorized = EnsureMapAdminAuthorized();
+        if (unauthorized is not null)
+        {
+            return unauthorized;
+        }
+
         try
         {
             var count = await mapService.ClearAllPoisAsync();
@@ -290,5 +315,15 @@ public class MapController(
             return StatusCode(StatusCodes.Status500InternalServerError,
                 ErrorResponse(ApiCodes.InternalError, $"清空失败: {ex.Message}"));
         }
+    }
+
+    private ActionResult<ApiResponse<object>>? EnsureMapAdminAuthorized()
+    {
+        if (mapAdminTokenService.IsAuthorized(Request))
+        {
+            return null;
+        }
+
+        return Unauthorized(ErrorResponse(StatusCodes.Status401Unauthorized, "Map 管理操作需要有效的 Token"));
     }
 }
