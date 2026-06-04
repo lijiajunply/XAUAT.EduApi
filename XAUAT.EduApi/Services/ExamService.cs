@@ -148,7 +148,7 @@ public class ExamService(
         return await cacheService.GetOrCreateAsync(
             CacheKeys.ExamArrangement(id),
             async () => await FetchExamArrangementAsync(cookie, id, language, requestStudentIds ?? [id]),
-            TimeSpan.FromHours(1));
+            TimeSpan.FromHours(1), isUse: false);
     }
 
     private async Task<ExamResponse> FetchExamArrangementAsync(
@@ -281,11 +281,10 @@ public class ExamService(
         // 教务系统页面可能有 tbody，也可能直接把 tr 挂在 table 下
         var rows = doc.DocumentNode.SelectNodes("//table[@id='exams']//tr");
 
-        if (rows != null)
+        if (rows != null!)
         {
-            foreach (var row in rows)
+            foreach (var cells in rows.Select(row => row.SelectNodes("td")))
             {
-                var cells = row.SelectNodes("td");
                 // 跳过表头和异常行，当前接口实际只依赖前 4 列
                 if (cells is not { Count: >= 4 }) continue;
 
@@ -329,9 +328,13 @@ public class ExamService(
         if (string.IsNullOrWhiteSpace(timeRaw))
             return DateTime.MinValue;
 
-        var dashIndex = timeRaw.IndexOf('-');
+        // 1. 同时查找连字符 '-' 和波浪号 '~' 的位置
+        var dashIndex = timeRaw.IndexOfAny(['-', '~']);
+
+        // 2. 如果找到了任意一个分隔符，就截取前半部分；否则保留整串
         var startPart = dashIndex > 0 ? timeRaw[..dashIndex].Trim() : timeRaw.Trim();
 
+        // 3. 后续的解析逻辑保持不变
         if (DateTime.TryParseExact(startPart, "yyyy-MM-dd HH:mm", null, DateTimeStyles.AssumeUniversal, out var result))
             return result;
 
