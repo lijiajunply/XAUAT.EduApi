@@ -174,7 +174,32 @@ public class ExamService(
                     var content = await response.Content.ReadAsStringAsync(ct);
 
                     // 限流页识别必须放在执行器内部，这样第一次命中才能真正写入冷却状态
-                    content.ThrowIfAuthOrRateLimited();
+                    try
+                    {
+                        content.ThrowIfAuthOrRateLimited();
+                    }
+                    catch (UnAuthenticationError)
+                    {
+                        if (string.IsNullOrEmpty(id)) throw;
+                        var data = await examRepository.GetByStudentIdAsync(id);
+
+                        var examRecords = data as ExamRecord[] ?? data.ToArray();
+                        if (examRecords.Length != 0)
+                        {
+                            return new ExamResponse()
+                            {
+                                Exams = examRecords.Select(x => new ExamInfo()
+                                {
+                                    Name = x.Name,
+                                    Time = x.Time,
+                                    Location = x.Location,
+                                    Seat = x.Seat,
+                                }).ToList()
+                            };
+                        }
+
+                        throw;
+                    }
 
                     var examData = ParseNow(content);
                     if (examData != null)
