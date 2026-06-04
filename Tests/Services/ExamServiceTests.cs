@@ -6,7 +6,8 @@ using XAUAT.EduApi.Caching;
 using XAUAT.EduApi.Repos;
 using EduApi.Data.Models;
 using System.Net;
-using Newtonsoft.Json;
+using System.Collections.Concurrent;
+using XAUAT.EduApi.Extensions;
 
 namespace XAUAT.EduApi.Tests.Services;
 
@@ -57,7 +58,8 @@ public class ExamServiceTests
                 It.IsAny<int>(),
                 It.IsAny<CancellationToken>(),
                 It.IsAny<bool>()))
-            .Returns(async (string key, Func<Task<T>> factory, TimeSpan? exp, CacheLevel level, int priority, CancellationToken ct, bool isUse) =>
+            .Returns(async (string key, Func<Task<T>> factory, TimeSpan? exp, CacheLevel level, int priority,
+                    CancellationToken ct, bool isUse) =>
                 await factory());
     }
 
@@ -118,7 +120,8 @@ public class ExamServiceTests
 
         var handlerMock = new Mock<HttpMessageHandler>();
         handlerMock.Protected()
-            .Setup<Task<HttpResponseMessage>>("SendAsync", ItExpr.IsAny<HttpRequestMessage>(), ItExpr.IsAny<CancellationToken>())
+            .Setup<Task<HttpResponseMessage>>("SendAsync", ItExpr.IsAny<HttpRequestMessage>(),
+                ItExpr.IsAny<CancellationToken>())
             .ReturnsAsync(new HttpResponseMessage
             {
                 StatusCode = HttpStatusCode.OK,
@@ -144,7 +147,8 @@ public class ExamServiceTests
 
         var handlerMock = new Mock<HttpMessageHandler>();
         handlerMock.Protected()
-            .Setup<Task<HttpResponseMessage>>("SendAsync", ItExpr.IsAny<HttpRequestMessage>(), ItExpr.IsAny<CancellationToken>())
+            .Setup<Task<HttpResponseMessage>>("SendAsync", ItExpr.IsAny<HttpRequestMessage>(),
+                ItExpr.IsAny<CancellationToken>())
             .ReturnsAsync(new HttpResponseMessage
             {
                 StatusCode = HttpStatusCode.OK,
@@ -155,7 +159,8 @@ public class ExamServiceTests
         _httpClientFactoryMock.Setup(m => m.CreateClient(It.IsAny<string>())).Returns(httpClient);
 
         // Act & Assert
-        await Assert.ThrowsAsync<XAUAT.EduApi.Exceptions.UnAuthenticationError>(() => _examService.GetThisSemester(cookie));
+        await Assert.ThrowsAsync<XAUAT.EduApi.Exceptions.UnAuthenticationError>(() =>
+            _examService.GetThisSemester(cookie));
     }
 
     #endregion
@@ -256,7 +261,8 @@ public class ExamServiceTests
 
         var handlerMock = new Mock<HttpMessageHandler>();
         handlerMock.Protected()
-            .Setup<Task<HttpResponseMessage>>("SendAsync", ItExpr.IsAny<HttpRequestMessage>(), ItExpr.IsAny<CancellationToken>())
+            .Setup<Task<HttpResponseMessage>>("SendAsync", ItExpr.IsAny<HttpRequestMessage>(),
+                ItExpr.IsAny<CancellationToken>())
             .ThrowsAsync(new HttpRequestException("Network error"));
 
         var httpClient = new HttpClient(handlerMock.Object);
@@ -313,7 +319,8 @@ public class ExamServiceTests
 
         var handlerMock = new Mock<HttpMessageHandler>();
         handlerMock.Protected()
-            .Setup<Task<HttpResponseMessage>>("SendAsync", ItExpr.IsAny<HttpRequestMessage>(), ItExpr.IsAny<CancellationToken>())
+            .Setup<Task<HttpResponseMessage>>("SendAsync", ItExpr.IsAny<HttpRequestMessage>(),
+                ItExpr.IsAny<CancellationToken>())
             .ReturnsAsync(new HttpResponseMessage
             {
                 StatusCode = HttpStatusCode.OK,
@@ -330,6 +337,141 @@ public class ExamServiceTests
         Assert.NotNull(result);
     }
 
+    [Fact]
+    public async Task GetExamArrangementsAsync_ShouldParseExamRows_WithoutTbody()
+    {
+        // Arrange
+        var cookie = "test-cookie";
+        var id = "123";
+        var htmlContent = """
+                          <html>
+                              <table id="exams">
+                                  <tr>
+                                      <th>课程</th><th>时间</th><th>地点</th><th>座位</th>
+                                  </tr>
+                                  <tr>
+                                      <td>高等数学</td>
+                                      <td>2026-06-20 09:00-11:00</td>
+                                      <td>教学楼A101</td>
+                                      <td>12</td>
+                                  </tr>
+                              </table>
+                          </html>
+                          """;
+
+        var handlerMock = new Mock<HttpMessageHandler>();
+        handlerMock.Protected()
+            .Setup<Task<HttpResponseMessage>>("SendAsync", ItExpr.IsAny<HttpRequestMessage>(),
+                ItExpr.IsAny<CancellationToken>())
+            .ReturnsAsync(new HttpResponseMessage
+            {
+                StatusCode = HttpStatusCode.OK,
+                Content = new StringContent(htmlContent)
+            });
+
+        var httpClient = new HttpClient(handlerMock.Object);
+        _httpClientFactoryMock.Setup(m => m.CreateClient(It.IsAny<string>())).Returns(httpClient);
+
+        // Act
+        var result = await _examService.GetExamArrangementsAsync(cookie, id);
+
+        // Assert
+        Assert.Single(result.Exams);
+        Assert.Equal("高等数学", result.Exams[0].Name);
+        Assert.True(result.CanClick);
+    }
+
+    [Fact]
+    public async Task GetExamArrangementsAsync_ShouldParseExamRows_WhenOnlyFourColumnsPresent()
+    {
+        // Arrange
+        var cookie = "test-cookie";
+        var id = "123";
+        var htmlContent = """
+                          <html>
+                              <table id="exams">
+                                  <tbody>
+                                      <tr>
+                                          <td>大学英语</td>
+                                          <td>2026-06-22 14:00-16:00</td>
+                                          <td>教学楼B302</td>
+                                          <td>08</td>
+                                      </tr>
+                                  </tbody>
+                              </table>
+                          </html>
+                          """;
+
+        var handlerMock = new Mock<HttpMessageHandler>();
+        handlerMock.Protected()
+            .Setup<Task<HttpResponseMessage>>("SendAsync", ItExpr.IsAny<HttpRequestMessage>(),
+                ItExpr.IsAny<CancellationToken>())
+            .ReturnsAsync(new HttpResponseMessage
+            {
+                StatusCode = HttpStatusCode.OK,
+                Content = new StringContent(htmlContent)
+            });
+
+        var httpClient = new HttpClient(handlerMock.Object);
+        _httpClientFactoryMock.Setup(m => m.CreateClient(It.IsAny<string>())).Returns(httpClient);
+
+        // Act
+        var result = await _examService.GetExamArrangementsAsync(cookie, id);
+
+        // Assert
+        Assert.Single(result.Exams);
+        Assert.Equal("大学英语", result.Exams[0].Name);
+        Assert.Equal("08", result.Exams[0].Seat);
+        Assert.True(result.CanClick);
+    }
+
+    [Fact]
+    public async Task GetExamArrangementsAsync_ShouldTrimIds_WhenStudentIdContainsSpaces()
+    {
+        // Arrange
+        var cookie = "test-cookie";
+        var id = " 123 , 456 ,, ";
+        var cacheKeys = new ConcurrentBag<string>();
+
+        _cacheServiceMock
+            .Setup(m => m.GetOrCreateAsync(
+                It.IsAny<string>(),
+                It.IsAny<Func<Task<ExamResponse>>>(),
+                It.IsAny<TimeSpan?>(),
+                It.IsAny<CacheLevel>(),
+                It.IsAny<int>(),
+                It.IsAny<CancellationToken>(),
+                It.IsAny<bool>()))
+            .Returns(async (string key, Func<Task<ExamResponse>> factory, TimeSpan? exp, CacheLevel level, int priority,
+                CancellationToken ct, bool isUse) =>
+            {
+                cacheKeys.Add(key);
+                return await factory();
+            });
+
+        var handlerMock = new Mock<HttpMessageHandler>();
+        handlerMock.Protected()
+            .Setup<Task<HttpResponseMessage>>("SendAsync", ItExpr.IsAny<HttpRequestMessage>(),
+                ItExpr.IsAny<CancellationToken>())
+            .ReturnsAsync(new HttpResponseMessage
+            {
+                StatusCode = HttpStatusCode.OK,
+                Content = new StringContent("<html><table id=\"exams\"></table></html>")
+            });
+
+        var httpClient = new HttpClient(handlerMock.Object);
+        _httpClientFactoryMock.Setup(m => m.CreateClient(It.IsAny<string>())).Returns(httpClient);
+
+        // Act
+        var result = await _examService.GetExamArrangementsAsync(cookie, id);
+
+        // Assert
+        Assert.True(result.Error == null, $"unexpected error: {result.Error}");
+        Assert.Equal(2, cacheKeys.Count);
+        Assert.Contains(CacheKeys.ExamArrangement("123"), cacheKeys);
+        Assert.Contains(CacheKeys.ExamArrangement("456"), cacheKeys);
+    }
+
     #endregion
 
     #region Edge Cases
@@ -343,7 +485,8 @@ public class ExamServiceTests
 
         var handlerMock = new Mock<HttpMessageHandler>();
         handlerMock.Protected()
-            .Setup<Task<HttpResponseMessage>>("SendAsync", ItExpr.IsAny<HttpRequestMessage>(), ItExpr.IsAny<CancellationToken>())
+            .Setup<Task<HttpResponseMessage>>("SendAsync", ItExpr.IsAny<HttpRequestMessage>(),
+                ItExpr.IsAny<CancellationToken>())
             .ReturnsAsync(new HttpResponseMessage
             {
                 StatusCode = HttpStatusCode.OK,
@@ -369,7 +512,8 @@ public class ExamServiceTests
 
         var handlerMock = new Mock<HttpMessageHandler>();
         handlerMock.Protected()
-            .Setup<Task<HttpResponseMessage>>("SendAsync", ItExpr.IsAny<HttpRequestMessage>(), ItExpr.IsAny<CancellationToken>())
+            .Setup<Task<HttpResponseMessage>>("SendAsync", ItExpr.IsAny<HttpRequestMessage>(),
+                ItExpr.IsAny<CancellationToken>())
             .ReturnsAsync(new HttpResponseMessage
             {
                 StatusCode = HttpStatusCode.OK,

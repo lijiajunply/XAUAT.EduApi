@@ -55,14 +55,26 @@ public class ExamService(
             return await GetExamArrangementAsync(cookie, id, language, requestStudentIds);
         }
 
-        var split = id.Split(',');
+        var split = id.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+        if (split.Length == 0)
+        {
+            return await GetExamArrangementAsync(cookie, null, language, requestStudentIds);
+        }
+
+        if (split.Length == 1)
+        {
+            return await GetExamArrangementAsync(cookie, split[0], language, [split[0]]);
+        }
 
         // 使用 Task.WhenAll 并行获取所有学生的考试安排，解决 N+1 问题
         var tasks = split.Select(s => GetExamArrangementAsync(cookie, s, language, [s])).ToArray();
         var allResults = await Task.WhenAll(tasks).ConfigureAwait(false);
 
         // 合并结果
-        var examResponse = new ExamResponse();
+        var examResponse = new ExamResponse
+        {
+            CanClick = allResults.Any(result => result.CanClick || result.Exams.Count > 0)
+        };
         foreach (var result in allResults)
         {
             examResponse.Exams.AddRange(result.Exams);
@@ -209,6 +221,7 @@ public class ExamService(
                             return new ExamResponse
                             {
                                 Exams = examData,
+                                CanClick = examData.Count > 0
                             };
                         }
 
@@ -225,6 +238,7 @@ public class ExamService(
                         return new ExamResponse
                         {
                             Exams = examData,
+                            CanClick = examData.Count > 0
                         };
                     }
 
@@ -264,15 +278,17 @@ public class ExamService(
 
         var examList = new List<ExamInfo>();
 
-        // 使用 XPath 定位到 id 为 exams 的表格下的 tbody 中的所有 tr 行
-        var rows = doc.DocumentNode.SelectNodes("//table[@id='exams']/tbody/tr");
+        // 教务系统页面可能有 tbody，也可能直接把 tr 挂在 table 下
+        var rows = doc.DocumentNode.SelectNodes("//table[@id='exams']//tr");
 
-        if (rows != null!)
+        if (rows != null)
         {
-            foreach (var cells in rows.Select(row => row.SelectNodes("td")))
+            foreach (var row in rows)
             {
-                // 确保单元格数量与表头一致（6列）
-                if (cells is not { Count: >= 6 }) continue;
+                var cells = row.SelectNodes("td");
+                // 跳过表头和异常行，当前接口实际只依赖前 4 列
+                if (cells is not { Count: >= 4 }) continue;
+
                 var exam = new ExamInfo
                 {
                     Name = cells[0].InnerText.Trim(),
