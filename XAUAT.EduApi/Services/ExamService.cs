@@ -148,7 +148,7 @@ public class ExamService(
         return await cacheService.GetOrCreateAsync(
             CacheKeys.ExamArrangement(id),
             async () => await FetchExamArrangementAsync(cookie, id, language, requestStudentIds ?? [id]),
-            TimeSpan.FromHours(1), isUse: false);
+            TimeSpan.FromHours(1));
     }
 
     private async Task<ExamResponse> FetchExamArrangementAsync(
@@ -190,7 +190,7 @@ public class ExamService(
                     {
                         content.ThrowIfAuthOrRateLimited();
                     }
-                    catch (UnAuthenticationError)
+                    catch (Exception)
                     {
                         if (string.IsNullOrEmpty(id)) throw;
                         var data = await examRepository.GetByStudentIdAsync(id);
