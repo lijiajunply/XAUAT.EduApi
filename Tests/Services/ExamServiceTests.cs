@@ -343,6 +343,7 @@ public class ExamServiceTests
         // Arrange
         var cookie = "test-cookie";
         var id = "123";
+        List<ExamRecord>? persistedRecords = null;
         var htmlContent = """
                           <html>
                               <table id="exams">
@@ -371,6 +372,10 @@ public class ExamServiceTests
 
         var httpClient = new HttpClient(handlerMock.Object);
         _httpClientFactoryMock.Setup(m => m.CreateClient(It.IsAny<string>())).Returns(httpClient);
+        _examRepositoryMock
+            .Setup(x => x.MergeStudentExamsAsync(id, It.IsAny<IEnumerable<ExamRecord>>()))
+            .Callback<string, IEnumerable<ExamRecord>>((_, records) => persistedRecords = records.ToList())
+            .Returns(Task.CompletedTask);
 
         // Act
         var result = await _examService.GetExamArrangementsAsync(cookie, id);
@@ -379,6 +384,10 @@ public class ExamServiceTests
         Assert.Single(result.Exams);
         Assert.Equal("高等数学", result.Exams[0].Name);
         Assert.True(result.CanClick);
+        Assert.NotNull(persistedRecords);
+        var persistedRecord = Assert.Single(persistedRecords);
+        Assert.Equal(DateTimeKind.Utc, persistedRecord.ExamTime.Kind);
+        Assert.Equal(new DateTime(2026, 6, 20, 1, 0, 0, DateTimeKind.Utc), persistedRecord.ExamTime);
     }
 
     [Fact]

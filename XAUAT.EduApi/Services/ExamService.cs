@@ -34,6 +34,7 @@ public class ExamService(
     : IExamService
 {
     private const string BaseUrl = "https://swjw.xauat.edu.cn";
+    private static readonly TimeZoneInfo SchoolTimeZone = CreateSchoolTimeZone();
 
     private readonly IStudentRateLimitExecutor _rateLimitExecutor =
         rateLimitExecutor ?? NoOpStudentRateLimitExecutor.Instance;
@@ -350,13 +351,50 @@ public class ExamService(
             startPart = timeRaw[..rangeIndex].Trim();
         }
 
-        if (DateTime.TryParseExact(startPart, "yyyy-MM-dd HH:mm", null, DateTimeStyles.AssumeUniversal,
-                out var result) ||
-            DateTime.TryParseExact(startPart, "yyyy/MM/dd HH:mm", null, DateTimeStyles.AssumeUniversal, out result) ||
-            DateTime.TryParse(startPart, null, DateTimeStyles.AssumeUniversal, out result))
-            return result;
+        if (DateTime.TryParseExact(startPart, "yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture,
+                DateTimeStyles.AllowWhiteSpaces, out var result) ||
+            DateTime.TryParseExact(startPart, "yyyy/MM/dd HH:mm", CultureInfo.InvariantCulture,
+                DateTimeStyles.AllowWhiteSpaces, out result) ||
+            DateTime.TryParse(startPart, CultureInfo.InvariantCulture, DateTimeStyles.AllowWhiteSpaces, out result))
+            return ToUtcExamTime(result);
 
-        return DateTime.MinValue;
+        return DateTime.SpecifyKind(DateTime.MinValue, DateTimeKind.Utc);
+    }
+
+    private static DateTime ToUtcExamTime(DateTime examTime)
+    {
+        if (examTime == DateTime.MinValue)
+            return DateTime.SpecifyKind(DateTime.MinValue, DateTimeKind.Utc);
+
+        return examTime.Kind switch
+        {
+            DateTimeKind.Utc => examTime,
+            DateTimeKind.Local => examTime.ToUniversalTime(),
+            _ => TimeZoneInfo.ConvertTimeToUtc(examTime, SchoolTimeZone)
+        };
+    }
+
+    private static TimeZoneInfo CreateSchoolTimeZone()
+    {
+        foreach (var timeZoneId in new[] { "Asia/Shanghai", "China Standard Time" })
+        {
+            try
+            {
+                return TimeZoneInfo.FindSystemTimeZoneById(timeZoneId);
+            }
+            catch (TimeZoneNotFoundException)
+            {
+            }
+            catch (InvalidTimeZoneException)
+            {
+            }
+        }
+
+        return TimeZoneInfo.CreateCustomTimeZone(
+            "Asia/Shanghai",
+            TimeSpan.FromHours(8),
+            "China Standard Time",
+            "China Standard Time");
     }
 }
 
