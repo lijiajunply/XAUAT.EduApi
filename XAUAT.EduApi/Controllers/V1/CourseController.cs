@@ -75,8 +75,9 @@ public class CourseController(
     }
 
     [HttpGet("Calendar")]
-    public ActionResult GetCalendarSubscription(string username, string password)
+    public ActionResult GetCalendarSubscription(string username, string password, string type = "webcal")
     {
-        return Redirect($"webcal://schedule.xauat.site/class?school=xauat&username={username}&password={password}");
+        if (type != "webcal") type = "https";
+        return Redirect($"{type}://schedule.xauat.site/class?school=xauat&username={username}&password={password}");
     }
 }
