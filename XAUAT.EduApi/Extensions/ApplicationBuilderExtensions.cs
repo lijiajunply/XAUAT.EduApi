@@ -1,3 +1,4 @@
+using ModelContextProtocol.AspNetCore;
 using XAUAT.EduApi.Middlewares;
 using Scalar.AspNetCore;
 
@@ -45,6 +46,7 @@ public static class ApplicationBuilderExtensions
             app.MapOpenApi();
             app.MapControllers();
             app.MapScalarApiReference();
+            app.MapMcp("/mcp");
             return app;
         }
 

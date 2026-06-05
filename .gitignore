@@ -13,3 +13,5 @@ login.test.json
 
 logs/
 .env
+
+.DS_Store
