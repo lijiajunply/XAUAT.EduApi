@@ -312,6 +312,7 @@ public class ExamService(
         var timeRaw = info.Time;
         var examTime = ParseExamTime(timeRaw);
         var rawKey = $"{studentId}_{info.Name}_{timeRaw}";
+        timeRaw = timeRaw.Replace('~', '-');
         return new ExamRecord
         {
             Key = rawKey.ToHash(),
