@@ -73,4 +73,10 @@ public class CourseController(
                 ErrorResponse(ApiCodes.InternalError, Message(ApiMessageKey.InternalServerError)));
         }
     }
+
+    [HttpGet("Calendar")]
+    public ActionResult GetCalendarSubscription(string username, string password)
+    {
+        return Redirect($"webcal://schedule.xauat.site/class?school=xauat&username={username}&password={password}");
+    }
 }
