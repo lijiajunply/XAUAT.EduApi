@@ -328,20 +328,32 @@ public class ExamService(
         if (string.IsNullOrWhiteSpace(timeRaw))
             return DateTime.MinValue;
 
-        // 1. 同时查找连字符 '-' 和波浪号 '~' 的位置
-        var dashIndex = timeRaw.IndexOfAny(['-', '~']);
+        var startPart = timeRaw.Trim();
 
-        // 2. 如果找到了任意一个分隔符，就截取前半部分；否则保留整串
-        var startPart = dashIndex > 0 ? timeRaw[..dashIndex].Trim() : timeRaw.Trim();
+        // 2026-07-13 14:00~16:00
+        var rangeIndex = timeRaw.IndexOfAny(['~', '～']);
+        if (rangeIndex == -1)
+        {
+            // 如果没找到波浪号，找连字符，但要确保它不是日期里的连字符
+            // 技巧：考试时间段的连字符通常在空格后面，或者我们可以找最后一个 '-'（前提是它后面没有其他日期特征）
+            // 最稳妥的是找 " - " 或者看 '-' 是不是出现在空格和具体时间之后
+            rangeIndex = timeRaw.IndexOf(" - ", StringComparison.Ordinal);
+            if (rangeIndex == -1 && timeRaw.Count(c => c == '-') > 2)
+            {
+                // 如果有超过两个横杠（如 2026-07-13 14:00-16:00），说明最后一个是时间段分隔符
+                rangeIndex = timeRaw.LastIndexOf('-');
+            }
+        }
 
-        // 3. 后续的解析逻辑保持不变
-        if (DateTime.TryParseExact(startPart, "yyyy-MM-dd HH:mm", null, DateTimeStyles.AssumeUniversal, out var result))
-            return result;
+        if (rangeIndex > 0)
+        {
+            startPart = timeRaw[..rangeIndex].Trim();
+        }
 
-        if (DateTime.TryParseExact(startPart, "yyyy/MM/dd HH:mm", null, DateTimeStyles.AssumeUniversal, out result))
-            return result;
-
-        if (DateTime.TryParse(startPart, null, DateTimeStyles.AssumeUniversal, out result))
+        if (DateTime.TryParseExact(startPart, "yyyy-MM-dd HH:mm", null, DateTimeStyles.AssumeUniversal,
+                out var result) ||
+            DateTime.TryParseExact(startPart, "yyyy/MM/dd HH:mm", null, DateTimeStyles.AssumeUniversal, out result) ||
+            DateTime.TryParse(startPart, null, DateTimeStyles.AssumeUniversal, out result))
             return result;
 
         return DateTime.MinValue;
