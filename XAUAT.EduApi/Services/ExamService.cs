@@ -3,6 +3,7 @@ using System.Text.RegularExpressions;
 using EduApi.Data;
 using EduApi.Data.Models;
 using HtmlAgilityPack;
+using Newtonsoft.Json;
 using Polly;
 using XAUAT.EduApi.Caching;
 using XAUAT.EduApi.Exceptions;
@@ -215,7 +216,7 @@ public class ExamService(
                     }
 
                     var examData = ParseNow(content);
-                    if (examData != null)
+                    if (examData != null!)
                     {
                         if (string.IsNullOrEmpty(id) || examData.Count <= 0)
                         {
@@ -272,39 +273,73 @@ public class ExamService(
         }
     }
 
-    private List<ExamInfo>? ParseNow(string html)
+    private List<ExamInfo> ParseNow(string html)
     {
-        var doc = new HtmlDocument();
-        doc.LoadHtml(html);
-
-        var examList = new List<ExamInfo>();
-
-        // 教务系统页面可能有 tbody，也可能直接把 tr 挂在 table 下
-        var rows = doc.DocumentNode.SelectNodes("//table[@id='exams']//tr");
-
-        if (rows != null!)
+        var result = new List<ExamInfo>();
+        try
         {
-            foreach (var cells in rows.Select(row => row.SelectNodes("td")))
-            {
-                // 跳过表头和异常行，当前接口实际只依赖前 4 列
-                if (cells is not { Count: >= 4 }) continue;
+            // 1. 使用正则表达式从内嵌的 <script> 中提取出 studentExamList 的 JSON 字符串
+            const string pattern = @"var studentExamList = (\[.*?\]);";
+            var match = Regex.Match(html, pattern, RegexOptions.Singleline);
 
-                var exam = new ExamInfo
+            if (!match.Success)
+            {
+                Console.WriteLine("未在网页脚本中找到座位数据矩阵！");
+                return result;
+            }
+
+            var jsonRaw = match.Groups[1].Value;
+            // 将强智系统中的单引号替换为标准 JSON 的双引号
+            jsonRaw = jsonRaw.Replace("'", "\"");
+
+            // 2. 反序列化为 C# 对象列表
+            var examList = JsonConvert.DeserializeObject<List<StudentExam>>(jsonRaw) ?? [];
+
+            // 3. 使用 HtmlAgilityPack 解析 HTML 表格，获取课程和时间等基础文本
+            var htmlDoc = new HtmlDocument();
+            htmlDoc.LoadHtml(html);
+
+            // 定位到表格的行
+            var rows = htmlDoc.DocumentNode.SelectNodes("//table[@id='exams']/tbody/tr");
+            if (rows == null!) return [];
+
+            foreach (var row in rows)
+            {
+                var tds = row.SelectNodes("td");
+                if (tds == null! || tds.Count < 4) continue;
+
+                var courseName = tds[0].InnerText.Trim();
+                var time = tds[1].InnerText.Trim();
+                var examPlace = tds[2].InnerText.Trim();
+
+                // 获取对应的座位 <td> 的 id（形如 seat-2666478）
+                var seatTdId = tds[3].GetAttributeValue("id", "");
+                var examId = long.Parse(seatTdId.Replace("seat-", ""));
+
+                // 从 JSON 列表中匹配出这场考试的详细座位图
+                var examData = examList.FirstOrDefault(e => e.Id == examId);
+
+                if (examData != null)
                 {
-                    Name = cells[0].InnerText.Trim(),
-                    Time = cells[1].InnerText.Trim(),
-                    Location = cells[2].InnerText.Trim(),
-                    Seat = cells[3].InnerText.Trim(),
-                };
-                examList.Add(exam);
+                    // 计算行列坐标（例如 A9）
+                    // var alphabetCoordinate = CalculateSeatCoordinate(examData.SeatMap.Map, examData.SeatNo);
+
+                    result.Add(new ExamInfo()
+                    {
+                        Name = courseName.Split('\n')[0].Trim(),
+                        Location = examPlace,
+                        Time = time,
+                        Seat = examData.SeatNo.ToString()
+                    });
+                }
             }
         }
-        else
+        catch (Exception ex)
         {
-            Console.WriteLine("⚠️ 提示：未在 <tbody> 中找到任何考试数据行（当前表格为空）。");
+            Console.WriteLine("解析发生错误: " + ex.Message);
         }
 
-        return examList;
+        return result;
     }
 
     private static ExamRecord ExamInfoToRecord(string studentId, ExamInfo info)
@@ -439,4 +474,85 @@ public static class SemesterModelStatic
             Text = text
         };
     }
+
+    /// <summary>
+    /// 核心算法：还原 JS 双重循环，根据座位矩阵和座位号计算出类似 "A9" 的排座坐标
+    /// </summary>
+    private static string CalculateSeatCoordinate(string mapStr, int targetSeatNo)
+    {
+        // 按行切割 (\r\n 或 \n)
+        var rows = mapStr.Split(["\r\n", "\n"], StringSplitOptions.RemoveEmptyEntries);
+
+        for (var rowIndex = 0; rowIndex < rows.Length; rowIndex++)
+        {
+            // 按逗号切割列
+            var columns = rows[rowIndex].Split(',');
+
+            for (var colIndex = 0; colIndex < columns.Length; colIndex++)
+            {
+                var seatValue = columns[colIndex].Trim();
+                if (string.IsNullOrEmpty(seatValue)) continue;
+
+                // 找到了该同学的座位号
+                if (!int.TryParse(seatValue, out var currentSeatNo) || currentSeatNo != targetSeatNo) continue;
+                // 列索引转字母 (colIndex + 1)
+                var alphabet = NumToString(colIndex + 1);
+                // 行索引转数字 (rowIndex + 1)
+                var alphabetNo = rowIndex + 1;
+
+                return $"{alphabet}{alphabetNo}"; // 拼接成 A9, B16 等
+            }
+        }
+
+        return "未找到坐标";
+    }
+
+    /// <summary>
+    /// 递归函数：将数字列号转换为 Excel 风格的字母（1->A, 26->Z, 27->AA）
+    /// </summary>
+    private static string NumToString(int numM)
+    {
+        var stringArray = new List<char>();
+
+        NumToStringAction(numM);
+        stringArray.Reverse(); // 翻转
+        return new string(stringArray.ToArray());
+
+        void NumToStringAction(int nNum)
+        {
+            while (true)
+            {
+                var num = nNum - 1;
+                var a = num / 26; // 商
+                var b = num % 26; // 余数
+
+                stringArray.Add((char)(64 + (b + 1)));
+                if (a > 0)
+                {
+                    nNum = a;
+                    continue;
+                }
+
+                break;
+            }
+        }
+    }
+}
+
+[Serializable]
+public class SeatMapInfo
+{
+    public int Columns { get; set; }
+    public int Rows { get; set; }
+    public string Map { get; set; } = "";
+}
+
+[Serializable]
+public class StudentExam
+{
+    public long StudentId { get; set; }
+    public int BizTypeId { get; set; }
+    public long Id { get; set; }
+    public int SeatNo { get; set; }
+    public SeatMapInfo SeatMap { get; set; } = new();
 }
