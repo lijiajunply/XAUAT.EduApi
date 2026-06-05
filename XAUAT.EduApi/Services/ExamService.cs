@@ -309,7 +309,7 @@ public class ExamService(
                 if (tds == null! || tds.Count < 4) continue;
 
                 var courseName = tds[0].InnerText.Trim();
-                var time = tds[1].InnerText.Trim();
+                var time = tds[1].InnerText.Trim().Replace('~', '-');
                 var examPlace = tds[2].InnerText.Trim();
 
                 // 获取对应的座位 <td> 的 id（形如 seat-2666478）
