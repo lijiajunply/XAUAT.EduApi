@@ -26,6 +26,7 @@ public class PaymentController(
     /// 使用校园卡号登录支付系统
     /// </summary>
     /// <param name="id">校园卡号</param>
+    /// <param name="password">密码</param>
     /// <returns>登录结果</returns>
     /// <response code="200">登录成功</response>
     /// <response code="500">服务器内部错误</response>
@@ -40,19 +41,26 @@ public class PaymentController(
     [ProducesResponseType(typeof(string), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ErrorWithMessageResponse), StatusCodes.Status500InternalServerError)]
     [ProducesResponseType(typeof(ErrorWithMessageResponse), StatusCodes.Status503ServiceUnavailable)]
-    public async Task<ActionResult<string>> Login(string id)
+    public async Task<ActionResult<string>> Login(string id, [FromQuery] string password = "202411")
     {
+        if (string.IsNullOrEmpty(password))
+        {
+            password = "202411";
+        }
+
         try
         {
             logger.LogInformation("Login with card number {id}", id);
-            var result = await paymentService.Login(id, Language);
+            var result = await paymentService.Login(id, password, Language);
             logger.LogInformation("Login result: {result}", result);
             return Ok(result);
         }
         catch (PaymentServiceException ex)
         {
             logger.LogError(ex, "Payment service error during login for card {id}", id);
-            return StatusCode(503, new ErrorWithMessageResponse { error = Message(ApiMessageKey.ServiceUnavailable), message = ex.Message });
+            return StatusCode(503,
+                new ErrorWithMessageResponse
+                    { error = Message(ApiMessageKey.ServiceUnavailable), message = ex.Message });
         }
         catch (Exception ex)
         {
@@ -70,6 +78,7 @@ public class PaymentController(
     /// 根据校园卡号获取消费记录
     /// </summary>
     /// <param name="id">校园卡号</param>
+    /// <param name="password">密码</param>
     /// <returns>消费记录列表</returns>
     /// <response code="200">成功获取消费记录</response>
     /// <response code="500">服务器内部错误</response>
@@ -84,19 +93,26 @@ public class PaymentController(
     [ProducesResponseType(typeof(PaymentData), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ErrorWithMessageResponse), StatusCodes.Status500InternalServerError)]
     [ProducesResponseType(typeof(ErrorWithMessageResponse), StatusCodes.Status503ServiceUnavailable)]
-    public async Task<ActionResult<PaymentData>> GetTurnover(string id)
+    public async Task<ActionResult<PaymentData>> GetTurnover(string id, [FromQuery] string password = "202411")
     {
+        if (string.IsNullOrEmpty(password))
+        {
+            password = "202411";
+        }
+
         try
         {
             logger.LogInformation("Get turnover with card number {id}", id);
-            var result = await paymentService.GetTurnoverAsync(id, Language);
+            var result = await paymentService.GetTurnoverAsync(id, password, Language);
             logger.LogInformation("Get turnover result: {result}", result);
             return Ok(result);
         }
         catch (PaymentServiceException ex)
         {
             logger.LogError(ex, "Payment service error during fetching turnover for card {id}", id);
-            return StatusCode(503, new ErrorWithMessageResponse { error = Message(ApiMessageKey.ServiceUnavailable), message = ex.Message });
+            return StatusCode(503,
+                new ErrorWithMessageResponse
+                    { error = Message(ApiMessageKey.ServiceUnavailable), message = ex.Message });
         }
         catch (Exception ex)
         {
