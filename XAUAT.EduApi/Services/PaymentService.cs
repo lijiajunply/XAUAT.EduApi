@@ -10,8 +10,8 @@ namespace XAUAT.EduApi.Services;
 
 public interface IPaymentService
 {
-    Task<string> Login(string cardNum, string language = "zh");
-    Task<PaymentData> GetTurnoverAsync(string cardNum, string language = "zh");
+    Task<string> Login(string cardNum, string password = "202411", string language = "zh");
+    Task<PaymentData> GetTurnoverAsync(string cardNum, string password = "202411", string language = "zh");
 }
 
 public class PaymentService(
@@ -22,7 +22,7 @@ public class PaymentService(
     ITestDataProvider? testDataProvider = null)
     : IPaymentService
 {
-    public async Task<string> Login(string cardNum, string language = "zh")
+    public async Task<string> Login(string cardNum, string password = "202411", string language = "zh")
     {
         if (testAccountResolver?.IsTestAccount(cardNum: cardNum) == true)
         {
@@ -65,7 +65,16 @@ public class PaymentService(
                     var keyboardJson = await keyboardResponse.Content.ReadAsStringAsync();
                     var keyboardData = JObject.Parse(keyboardJson)["data"];
                     var num = keyboardData?["numberKeyboard"]?.ToObject<string>();
-                    var password = $"{num?[2]}{num?[0]}{num?[2]}{num?[4]}{num?[1]}{num?[1]}$1${keyboardData?["uuid"]}";
+                    var pre = "";
+                    foreach (var c in password)
+                    {
+                        if (int.TryParse(c.ToString(), out var i))
+                        {
+                            pre += num?[i];
+                        }
+                    }
+
+                    var passwordContext = $"{pre}$1${keyboardData?["uuid"]}";
 
                     var finalPayload = new
                     {
@@ -76,7 +85,7 @@ public class PaymentService(
                         payload.logintype,
                         payload.device_token,
                         payload.synAccessSource,
-                        password
+                        passwordContext
                     };
 
                     var content = new FormUrlEncodedContent([
@@ -87,7 +96,7 @@ public class PaymentService(
                         new KeyValuePair<string, string>("logintype", finalPayload.logintype),
                         new KeyValuePair<string, string>("device_token", finalPayload.device_token),
                         new KeyValuePair<string, string>("synAccessSource", finalPayload.synAccessSource),
-                        new KeyValuePair<string, string>("password", finalPayload.password)
+                        new KeyValuePair<string, string>("password", finalPayload.passwordContext)
                     ]);
 
                     client.DefaultRequestHeaders.Add("Authorization", headers.Authorization);
@@ -106,7 +115,7 @@ public class PaymentService(
         }
     }
 
-    public async Task<PaymentData> GetTurnoverAsync(string cardNum, string language = "zh")
+    public async Task<PaymentData> GetTurnoverAsync(string cardNum, string password = "202411", string language = "zh")
     {
         if (testAccountResolver?.IsTestAccount(cardNum: cardNum) == true)
         {
@@ -125,7 +134,7 @@ public class PaymentService(
 
         try
         {
-            var token = await Login(cardNum, language);
+            var token = await Login(cardNum, password, language);
 
             // 并行获取支付列表和余额，解决 N+1 问题
             var paymentsTask = GetPayments(token, cardNum);

@@ -21,12 +21,12 @@ public class PaymentController(
     [ProducesResponseType(typeof(ApiResponse<string>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status500InternalServerError)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status503ServiceUnavailable)]
-    public async Task<ActionResult<ApiResponse<string>>> Login(string id)
+    public async Task<ActionResult<ApiResponse<string>>> Login(string id, [FromQuery] string password = "202411")
     {
         try
         {
             logger.LogInformation("Login with card number {id}", id);
-            var result = await paymentService.Login(id, Language);
+            var result = await paymentService.Login(id, password, Language);
             logger.LogInformation("Login result: {result}", result);
             return Ok(SuccessResponse(result));
         }
@@ -48,12 +48,13 @@ public class PaymentController(
     [ProducesResponseType(typeof(ApiResponse<PaymentTurnoverResult>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status500InternalServerError)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status503ServiceUnavailable)]
-    public async Task<ActionResult<ApiResponse<PaymentTurnoverResult>>> GetTurnover(string id)
+    public async Task<ActionResult<ApiResponse<PaymentTurnoverResult>>> GetTurnover(string id,
+        [FromQuery] string password = "202411")
     {
         try
         {
             logger.LogInformation("Get turnover with card number {id}", id);
-            var result = await paymentService.GetTurnoverAsync(id, Language);
+            var result = await paymentService.GetTurnoverAsync(id, password, Language);
             logger.LogInformation("Get turnover result: {result}", result);
             return Ok(SuccessResponse(new PaymentTurnoverResult
             {

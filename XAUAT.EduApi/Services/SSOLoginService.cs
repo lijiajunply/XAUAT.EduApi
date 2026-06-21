@@ -54,7 +54,7 @@ public class SSOLoginService(
             var studentId = await cookieCode.GetCode(cookies);
             if (string.IsNullOrEmpty(studentId) || studentId == "/student/login")
             {
-                logger.LogWarning("用户 {Username} 登录失败，Cookie 解析失败", username);
+                logger.LogWarning("用户 {Username} 登录失败，用户 Id {StudentId}", username, studentId);
                 throw new LoginFailedException();
             }
 
