@@ -32,7 +32,9 @@ public class SSOLoginService(
             using var httpClient = httpClientFactory.CreateClient();
             httpClient.Timeout = TimeSpan.FromSeconds(15); // 5秒超时
 
-            var response = await httpClient.GetAsync($"https://schedule.xauat.site/login/{username}/{password}");
+            var encodedUsername = Uri.EscapeDataString(username);
+            var encodedPassword = Uri.EscapeDataString(password);
+            var response = await httpClient.GetAsync($"https://schedule.xauat.site/login/{encodedUsername}/{encodedPassword}");
             var content = await response.Content.ReadAsStringAsync();
 
             // 检查响应状态
